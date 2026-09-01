@@ -107,3 +107,8 @@ This bumps `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml`, bui
 - Canvas tokens, Google OAuth state, transcription API keys and any GitHub token are stored in the macOS Keychain.
 - Each Antigravity job runs sandboxed in a fresh private temp folder that contains only the audio or transcript and Lectern's skill file, and is deleted afterwards.
 - This repository does not contain credentials. Do not commit `.env` files or tokens.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
