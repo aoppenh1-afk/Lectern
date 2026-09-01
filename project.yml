@@ -1,0 +1,116 @@
+name: Lectern
+options:
+  bundleIdPrefix: com.lectern
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  defaultSettings: recommended
+packages:
+  ParakeetTDT:
+    path: Vendor/ParakeetTDT
+  AppAuth:
+    url: https://github.com/openid/AppAuth-iOS.git
+    from: "1.7.6"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    # Single source of truth for the app version. scripts/release.sh bumps
+    # these, tags the commit, and publishes the matching GitHub release.
+    MARKETING_VERSION: "1.1.1"
+    CURRENT_PROJECT_VERSION: "4"
+targets:
+  Lectern:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/Lectern
+      - path: Resources
+        buildPhase: resources
+      # Agent skills ship inside the bundle as folder references so
+      # LecternAgentSkill.bundledURL finds Resources/<skill>/SKILL.md.
+      - path: .agents/skills/lectern-transcription
+        type: folder
+        buildPhase: resources
+      - path: .agents/skills/lectern-notes
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: ParakeetTDT
+        product: ParakeetTDT
+      - package: AppAuth
+        product: AppAuth
+    settings:
+      base:
+        PRODUCT_NAME: Lectern
+        COMBINE_HIDPI_IMAGES: YES
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        Debug:
+          ENABLE_TESTABILITY: YES
+          SWIFT_OPTIMIZATION_LEVEL: -Onone
+    info:
+      path: Support/Info.plist
+      properties:
+        CFBundleDisplayName: Lectern
+        CFBundleName: Lectern
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # GitHub "owner/repo" the in-app updater polls for releases.
+        LecternUpdateRepository: aoppenh1-afk/Lectern
+        LSApplicationCategoryType: public.app-category.productivity
+        NSMicrophoneUsageDescription: Lectern records your microphone during lectures so they can be transcribed and studied on this Mac.
+        NSHumanReadableCopyright: ""
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.lectern.bundle
+            UTTypeDescription: Lectern Lecture Bundle
+            UTTypeConformsTo:
+              - com.apple.package
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - lectern
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Lectern Lecture Bundle
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Owner
+            LSItemContentTypes:
+              - com.lectern.bundle
+  LecternTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/LecternTests
+      - Sources/Lectern/Domain/Enums.swift
+      - Sources/Lectern/Generation/AgentProfile.swift
+      - Sources/Lectern/Generation/AgentDetector.swift
+      - Sources/Lectern/Generation/AntigravityCLI.swift
+      - Sources/Lectern/Updates/AppUpdater.swift
+      - Sources/Lectern/Generation/NotesMarkdown.swift
+      - Sources/Lectern/Generation/Prompts.swift
+      - Sources/Lectern/GoogleDocs/NotesMarkdownConverter.swift
+      - Sources/Lectern/Canvas/CanvasHTMLTextCache.swift
+      - Sources/Lectern/Transcription/TranscriptionProviders.swift
+      - Sources/Lectern/Transcription/ExternalTranscriptionEngine.swift
+      - Sources/Lectern/Canvas/CanvasClient.swift
+      - Sources/Lectern/Canvas/CanvasConnectionSettings.swift
+      - Sources/Lectern/ImportExport/LecternBundleOptions.swift
+      - Sources/Lectern/ImportExport/LectureExportAvailability.swift
+    settings:
+      base:
+        PRODUCT_NAME: LecternTests
+        GENERATE_INFOPLIST_FILE: YES
+      configs:
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: -Onone
+schemes:
+  Lectern:
+    build:
+      targets:
+        Lectern: all
+        LecternTests: [test]
+    test:
+      targets:
+        - LecternTests

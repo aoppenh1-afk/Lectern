@@ -1,0 +1,3 @@
+# ACP agents for all study-material generation
+
+Transcript cleanup, Notes, Flashcards, and Quiz generation need an LLM. Instead of hand-rolling per-provider HTTP APIs, every generation call goes through the Agent Client Protocol to a local agent process: opencode is a first-class option (any provider it is logged into), and ChatGPT connects through its best available agent path so subscription auth and image generation work without API keys. Considered alternatives: direct ChatGPT OAuth in-app (single provider, custom auth code) and BYOK REST APIs (rejected by owner). Consequences: generation depends on external CLIs being installed and signed in; AI raster images are only available on the ChatGPT-backed path, with Mermaid/SVG diagrams as the universal fallback.
