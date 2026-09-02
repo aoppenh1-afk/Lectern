@@ -17,8 +17,8 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     # Single source of truth for the app version. scripts/release.sh bumps
     # these, tags the commit, and publishes the matching GitHub release.
-    MARKETING_VERSION: "1.1.1"
-    CURRENT_PROJECT_VERSION: "4"
+    MARKETING_VERSION: "1.2.0"
+    CURRENT_PROJECT_VERSION: "5"
 targets:
   Lectern:
     type: application

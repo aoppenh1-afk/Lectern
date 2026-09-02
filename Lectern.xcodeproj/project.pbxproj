@@ -742,9 +742,9 @@
 		61595058FE4F5DCCDB067FEA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.1.1;
+				MARKETING_VERSION = 1.2.0;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
 			};
@@ -753,9 +753,9 @@
 		74B33E8C5EAEB4F26AB81C33 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.1.1;
+				MARKETING_VERSION = 1.2.0;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
 			};
