@@ -14,6 +14,7 @@ struct LectureDetailView: View {
     let onAttachFiles: () -> Void
 
     @State private var selectedTab: Tab = .rawTranscript
+    @State private var antigravityCatalog = AgentModelCatalog.empty
 
     enum Tab: Hashable {
         case rawTranscript, cleanedTranscript, notes, flashcards, quiz, bookmarks, attachments
@@ -35,6 +36,9 @@ struct LectureDetailView: View {
         }
         .task {
             _ = transcription.recoverCompletedLocalCheckpointIfPossible(lecture)
+            if let profile = AgentProfiles.profile(id: AgentProfiles.antigravityID) {
+                antigravityCatalog = await AgentModelCatalogLoader.load(for: profile)
+            }
         }
     }
 
@@ -211,7 +215,7 @@ struct LectureDetailView: View {
     private func transcriptionChoiceMenu(label: String) -> some View {
         Menu(label) {
             Section("Models available on this Mac") {
-                ForEach(BuiltInTranscriptionModel.allCases) { model in
+                ForEach(BuiltInTranscriptionModel.allCases.filter { !$0.usesAntigravity }) { model in
                     Button {
                         transcription.retranscribe(
                             lecture,
@@ -220,10 +224,21 @@ struct LectureDetailView: View {
                             builtInModelID: model.id
                         )
                     } label: {
-                        Label(
-                            model.title,
-                            systemImage: model.usesAntigravity ? "sparkles" : "macbook"
-                        )
+                        Label(model.title, systemImage: "macbook")
+                    }
+                }
+                Menu("Antigravity CLI") {
+                    ForEach(antigravityMenuModels) { model in
+                        Button {
+                            transcription.retranscribe(
+                                lecture,
+                                as: lecture.language,
+                                source: .local,
+                                builtInModelID: model.id
+                            )
+                        } label: {
+                            Label(model.name, systemImage: "sparkles")
+                        }
                     }
                 }
             }
@@ -246,6 +261,22 @@ struct LectureDetailView: View {
             }
         }
         .controlSize(.small)
+    }
+
+    private var antigravityMenuModels: [AgentModel] {
+        if antigravityCatalog.models.isEmpty {
+            return [
+                AgentModel(
+                    id: AntigravityCLI.modelID,
+                    name: AntigravityCLI.displayName,
+                    provider: "Google",
+                    isDefault: true,
+                    supportedThinkingLevels: AntigravityCLI.thinkingLevels,
+                    defaultThinkingLevel: .high
+                )
+            ]
+        }
+        return antigravityCatalog.models
     }
 
     // MARK: - Tab bar (underline style)

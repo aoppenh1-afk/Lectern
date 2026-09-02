@@ -9,6 +9,14 @@ guard ThinkingLevel.chatOptions(
 }
 
 guard ThinkingLevel.chatOptions(
+    profileID: "antigravity",
+    advertised: []
+) == [.low, .medium, .high] else {
+    fputs("FAIL: Antigravity hid Gemini thinking levels without per-model metadata\n", stderr)
+    exit(1)
+}
+
+guard ThinkingLevel.chatOptions(
     profileID: "codex",
     advertised: []
 ).isEmpty else {

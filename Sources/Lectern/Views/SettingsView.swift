@@ -724,7 +724,7 @@ private struct AgentsPane: View {
             SettingsCard {
                 agentField(
                     title: "Antigravity CLI",
-                    caption: "Uses the signed-in agy CLI with Gemini 3.7 Flash High in private temporary workspaces.",
+                    caption: "Uses the signed-in agy CLI with Gemini 3.8 Flash High in private temporary workspaces.",
                     text: $antigravityCommand
                 )
                 agentField(

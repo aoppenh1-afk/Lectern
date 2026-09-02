@@ -237,7 +237,7 @@ enum AgentModelCatalogLoader {
             name: AntigravityCLI.displayName,
             provider: "Google",
             isDefault: true,
-            supportedThinkingLevels: [.high],
+            supportedThinkingLevels: AntigravityCLI.thinkingLevels,
             defaultThinkingLevel: .high
         )
         guard let executable = AgentProfiles.resolveExecutable(profile.executablePath),
@@ -259,13 +259,14 @@ enum AgentModelCatalogLoader {
               ? AntigravityCLI.modelID
               : available[0].id)
         let models = available.map { listing in
-            AgentModel(
+            let thinkingVariant = AntigravityCLI.isThinkingVariant(listing.id)
+            return AgentModel(
                 id: listing.id,
                 name: listing.name,
                 provider: antigravityProviderName(for: listing.id),
                 isDefault: listing.id == preferredID,
-                supportedThinkingLevels: [],
-                defaultThinkingLevel: nil
+                supportedThinkingLevels: thinkingVariant ? AntigravityCLI.thinkingLevels : [],
+                defaultThinkingLevel: thinkingVariant ? AntigravityCLI.thinkingLevel(fromModelID: listing.id) : nil
             )
         }
         return .init(models: models, currentID: preferredID)

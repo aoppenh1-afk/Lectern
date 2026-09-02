@@ -10,7 +10,7 @@ Create the faithful text record that later notes and study materials will use. F
 ## Select the mode
 
 - **Audio transcription:** listen to the complete referenced audio and transcribe it. When the request supplies a JSON schema, return one object that matches it exactly.
-- **Transcript cleanup:** repair the supplied speech-recognition text without changing its substance. Return only the cleaned Markdown transcript.
+- **Transcript cleanup:** repair the supplied speech-recognition text without changing its substance, then rewrite it as continuous prose paragraphs. Return only the cleaned Markdown transcript.
 
 Do not combine transcription with note-taking. Never summarize, outline, explain, translate, add a title, infer a source, or add a fact that was not spoken.
 
@@ -31,7 +31,7 @@ Do not combine transcription with note-taking. Never summarize, outline, explain
 ## English lecture branch
 
 - Write in English and preserve isolated foreign terms, technical vocabulary, names, formulas, and quotations accurately.
-- Do not make spoken student language sound like an essay. Correct recognition errors and punctuation without polishing away the speaker's voice.
+- Do not make spoken student language sound like an essay. Correct recognition errors and punctuation without polishing away the speaker's voice. In cleanup mode, paragraphing is a layout change only.
 
 ## English-Hebrew shiur branch
 
@@ -80,9 +80,11 @@ When the recognizer produced gibberish at a language boundary, use the audio fir
 
 ## Transcript cleanup output
 
-- Keep every existing `[mm:ss]` timestamp marker exactly where it appears.
+- Strip timestamp markers (`[mm:ss]`, `[hh:mm:ss]`, and similar) and do not keep a timed or line-by-line transcript layout.
 - Reconstruct garbled or cut-off wording only when context makes the intended wording reasonably clear.
-- Break long text into readable paragraphs at speaker or topic shifts without reordering it.
+- Write continuous prose paragraphs so the result reads as one article of what was spoken. Break paragraphs at speaker turns, topic shifts, and natural rhetorical units — not at pauses, recognizer line breaks, or former timestamp boundaries.
+- Do not add a title, headings, a summary, or an outline. This is still a transcript of the lecture, not notes.
+- Keep speaker labels only when the source has distinct speakers and they remain useful as a short prefix on the paragraph they spoke (`Student:` / `Professor:`). Do not keep one line per utterance.
 - Return only the cleaned Markdown transcript. Do not add a preamble or closing comment.
 
 ## Completion check

@@ -51,6 +51,7 @@ struct LectureChatView: View {
         }
         .onChange(of: effectiveModelID) { _, _ in normalizeThinkingLevel() }
         .onChange(of: profileID) { _, _ in normalizeThinkingLevel() }
+        .onChange(of: thinkingLevelRaw) { _, _ in applyThinkingToSelectedModel() }
         .alert("Could not attach file", isPresented: Binding(
             get: { attachmentError != nil },
             set: { if !$0 { attachmentError = nil } }
@@ -704,9 +705,26 @@ struct LectureChatView: View {
     }
 
     private func normalizeThinkingLevel() {
+        if let modelID = effectiveModelID, AntigravityCLI.isThinkingVariant(modelID) {
+            let next = AntigravityCLI.thinkingLevel(fromModelID: modelID).rawValue
+            if thinkingLevelRaw != next {
+                thinkingLevelRaw = next
+            }
+            return
+        }
         let levels = availableThinkingLevels
         guard !levels.isEmpty, !levels.contains(thinkingLevel) else { return }
         thinkingLevelRaw = (selectedModel?.defaultThinkingLevel ?? levels[0]).rawValue
+    }
+
+    private func applyThinkingToSelectedModel() {
+        guard selectedProfile?.id == AgentProfiles.antigravityID,
+              let current = effectiveModelID else { return }
+        let catalogIDs = modelCatalogs[AgentProfiles.antigravityID]?.models.map(\.id) ?? []
+        let next = AntigravityCLI.applyThinking(thinkingLevel, to: current, availableIDs: catalogIDs)
+        guard next != current else { return }
+        modelOverride = next
+        AgentProfiles.setModel(next, for: AgentProfiles.antigravityID)
     }
 
     private func loadModelCatalogs() async {

@@ -7,6 +7,8 @@ struct TranscriptionSettingsPane: View {
     @State private var showingNewConnection = false
     @State private var testingID: UUID?
     @State private var testMessages: [UUID: String] = [:]
+    @State private var antigravityCatalog = AgentModelCatalog.empty
+    @State private var antigravityCatalogLoading = false
 
     var body: some View {
         @Bindable var preferences = preferences
@@ -23,6 +25,9 @@ struct TranscriptionSettingsPane: View {
         .sheet(item: $editingConnection) { connection in
             TranscriptionConnectionEditor(connection: connection)
                 .environment(preferences)
+        }
+        .task {
+            await loadAntigravityCatalog()
         }
     }
 
@@ -48,8 +53,8 @@ struct TranscriptionSettingsPane: View {
                         .font(.system(size: 12, weight: .medium))
                     Spacer()
                     Picker("", selection: Binding(
-                        get: { preferences.builtInModelID ?? "" },
-                        set: { preferences.builtInModelID = $0.isEmpty ? nil : $0 }
+                        get: { builtInFamilyID(preferences.builtInModelID) },
+                        set: { selectBuiltInFamily($0, preferences: preferences) }
                     )) {
                         Text("Automatic by lecture language").tag("")
                         ForEach(BuiltInTranscriptionModel.allCases) { model in
@@ -60,9 +65,62 @@ struct TranscriptionSettingsPane: View {
                     .frame(width: 280)
                 }
 
-                if let modelID = preferences.builtInModelID,
-                   let model = BuiltInTranscriptionModel(rawValue: modelID) {
-                    Text(model.subtitle)
+                if builtInFamilyID(preferences.builtInModelID) == BuiltInTranscriptionModel.antigravity.id {
+                    HStack(spacing: 12) {
+                        Text("Gemini model")
+                            .font(.system(size: 12, weight: .medium))
+                        Spacer()
+                        if antigravityCatalogLoading && antigravityCatalog.models.isEmpty {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Picker("", selection: Binding(
+                                get: {
+                                    BuiltInTranscriptionModel.resolvedAntigravityModelID(preferences.builtInModelID)
+                                },
+                                set: { preferences.builtInModelID = $0 }
+                            )) {
+                                ForEach(antigravityPickerModels) { model in
+                                    Text(model.name).tag(model.id)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 280)
+                        }
+                    }
+
+                    HStack(spacing: 12) {
+                        Text("Thinking")
+                            .font(.system(size: 12, weight: .medium))
+                        Spacer()
+                        Picker("", selection: Binding(
+                            get: {
+                                AntigravityCLI.thinkingLevel(
+                                    fromModelID: BuiltInTranscriptionModel.resolvedAntigravityModelID(preferences.builtInModelID)
+                                ).rawValue
+                            },
+                            set: { raw in
+                                let level = ThinkingLevel(rawValue: raw) ?? .high
+                                let current = BuiltInTranscriptionModel.resolvedAntigravityModelID(preferences.builtInModelID)
+                                preferences.builtInModelID = AntigravityCLI.applyThinking(
+                                    level,
+                                    to: current,
+                                    availableIDs: antigravityCatalog.models.map(\.id)
+                                )
+                            }
+                        )) {
+                            ForEach(AntigravityCLI.thinkingLevels) { level in
+                                Text(level.title).tag(level.rawValue)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 140)
+                    }
+                }
+
+                if let modelID = preferences.builtInModelID {
+                    let model = BuiltInTranscriptionModel.resolve(modelID, language: .english)
+                    Text(antigravitySubtitle(for: model, storedID: modelID))
                         .font(.system(size: 10.5))
                         .foregroundStyle(.secondary)
                 }
@@ -89,6 +147,75 @@ struct TranscriptionSettingsPane: View {
         }
         .padding(16)
         .transcriptionSettingsCard()
+    }
+
+    private var antigravityPickerModels: [AgentModel] {
+        var models = antigravityCatalog.models
+        if models.isEmpty {
+            models = [
+                AgentModel(
+                    id: AntigravityCLI.modelID,
+                    name: AntigravityCLI.displayName,
+                    provider: "Google",
+                    isDefault: true,
+                    supportedThinkingLevels: AntigravityCLI.thinkingLevels,
+                    defaultThinkingLevel: .high
+                )
+            ]
+        }
+        let selected = BuiltInTranscriptionModel.resolvedAntigravityModelID(preferences.builtInModelID)
+        if !models.contains(where: { $0.id == selected }) {
+            models.insert(
+                AgentModel(
+                    id: selected,
+                    name: selected,
+                    provider: "Google",
+                    isDefault: false,
+                    supportedThinkingLevels: AntigravityCLI.isThinkingVariant(selected) ? AntigravityCLI.thinkingLevels : [],
+                    defaultThinkingLevel: AntigravityCLI.isThinkingVariant(selected)
+                        ? AntigravityCLI.thinkingLevel(fromModelID: selected)
+                        : nil
+                ),
+                at: 0
+            )
+        }
+        return models
+    }
+
+    private func builtInFamilyID(_ stored: String?) -> String {
+        guard let stored, !stored.isEmpty else { return "" }
+        return BuiltInTranscriptionModel.resolve(stored, language: .english).id
+    }
+
+    private func selectBuiltInFamily(_ familyID: String, preferences: TranscriptionPreferences) {
+        if familyID.isEmpty {
+            preferences.builtInModelID = nil
+        } else if familyID == BuiltInTranscriptionModel.antigravity.id {
+            preferences.builtInModelID = BuiltInTranscriptionModel.resolvedAntigravityModelID(
+                preferences.builtInModelID
+            )
+        } else {
+            preferences.builtInModelID = familyID
+        }
+    }
+
+    private func antigravitySubtitle(for model: BuiltInTranscriptionModel, storedID: String) -> String {
+        if model.usesAntigravity {
+            let resolved = BuiltInTranscriptionModel.resolvedAntigravityModelID(storedID)
+            if let named = antigravityCatalog.models.first(where: { $0.id == resolved }) {
+                return "\(named.name) · \(model.subtitle)"
+            }
+            return "\(resolved) · \(model.subtitle)"
+        }
+        return model.subtitle
+    }
+
+    private func loadAntigravityCatalog() async {
+        guard let profile = AgentProfiles.profile(id: AgentProfiles.antigravityID) else { return }
+        antigravityCatalogLoading = true
+        let loaded = await AgentModelCatalogLoader.load(for: profile)
+        antigravityCatalog = loaded
+        antigravityCatalogLoading = false
     }
 
     private var connectionsCard: some View {
@@ -336,6 +463,7 @@ private struct TranscriptionConnectionEditor: View {
     @State private var customModel = false
     @State private var errorMessage: String?
     @State private var showingDeleteConfirmation = false
+    @State private var antigravityCatalog = AgentModelCatalog.empty
 
     init(connection: TranscriptionConnection?) {
         let provider = connection?.provider ?? .deepgram
@@ -413,6 +541,9 @@ private struct TranscriptionConnectionEditor: View {
         }
         .frame(width: 560, height: 650)
         .background(LecternTheme.paper)
+        .task {
+            await loadAntigravityModels()
+        }
         .confirmationDialog("Remove this connection?", isPresented: $showingDeleteConfirmation) {
             Button(draft.provider.requiresAPIKey ? "Remove connection and Keychain key" : "Remove connection", role: .destructive) { remove() }
         }
@@ -431,12 +562,18 @@ private struct TranscriptionConnectionEditor: View {
                     }
                 }
                 .onChange(of: draft.provider) { _, provider in
+                    if provider == .antigravityCLI {
+                        draft.costTier = .included
+                        if let preferred = antigravityCatalog.models.first(where: \.isDefault)
+                            ?? antigravityCatalog.models.first {
+                            draft.modelID = preferred.id
+                            customModel = false
+                            return
+                        }
+                    }
                     if let model = TranscriptionProviderCatalog.provider(provider)?.models.first {
                         draft.modelID = model.id
                         customModel = false
-                    }
-                    if provider == .antigravityCLI {
-                        draft.costTier = .included
                     }
                 }
 
@@ -445,16 +582,33 @@ private struct TranscriptionConnectionEditor: View {
                         .textFieldStyle(.roundedBorder)
                 } else {
                     Picker("Model", selection: $draft.modelID) {
-                        ForEach(providerDescriptor?.models ?? []) { model in
+                        ForEach(editorModels) { model in
                             Text(model.title).tag(model.id)
                         }
                     }
                 }
             }
 
-            if draft.provider != .antigravityCLI {
-                Toggle("Use a custom model ID", isOn: $customModel)
-                    .font(.system(size: 11))
+            Toggle("Use a custom model ID", isOn: $customModel)
+                .font(.system(size: 11))
+
+            if draft.provider == .antigravityCLI, AntigravityCLI.isThinkingVariant(draft.modelID) {
+                Picker("Thinking", selection: Binding(
+                    get: { AntigravityCLI.thinkingLevel(fromModelID: draft.modelID).rawValue },
+                    set: { raw in
+                        let level = ThinkingLevel(rawValue: raw) ?? .high
+                        draft.modelID = AntigravityCLI.applyThinking(
+                            level,
+                            to: draft.modelID,
+                            availableIDs: antigravityCatalog.models.map(\.id)
+                        )
+                    }
+                )) {
+                    ForEach(AntigravityCLI.thinkingLevels) { level in
+                        Text(level.title).tag(level.rawValue)
+                    }
+                }
+                .font(.system(size: 12))
             }
 
             if draft.provider.requiresAPIKey {
@@ -510,6 +664,33 @@ private struct TranscriptionConnectionEditor: View {
             Text("This transcription connection receives lecture audio only. Antigravity can be selected separately as a study-material or chat agent.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var editorModels: [TranscriptionModelDescriptor] {
+        if draft.provider == .antigravityCLI, !antigravityCatalog.models.isEmpty {
+            return antigravityCatalog.models.map { model in
+                .init(
+                    id: model.id,
+                    title: model.name,
+                    subtitle: model.id,
+                    capabilities: TranscriptionProviderCatalog.capabilities(
+                        provider: .antigravityCLI,
+                        modelID: AntigravityCLI.transcriptionModelID
+                    )
+                )
+            }
+        }
+        return providerDescriptor?.models ?? []
+    }
+
+    private func loadAntigravityModels() async {
+        guard let profile = AgentProfiles.profile(id: AgentProfiles.antigravityID) else { return }
+        antigravityCatalog = await AgentModelCatalogLoader.load(for: profile)
+        if draft.provider == .antigravityCLI,
+           !antigravityCatalog.models.contains(where: { $0.id == draft.modelID }),
+           let preferred = antigravityCatalog.models.first(where: \.isDefault) ?? antigravityCatalog.models.first {
+            draft.modelID = preferred.id
         }
     }
 

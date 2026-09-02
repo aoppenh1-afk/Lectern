@@ -139,12 +139,28 @@ final class TranscriptionProviderTests: XCTestCase {
             .antigravity
         )
         XCTAssertEqual(
+            BuiltInTranscriptionModel.resolve("gemini-3.8-flash-low", language: .hebrewEnglish),
+            .antigravity
+        )
+        XCTAssertEqual(
+            BuiltInTranscriptionModel.resolve("Gemini 3.8 Flash (Low)", language: .hebrewEnglish),
+            .antigravity
+        )
+        XCTAssertEqual(
             BuiltInTranscriptionModel.resolve("gemini-3.7-flash-low", language: .hebrewEnglish),
             .antigravity
         )
         XCTAssertEqual(
             BuiltInTranscriptionModel.resolve("Gemini 3.7 Flash (Low)", language: .hebrewEnglish),
             .antigravity
+        )
+        XCTAssertEqual(
+            BuiltInTranscriptionModel.resolvedAntigravityModelID("gemini-3.7-flash-high"),
+            AntigravityCLI.transcriptionModelID
+        )
+        XCTAssertEqual(
+            BuiltInTranscriptionModel.resolvedAntigravityModelID("gemini-3.8-flash-medium"),
+            "gemini-3.8-flash-medium"
         )
     }
 
@@ -407,7 +423,7 @@ final class TranscriptionProviderTests: XCTestCase {
     }
 
     private func normalizeGemini() throws -> TranscriptionResult {
-        try ProviderNormalization.gemini(data(#"{"candidates":[{"content":{"parts":[{"text":"{\"text\":\"Hello שלום\",\"detectedLanguages\":[\"en\",\"he\"],\"segments\":[{\"startMs\":0,\"endMs\":1000,\"text\":\"Hello שלום\"}]}"}]}}]}"#), request: request(provider: .googleGemini, model: "gemini-3.7-flash"))
+        try ProviderNormalization.gemini(data(#"{"candidates":[{"content":{"parts":[{"text":"{\"text\":\"Hello שלום\",\"detectedLanguages\":[\"en\",\"he\"],\"segments\":[{\"startMs\":0,\"endMs\":1000,\"text\":\"Hello שלום\"}]}"}]}}]}"#), request: request(provider: .googleGemini, model: "gemini-3.8-flash"))
     }
 
     private func normalizeAssemblyAI() throws -> TranscriptionResult {

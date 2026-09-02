@@ -99,7 +99,11 @@ enum ThinkingLevel: String, CaseIterable, Identifiable, Codable, Sendable {
 
     static func chatOptions(profileID: String?, advertised: [ThinkingLevel]) -> [ThinkingLevel] {
         if !advertised.isEmpty { return advertised }
-        return profileID == "opencode" ? generationDefaults : []
+        switch profileID {
+        case "opencode": return generationDefaults
+        case "antigravity": return [.low, .medium, .high]
+        default: return []
+        }
     }
 }
 

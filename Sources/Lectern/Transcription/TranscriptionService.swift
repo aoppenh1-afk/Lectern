@@ -193,7 +193,11 @@ final class TranscriptionService {
         case .local(.antigravity):
             lecture.transcriptProviderRaw = TranscriptionProviderID.antigravityCLI.rawValue
             lecture.transcriptConnectionName = "Antigravity CLI"
-            lecture.transcriptModelID = BuiltInTranscriptionModel.antigravity.id
+            lecture.transcriptModelID = BuiltInTranscriptionModel.resolvedAntigravityModelID(
+                lecture.transcriptionSourceOverride == .local
+                    ? lecture.transcriptModelID
+                    : preferences.builtInModelID
+            )
             lecture.statusMessage = "Preparing Antigravity transcription"
         case .local(let model):
             lecture.transcriptProviderRaw = TranscriptionProviderID.local.rawValue
@@ -228,7 +232,13 @@ final class TranscriptionService {
             case .askEachTime:
                 break
             case .local(let model) where model.usesAntigravity:
-                let connection = TranscriptionConnection.builtInAntigravity()
+                let connection = TranscriptionConnection.builtInAntigravity(
+                    modelID: BuiltInTranscriptionModel.resolvedAntigravityModelID(
+                        lecture.transcriptionSourceOverride == .local
+                            ? lecture.transcriptModelID
+                            : preferences.builtInModelID
+                    )
+                )
                 let result = try await transcribeExternally(
                     recordingPath: recordingPath,
                     lecture: lecture,

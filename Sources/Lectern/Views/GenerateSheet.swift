@@ -41,6 +41,17 @@ struct GenerateSheet: View {
         profileID == AgentProfiles.antigravityID
     }
     private var catalogIDs: [String] { catalog.models.map(\.id) }
+    private var selectedModel: AgentModel? {
+        catalog.models.first(where: { $0.id == modelSelection })
+            ?? catalog.models.first(where: \.isDefault)
+            ?? catalog.models.first
+    }
+    private var availableThinkingLevels: [ThinkingLevel] {
+        ThinkingLevel.chatOptions(
+            profileID: profileID,
+            advertised: selectedModel?.supportedThinkingLevels ?? []
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -54,18 +65,18 @@ struct GenerateSheet: View {
         .frame(width: 480)
         .background(LecternTheme.paper)
         .onAppear {
-            if isAntigravityProfile {
-                thinkingLevelRaw = ThinkingLevel.high.rawValue
-            }
             loadStoredModel()
             refreshCatalog()
         }
         .onChange(of: profileID) { _, _ in
-            if isAntigravityProfile {
-                thinkingLevelRaw = ThinkingLevel.high.rawValue
-            }
             loadStoredModel()
             refreshCatalog()
+        }
+        .onChange(of: modelSelection) { _, _ in
+            syncThinkingFromSelectedModel()
+        }
+        .onChange(of: thinkingLevelRaw) { _, _ in
+            applyThinkingToSelectedModel()
         }
         .onChange(of: viewState) { old, new in
             guard old == .running, new != .running else { return }
@@ -135,7 +146,7 @@ struct GenerateSheet: View {
                 .padding(.bottom, 4)
 
             toggleRow(title: "Cleaned Transcript",
-                      detail: "Fillers removed, garbled words repaired",
+                      detail: "Repaired prose in paragraphs, without timestamps",
                       isOn: $cleanedTranscriptOn)
             cardDivider
             toggleRow(title: "Notes",
@@ -207,22 +218,26 @@ struct GenerateSheet: View {
             .padding(.vertical, 10)
             cardDivider
 
-            HStack {
-                Text("Thinking")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(LecternTheme.ink)
-                Spacer()
-                Picker("", selection: $thinkingLevelRaw) {
-                    ForEach(isAntigravityProfile ? [ThinkingLevel.high] : ThinkingLevel.generationDefaults) { level in
-                        Text(level.title).tag(level.rawValue)
+            if !availableThinkingLevels.isEmpty {
+                cardDivider
+
+                HStack {
+                    Text("Thinking")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(LecternTheme.ink)
+                    Spacer()
+                    Picker("", selection: $thinkingLevelRaw) {
+                        ForEach(availableThinkingLevels) { level in
+                            Text(level.title).tag(level.rawValue)
+                        }
                     }
+                    .controlSize(.small)
+                    .frame(width: 130)
+                    .labelsHidden()
                 }
-                .controlSize(.small)
-                .frame(width: 130)
-                .labelsHidden()
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
         }
         .background(
             RoundedRectangle(cornerRadius: LecternTheme.cardRadius, style: .continuous)
@@ -598,6 +613,7 @@ struct GenerateSheet: View {
     private func loadStoredModel() {
         let stored = selectedProfile?.model ?? ""
         applyStoredModel(stored)
+        syncThinkingFromSelectedModel()
     }
 
     private func applyStoredModel(_ stored: String) {
@@ -610,6 +626,48 @@ struct GenerateSheet: View {
         } else {
             modelSelection = catalog.models.isEmpty ? stored : "__custom"
             customModelText = stored
+        }
+    }
+
+    private func syncThinkingFromSelectedModel() {
+        let modelID: String
+        if !modelSelection.isEmpty, modelSelection != "__custom" {
+            modelID = modelSelection
+        } else if !customModelText.isEmpty {
+            modelID = customModelText
+        } else {
+            modelID = selectedProfile?.model ?? AntigravityCLI.modelID
+        }
+        guard AntigravityCLI.isThinkingVariant(modelID) else {
+            let levels = availableThinkingLevels
+            if !levels.isEmpty, !levels.contains(thinkingLevel) {
+                thinkingLevelRaw = (selectedModel?.defaultThinkingLevel ?? levels[0]).rawValue
+            }
+            return
+        }
+        let next = AntigravityCLI.thinkingLevel(fromModelID: modelID).rawValue
+        if thinkingLevelRaw != next {
+            thinkingLevelRaw = next
+        }
+    }
+
+    private func applyThinkingToSelectedModel() {
+        guard isAntigravityProfile else { return }
+        let current: String
+        if !modelSelection.isEmpty, modelSelection != "__custom" {
+            current = modelSelection
+        } else if !customModelText.isEmpty {
+            current = customModelText
+        } else {
+            current = selectedProfile?.model ?? AntigravityCLI.modelID
+        }
+        let next = AntigravityCLI.applyThinking(thinkingLevel, to: current, availableIDs: catalogIDs)
+        guard next != current else { return }
+        if catalogIDs.contains(next) {
+            modelSelection = next
+            customModelText = ""
+        } else if modelSelection == "__custom" || catalog.models.isEmpty {
+            customModelText = next
         }
     }
 
@@ -627,6 +685,7 @@ struct GenerateSheet: View {
                 catalog = loaded
                 catalogLoading = false
                 applyStoredModel(selectedProfile?.model ?? customModelText)
+                syncThinkingFromSelectedModel()
             }
         }
     }
@@ -641,10 +700,8 @@ struct GenerateSheet: View {
 
         guard let profile = selectedProfile else { return }
 
-        let resolvedModel: String?
-        if isAntigravityProfile {
-            resolvedModel = AntigravityCLI.modelID
-        } else if catalog.models.isEmpty {
+        var resolvedModel: String?
+        if catalog.models.isEmpty {
             resolvedModel = customModelText.trimmingCharacters(in: .whitespaces).isEmpty
                 ? nil : customModelText.trimmingCharacters(in: .whitespaces)
         } else if modelSelection == "__custom" {
@@ -652,6 +709,10 @@ struct GenerateSheet: View {
                 ? nil : customModelText.trimmingCharacters(in: .whitespaces)
         } else {
             resolvedModel = modelSelection.isEmpty ? nil : modelSelection
+        }
+        if isAntigravityProfile {
+            let base = resolvedModel ?? profile.model ?? AntigravityCLI.modelID
+            resolvedModel = AntigravityCLI.applyThinking(thinkingLevel, to: base, availableIDs: catalogIDs)
         }
         AgentProfiles.setModel(resolvedModel, for: profile.id)
 
@@ -790,7 +851,7 @@ struct GenerateSheet: View {
         case .queued: return "Queued"
         case .active:
             switch kind {
-            case .cleanedTranscript: return "Repairing the raw transcript…"
+            case .cleanedTranscript: return "Writing a cleaned prose transcript…"
             case .notes: return "Rewriting into study notes…"
             case .flashcards: return "Distilling atomic Q&A…"
             case .quiz: return "Writing practice questions…"

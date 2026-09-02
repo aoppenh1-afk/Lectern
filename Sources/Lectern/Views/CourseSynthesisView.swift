@@ -227,6 +227,7 @@ struct CourseSynthesisView: View {
             normalizeThinkingLevel()
         }
         .onChange(of: effectiveModelID) { _, _ in normalizeThinkingLevel() }
+        .onChange(of: thinkingLevelRaw) { _, _ in applyThinkingToSelectedModel() }
         .fileImporter(isPresented: $showingImporter,
                       allowedContentTypes: [.data],
                       allowsMultipleSelection: true) { result in
@@ -658,8 +659,25 @@ struct CourseSynthesisView: View {
     }
 
     private func normalizeThinkingLevel() {
+        if let modelID = effectiveModelID, AntigravityCLI.isThinkingVariant(modelID) {
+            let next = AntigravityCLI.thinkingLevel(fromModelID: modelID).rawValue
+            if thinkingLevelRaw != next {
+                thinkingLevelRaw = next
+            }
+            return
+        }
         guard !thinkingLevels.isEmpty, !thinkingLevels.contains(thinkingLevel) else { return }
         thinkingLevelRaw = (selectedModel?.defaultThinkingLevel ?? thinkingLevels[0]).rawValue
+    }
+
+    private func applyThinkingToSelectedModel() {
+        guard selectedProfile?.id == AgentProfiles.antigravityID,
+              let current = effectiveModelID else { return }
+        let catalogIDs = modelCatalogs[AgentProfiles.antigravityID]?.models.map(\.id) ?? []
+        let next = AntigravityCLI.applyThinking(thinkingLevel, to: current, availableIDs: catalogIDs)
+        guard next != current else { return }
+        modelOverride = next
+        AgentProfiles.setModel(next, for: AgentProfiles.antigravityID)
     }
 
     private func loadModelCatalogs() async {

@@ -3,18 +3,18 @@ import XCTest
 final class AntigravityCLITests: XCTestCase {
     func testModelListParserFindsVerifiedHighModelSlug() {
         let output = """
-        gemini-3.7-flash-high\tGemini 3.7 Flash (High)
-        gemini-3.7-flash-medium\tGemini 3.7 Flash (Medium)
+        gemini-3.8-flash-high\tGemini 3.8 Flash (High)
+        gemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)
         """
         XCTAssertEqual(
             AntigravityCLI.parseModelList(output),
-            ["gemini-3.7-flash-high", "gemini-3.7-flash-medium"]
+            ["gemini-3.8-flash-high", "gemini-3.8-flash-medium"]
         )
         XCTAssertEqual(
             AntigravityCLI.parseModels(output),
             [
-                .init(id: "gemini-3.7-flash-high", name: "Gemini 3.7 Flash (High)"),
-                .init(id: "gemini-3.7-flash-medium", name: "Gemini 3.7 Flash (Medium)"),
+                .init(id: "gemini-3.8-flash-high", name: "Gemini 3.8 Flash (High)"),
+                .init(id: "gemini-3.8-flash-medium", name: "Gemini 3.8 Flash (Medium)"),
             ]
         )
     }
@@ -80,7 +80,7 @@ final class AntigravityCLITests: XCTestCase {
         let connection = TranscriptionConnection(
             displayName: "Antigravity",
             provider: .antigravityCLI,
-            modelID: "gemini-3.7-flash-low",
+            modelID: "gemini-3.8-flash-low",
             cloudUploadConsent: true
         )
         let request = ExternalTranscriptionRequest(
@@ -94,8 +94,8 @@ final class AntigravityCLITests: XCTestCase {
         let result = try await ExternalTranscriptionEngine(antigravity: cli).transcribe(request) { _ in }
         XCTAssertEqual(result.text, "Hello world")
         XCTAssertEqual(result.providerInfo.provider, .antigravityCLI)
-        XCTAssertEqual(result.providerInfo.requestedModelID, "gemini-3.7-flash-low")
-        XCTAssertEqual(result.providerInfo.resolvedModelID, AntigravityCLI.transcriptionModelID)
+        XCTAssertEqual(result.providerInfo.requestedModelID, "gemini-3.8-flash-low")
+        XCTAssertEqual(result.providerInfo.resolvedModelID, "gemini-3.8-flash-low")
 
         let invocation = try XCTUnwrap(recorder.snapshot())
         XCTAssertEqual(invocation.request, "", "Short prompts travel inline instead of through request.md.")
@@ -113,9 +113,9 @@ final class AntigravityCLITests: XCTestCase {
         XCTAssertTrue(invocation.arguments.contains("--sandbox"))
         XCTAssertTrue(printPrompt.contains("Do not invoke whisper-cli"))
         let modelArgument = try XCTUnwrap(invocation.arguments.firstIndex(of: "--model"))
-        XCTAssertEqual(invocation.arguments[modelArgument + 1], AntigravityCLI.modelID)
+        XCTAssertEqual(invocation.arguments[modelArgument + 1], "gemini-3.8-flash-low")
         let effortArgument = try XCTUnwrap(invocation.arguments.firstIndex(of: "--effort"))
-        XCTAssertEqual(invocation.arguments[effortArgument + 1], "high")
+        XCTAssertEqual(invocation.arguments[effortArgument + 1], "low")
         let timeoutArgument = try XCTUnwrap(invocation.arguments.firstIndex(of: "--print-timeout"))
         XCTAssertEqual(
             invocation.arguments[timeoutArgument + 1],
@@ -132,11 +132,56 @@ final class AntigravityCLITests: XCTestCase {
     func testAgentProfileAndTranscriptionUseHighEffort() throws {
         let profile = try XCTUnwrap(AgentProfiles.profile(id: AgentProfiles.antigravityID))
         XCTAssertEqual(profile.model, AntigravityCLI.modelID)
+        XCTAssertEqual(AntigravityCLI.modelID, "gemini-3.8-flash-high")
 
         let provider = try XCTUnwrap(TranscriptionProviderCatalog.provider(.antigravityCLI))
         XCTAssertEqual(provider.models.map(\.id), [AntigravityCLI.transcriptionModelID])
         XCTAssertEqual(BuiltInTranscriptionModel.antigravity.id, AntigravityCLI.transcriptionModelID)
         XCTAssertFalse(TranscriptionProviderID.antigravityCLI.requiresAPIKey)
+    }
+
+    func testStoredGemini37HighDefaultMigratesToCurrentHighModel() throws {
+        let defaults = UserDefaults(suiteName: "LecternTests-antigravity-\(UUID().uuidString)")!
+        defaults.set(["antigravity": "gemini-3.7-flash-high"], forKey: AgentProfiles.modelsKey)
+        let profile = try XCTUnwrap(AgentProfiles.profile(id: AgentProfiles.antigravityID, userDefaults: defaults))
+        XCTAssertEqual(profile.model, AntigravityCLI.modelID)
+    }
+
+    func testGeminiThinkingVariantsRewriteModelAndEffort() {
+        XCTAssertEqual(AntigravityCLI.effort(for: .low), "low")
+        XCTAssertEqual(AntigravityCLI.effort(for: .medium), "medium")
+        XCTAssertEqual(AntigravityCLI.effort(for: .high), "high")
+        XCTAssertEqual(AntigravityCLI.effort(for: .xhigh), "high")
+        XCTAssertTrue(AntigravityCLI.isThinkingVariant("gemini-3.8-flash-high"))
+        XCTAssertTrue(AntigravityCLI.isThinkingVariant("gemini-3.1-pro-low"))
+        XCTAssertFalse(AntigravityCLI.isThinkingVariant("claude-sonnet-4-6"))
+        XCTAssertEqual(
+            AntigravityCLI.applyThinking(.medium, to: "gemini-3.8-flash-high"),
+            "gemini-3.8-flash-medium"
+        )
+        XCTAssertEqual(
+            AntigravityCLI.applyThinking(
+                .low,
+                to: "gemini-3.8-flash-high",
+                availableIDs: ["gemini-3.8-flash-high", "gemini-3.8-flash-medium"]
+            ),
+            "gemini-3.8-flash-high",
+            "Do not invent a sibling the catalog does not list."
+        )
+        XCTAssertEqual(
+            AntigravityCLI.applyThinking(.high, to: "claude-sonnet-4-6"),
+            "claude-sonnet-4-6"
+        )
+    }
+
+    func testCleanupPromptAsksForParagraphProseWithoutTimestamps() {
+        let prompt = Prompts.cleanedTranscript(
+            rawTranscript: "[00:01] um so today we will cover osmosis",
+            language: .english
+        )
+        XCTAssertTrue(prompt.contains("continuous prose paragraphs"))
+        XCTAssertTrue(prompt.contains("no timestamps"))
+        XCTAssertFalse(prompt.contains("Keep every existing `[mm:ss]` timestamp marker"))
     }
 
     func testNotesUseAtFilesInPrivateWorkspaceAndInstallNotesSkill() async throws {

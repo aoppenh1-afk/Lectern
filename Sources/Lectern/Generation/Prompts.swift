@@ -39,7 +39,7 @@ enum LecternAgentSkill: String, CaseIterable, Hashable, Sendable {
         switch self {
         case .transcription:
             return """
-            Preserve the complete lecture in source order. Never summarize or add facts. For a mixed English-Hebrew shiur, use English connective prose and standard Hebrew script for recognizable Torah terms, source names, and abbreviations. Preserve uncertainty instead of guessing. Return only the caller's requested transcript format.
+            Preserve the complete lecture in source order. Never summarize or add facts. For transcript cleanup, write continuous prose paragraphs with no timestamps. For a mixed English-Hebrew shiur, use English connective prose and standard Hebrew script for recognizable Torah terms, source names, and abbreviations. Preserve uncertainty instead of guessing. Return only the caller's requested transcript format.
             """
         case .notes:
             return """
@@ -81,7 +81,7 @@ enum Prompts {
         <task>
         Mode: transcript cleanup.
         Language branch: \(branch).
-        Return only the complete cleaned Markdown transcript.
+        Return only the complete cleaned Markdown transcript as continuous prose paragraphs, with no timestamps.
         </task>
 
         <raw-transcript>

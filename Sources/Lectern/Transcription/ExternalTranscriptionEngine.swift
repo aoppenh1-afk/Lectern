@@ -172,9 +172,13 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
 
         await onUpdate(.init(state: .processing))
         do {
+            let modelID = request.connection.modelID.isEmpty
+                ? AntigravityCLI.transcriptionModelID
+                : request.connection.modelID
             let output = try await cli.run(
                 prompt: prompt,
-                modelID: AntigravityCLI.transcriptionModelID,
+                modelID: modelID,
+                thinkingLevel: AntigravityCLI.thinkingLevel(fromModelID: modelID),
                 inputs: [.file(request.audioURL, named: audioName)],
                 skills: [.transcription],
                 jsonSchema: Self.outputSchema
@@ -264,7 +268,9 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
                 connectionID: request.connection.id,
                 provider: request.connection.provider,
                 requestedModelID: request.connection.modelID,
-                resolvedModelID: AntigravityCLI.transcriptionModelID,
+                resolvedModelID: request.connection.modelID.isEmpty
+                    ? AntigravityCLI.transcriptionModelID
+                    : request.connection.modelID,
                 providerJobID: nil,
                 attemptNumber: request.attemptNumber,
                 processingMode: request.connection.processingMode,

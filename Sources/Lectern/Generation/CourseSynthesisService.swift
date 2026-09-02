@@ -269,9 +269,14 @@ final class CourseSynthesisService {
                 prompt += "\n\nCourse image \(index + 1): @\(name)"
                 return AntigravityCLI.WorkspaceInput.data(image.data, named: name)
             }
+            let modelID = AntigravityCLI.applyThinking(
+                thinkingLevel,
+                to: modelOverride ?? profile.model ?? AntigravityCLI.modelID
+            )
             let output = try await AntigravityCLI.configured(for: profile).run(
                 prompt: prompt,
-                modelID: modelOverride ?? profile.model ?? AntigravityCLI.modelID,
+                modelID: modelID,
+                thinkingLevel: thinkingLevel,
                 inputs: inputs
             )
             onChunk?(output)

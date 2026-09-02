@@ -27,8 +27,8 @@ The verbatim output of transcribing a Recording, including filler words and tran
 _Avoid_: ASR text, transcript draft
 
 **Cleaned Transcript**:
-A repaired Raw Transcript: fillers removed and garbled or cut-off words reconstructed from context, trusting that what was said is true; wording stays faithful to the Lecture.
-_Avoid_: Edited transcript, summary
+A repaired Raw Transcript rewritten as continuous prose paragraphs: fillers removed, garbled words reconstructed from context, timestamps and pause-based line breaks dropped, so it reads as one article. Wording stays faithful to the Lecture.
+_Avoid_: Edited transcript, summary, notes
 
 **Notes**:
 Bullet-point study notes rewritten from a Lecture's content with a summary at the end; the Lecture is the baseline and any added information stays close to it. May include generated diagrams and images where applicable.

@@ -1,11 +1,58 @@
 import Foundation
 
 struct AntigravityCLI: Sendable {
-    static let modelID = "gemini-3.7-flash-high"
-    static let displayName = "Gemini 3.7 Flash (High)"
+    static let modelID = "gemini-3.8-flash-high"
+    static let displayName = "Gemini 3.8 Flash (High)"
     static let transcriptionModelID = AntigravityCLI.modelID
     static let transcriptionDisplayName = AntigravityCLI.displayName
-    static let reasoningEffort = "high"
+    static let thinkingLevels: [ThinkingLevel] = [.low, .medium, .high]
+
+    /// `agy --effort` only accepts low, medium, or high.
+    static func effort(for level: ThinkingLevel) -> String {
+        switch level {
+        case .none, .minimal, .low: return "low"
+        case .medium: return "medium"
+        case .high, .xhigh, .max, .ultra: return "high"
+        }
+    }
+
+    static func thinkingLevel(fromModelID id: String) -> ThinkingLevel {
+        switch thinkingSuffix(in: id) {
+        case "low": return .low
+        case "medium": return .medium
+        default: return .high
+        }
+    }
+
+    static func isThinkingVariant(_ id: String) -> Bool {
+        thinkingSuffix(in: id) != nil
+    }
+
+    /// Rewrites `gemini-*-flash|pro-{low,medium,high}` to the requested effort
+    /// when that sibling exists. Leaves Claude and other slugs unchanged.
+    static func applyThinking(
+        _ level: ThinkingLevel,
+        to modelID: String,
+        availableIDs: [String] = []
+    ) -> String {
+        guard let current = thinkingSuffix(in: modelID) else { return modelID }
+        let next = "\(String(modelID.dropLast(current.count + 1)))-\(effort(for: level))"
+        if availableIDs.isEmpty || availableIDs.contains(next) {
+            return next
+        }
+        return modelID
+    }
+
+    private static func thinkingSuffix(in id: String) -> String? {
+        let pattern = #"^gemini-\d+(?:\.\d+)?-(?:flash|pro)-(low|medium|high)$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(id.startIndex..., in: id)
+        guard let match = regex.firstMatch(in: id, range: range),
+              let suffixRange = Range(match.range(at: 1), in: id) else {
+            return nil
+        }
+        return String(id[suffixRange])
+    }
 
     /// `agy` 1.1.23 has no disabled value for `--print-timeout`; omitting the
     /// flag restores its five-minute default. The largest Go duration gives
@@ -107,6 +154,7 @@ struct AntigravityCLI: Sendable {
     func run(
         prompt: String,
         modelID: String = AntigravityCLI.modelID,
+        thinkingLevel: ThinkingLevel = .high,
         inputs: [WorkspaceInput] = [],
         skills: Set<LecternAgentSkill> = [],
         jsonSchema: String? = nil,
@@ -136,7 +184,7 @@ struct AntigravityCLI: Sendable {
             "--new-project",
             "--sandbox",
             "--model", modelID,
-            "--effort", AntigravityCLI.reasoningEffort,
+            "--effort", AntigravityCLI.effort(for: thinkingLevel),
             "--output-format", "json",
             "--print-timeout", timeout,
         ]

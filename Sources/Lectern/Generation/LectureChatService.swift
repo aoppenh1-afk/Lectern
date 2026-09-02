@@ -189,6 +189,7 @@ final class LectureChatService {
                         prompt: prompt,
                         images: images,
                         profile: profile,
+                        thinkingLevel: thinkingLevel,
                         modelOverride: modelOverride
                     )
                 } else {
@@ -300,6 +301,7 @@ final class LectureChatService {
                         prompt: proposalPrompt,
                         images: images,
                         profile: profile,
+                        thinkingLevel: thinkingLevel,
                         modelOverride: modelOverride
                     )
                 } else {
@@ -529,6 +531,7 @@ final class LectureChatService {
         prompt: String,
         images: [ACPConnection.PromptImage],
         profile: AgentProfile,
+        thinkingLevel: ThinkingLevel,
         modelOverride: String?
     ) async throws -> String {
         var request = prompt
@@ -544,9 +547,14 @@ final class LectureChatService {
             request += "\n\nAttached image \(index + 1): @\(name)"
             return AntigravityCLI.WorkspaceInput.data(image.data, named: name)
         }
+        let modelID = AntigravityCLI.applyThinking(
+            thinkingLevel,
+            to: modelOverride ?? profile.model ?? AntigravityCLI.modelID
+        )
         return try await AntigravityCLI.configured(for: profile).run(
             prompt: request,
-            modelID: modelOverride ?? profile.model ?? AntigravityCLI.modelID,
+            modelID: modelID,
+            thinkingLevel: thinkingLevel,
             inputs: inputs
         )
     }

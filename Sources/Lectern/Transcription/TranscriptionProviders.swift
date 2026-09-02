@@ -39,7 +39,7 @@ enum TranscriptionSource: String, Codable, CaseIterable, Identifiable, Sendable 
 enum BuiltInTranscriptionModel: String, Codable, CaseIterable, Identifiable, Sendable {
     case parakeet = "parakeet-tdt-0.6b-v3-coreml"
     case whisper = "whisper-large-v3-q5_0"
-    case antigravity = "gemini-3.7-flash-high"
+    case antigravity = "gemini-3.8-flash-high"
 
     var id: String { rawValue }
 
@@ -47,7 +47,7 @@ enum BuiltInTranscriptionModel: String, Codable, CaseIterable, Identifiable, Sen
         switch self {
         case .parakeet: return "Parakeet TDT 0.6B"
         case .whisper: return "Whisper Large v3"
-        case .antigravity: return AntigravityCLI.transcriptionDisplayName
+        case .antigravity: return "Antigravity CLI"
         }
     }
 
@@ -79,19 +79,48 @@ enum BuiltInTranscriptionModel: String, Codable, CaseIterable, Identifiable, Sen
             ?? allCases.first(where: { $0.modelInfo == storedValue || $0.id == storedValue }) {
             return match
         }
-        let normalized = storedValue.lowercased()
-        if storedValue == AntigravityCLI.modelID
-            || normalized.hasPrefix("gemini-3.7-flash-")
-            || normalized.hasPrefix("gemini 3.7 flash (")
-            || storedValue.caseInsensitiveCompare(BuiltInTranscriptionModel.antigravity.title) == .orderedSame {
+        if isAntigravityModelChoice(storedValue) {
             return .antigravity
         }
         return automatic(for: language)
     }
+
+    /// The slug sent to `agy --model`. The built-in Antigravity option and the
+    /// retired Gemini 3.7 Flash High default both resolve to the current High model.
+    static func resolvedAntigravityModelID(_ storedValue: String?) -> String {
+        guard let storedValue, !storedValue.isEmpty else {
+            return AntigravityCLI.transcriptionModelID
+        }
+        if storedValue == antigravity.id
+            || storedValue == "gemini-3.7-flash-high"
+            || storedValue.caseInsensitiveCompare(antigravity.title) == .orderedSame
+            || storedValue.caseInsensitiveCompare("Gemini 3.7 Flash (High)") == .orderedSame {
+            return AntigravityCLI.transcriptionModelID
+        }
+        if isAntigravityModelChoice(storedValue),
+           !storedValue.lowercased().hasPrefix("gemini ") {
+            return storedValue
+        }
+        return AntigravityCLI.transcriptionModelID
+    }
+
+    static func isAntigravityModelChoice(_ storedValue: String) -> Bool {
+        if storedValue == AntigravityCLI.modelID
+            || storedValue == antigravity.id
+            || storedValue.caseInsensitiveCompare(antigravity.title) == .orderedSame {
+            return true
+        }
+        let normalized = storedValue.lowercased()
+        if normalized.hasPrefix("gemini-") { return true }
+        if normalized.range(of: #"^gemini\s+\d+(?:\.\d+)?\s+(flash|pro)(\s+\((low|medium|high)\))?$"#, options: .regularExpression) != nil {
+            return true
+        }
+        return false
+    }
 }
 
 /// Picks the transcriber for a new or retried job. An explicit Settings model
-/// such as Gemini 3.7 Flash High wins over the Hebrew→whisper automatic default.
+/// such as Gemini 3.8 Flash High wins over the Hebrew→whisper automatic default.
 enum TranscriptionJobPlan: Equatable, Sendable {
     case askEachTime
     case local(BuiltInTranscriptionModel)
@@ -285,7 +314,7 @@ enum TranscriptionProviderCatalog {
             tintHex: "4285F4",
             summary: "Flexible multilingual transcription with structured segment output.",
             models: [
-                .init(id: "gemini-3.7-flash", title: "Gemini 3.7 Flash", subtitle: "Best free-tier quality candidate", capabilities: .init(
+                .init(id: "gemini-3.8-flash", title: "Gemini 3.8 Flash", subtitle: "Best free-tier quality candidate", capabilities: .init(
                     supportsCodeSwitching: true, supportsDiarization: true, supportsSegmentTimestamps: true,
                     supportsContextPrompt: true, maxContextPromptLength: 8_000, supportsFreeTier: true,
                     freeTierDescription: "Quota varies by project and account.",
@@ -305,7 +334,7 @@ enum TranscriptionProviderCatalog {
             shortName: "AG",
             assetName: "TranscriptionGemini",
             tintHex: "4285F4",
-            summary: "Gemini 3.7 Flash High through the signed-in Antigravity CLI.",
+            summary: "Gemini 3.8 Flash High through the signed-in Antigravity CLI.",
             models: [
                 .init(
                     id: AntigravityCLI.transcriptionModelID,
@@ -498,12 +527,12 @@ struct TranscriptionConnection: Identifiable, Codable, Hashable, Sendable {
         TranscriptionProviderCatalog.capabilities(provider: provider, modelID: modelID)
     }
 
-    static func builtInAntigravity() -> TranscriptionConnection {
+    static func builtInAntigravity(modelID: String? = nil) -> TranscriptionConnection {
         .init(
             id: builtInAntigravityID,
             displayName: "Antigravity CLI",
             provider: .antigravityCLI,
-            modelID: AntigravityCLI.transcriptionModelID,
+            modelID: modelID.flatMap { $0.isEmpty ? nil : $0 } ?? AntigravityCLI.transcriptionModelID,
             diarizationEnabled: true,
             timestampGranularity: .segment,
             costTier: .free,
