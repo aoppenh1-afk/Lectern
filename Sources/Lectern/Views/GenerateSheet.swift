@@ -772,9 +772,17 @@ struct GenerateSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            HStack {
+            Text("Close keeps generation running in the background.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
                 Spacer()
-                Button("Close") { finished = true }
+                Button("Cancel generation", role: .destructive) {
+                    generation.cancel()
+                    dismiss()
+                }
+                Button("Close") { dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
         }

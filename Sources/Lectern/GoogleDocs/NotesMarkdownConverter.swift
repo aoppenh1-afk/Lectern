@@ -2,19 +2,20 @@ import CryptoKit
 import Foundation
 
 /// Turns Lectern notes markdown into a Google Docs `batchUpdate` write:
-/// one text insert plus heading, bullet, and bold style requests.
+/// one text insert plus heading, bullet, bold, and paragraph-direction requests.
 ///
 /// Nested list depth is carried by leading tab characters: Docs reads the
 /// tabs to choose the nesting level for `createParagraphBullets` and then
 /// strips them.
 enum NotesMarkdownConverter {
-    static let formatVersion = "v2"
+    static let formatVersion = "v5"
 
     struct WritePlan {
         let text: String
         let headingRanges: [(start: Int, end: Int, level: Int)]
         let bulletRanges: [(start: Int, end: Int, preset: String)]
         let boldRanges: [(start: Int, end: Int)]
+        let directionRanges: [(start: Int, end: Int, direction: String)]
 
         func requests(tabId: String, existingBodyEndIndex: Int) -> [[String: Any]] {
             var requests: [[String: Any]] = []
@@ -50,6 +51,22 @@ enum NotesMarkdownConverter {
                         "textStyle": ["bold": true],
                         "fields": "bold",
                         "range": range(start: bold.start, end: bold.end, tabId: tabId)
+                    ]
+                ])
+            }
+            // Hebrew headings and body paragraphs use RTL flow with physical
+            // left alignment. Hebrew-led list paragraphs are emitted as LTR
+            // so Docs keeps their bullets on the left; their text is wrapped
+            // in a Unicode RTL isolate by `plan(markdown:)`.
+            for paragraph in directionRanges {
+                requests.append([
+                    "updateParagraphStyle": [
+                        "paragraphStyle": [
+                            "direction": paragraph.direction,
+                            "alignment": paragraph.direction == "RIGHT_TO_LEFT" ? "END" : "START",
+                        ],
+                        "fields": "direction,alignment",
+                        "range": range(start: paragraph.start, end: paragraph.end, tabId: tabId),
                     ]
                 ])
             }
@@ -93,11 +110,28 @@ enum NotesMarkdownConverter {
         var headingRanges: [(Int, Int, Int)] = []
         var listParas: [(start: Int, end: Int, preset: String)] = []
         var boldRanges: [(Int, Int)] = []
+        var directionRanges: [(start: Int, end: Int, direction: String)] = []
+        var renderedItems: [String] = []
         var cursor = 1
 
         for item in items {
+            let naturalDirection = paragraphDirection(for: item.text)
+            let isHebrewList: Bool
+            let renderedText: String
+            let renderedBold: [(start: Int, end: Int)]
+            if case .list = item.kind, naturalDirection == "RIGHT_TO_LEFT" {
+                isHebrewList = true
+                let isolated = isolateHebrewRuns(in: item.text, splitAt: item.bold)
+                renderedText = isolated.text
+                renderedBold = isolated.bold
+            } else {
+                isHebrewList = false
+                renderedText = item.text
+                renderedBold = item.bold
+            }
+
             let start = cursor
-            let textLen = item.text.utf16.count
+            let textLen = renderedText.utf16.count
             let end = start + textLen + 1
             switch item.kind {
             case .heading(let level):
@@ -107,17 +141,24 @@ enum NotesMarkdownConverter {
             case .body:
                 break
             }
-            for bold in item.bold {
+            for bold in renderedBold {
                 boldRanges.append((start + bold.start, start + bold.end))
             }
+            directionRanges.append((
+                start,
+                end,
+                isHebrewList ? "LEFT_TO_RIGHT" : naturalDirection
+            ))
+            renderedItems.append(renderedText)
             cursor = end
         }
 
         return WritePlan(
-            text: items.map(\.text).joined(separator: "\n"),
+            text: renderedItems.joined(separator: "\n"),
             headingRanges: headingRanges,
             bulletRanges: mergeConsecutive(listParas),
-            boldRanges: boldRanges
+            boldRanges: boldRanges,
+            directionRanges: directionRanges
         )
     }
 
@@ -251,6 +292,124 @@ enum NotesMarkdownConverter {
             in: input, range: NSRange(input.startIndex..., in: input),
             withTemplate: template
         )
+    }
+
+    private static func paragraphDirection(for text: String) -> String {
+        for scalar in text.unicodeScalars {
+            guard CharacterSet.letters.contains(scalar) else { continue }
+            return isHebrew(scalar) ? "RIGHT_TO_LEFT" : "LEFT_TO_RIGHT"
+        }
+        return "LEFT_TO_RIGHT"
+    }
+
+    private static func isHebrew(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0x0590...0x05FF, 0xFB1D...0xFB4F:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func isolateHebrewRuns(
+        in text: String,
+        splitAt boldRanges: [(start: Int, end: Int)]
+    ) -> (text: String, bold: [(start: Int, end: Int)]) {
+        let textLength = text.utf16.count
+        let boundaries = Set(
+            [0, textLength] + boldRanges.flatMap { [$0.start, $0.end] }
+        ).sorted()
+        var segments: [(start: Int, end: Int)] = []
+
+        for index in 0..<(boundaries.count - 1) {
+            segments += hebrewSegments(
+                in: text,
+                from: boundaries[index],
+                to: boundaries[index + 1]
+            )
+        }
+
+        var output = ""
+        var previousEnd = 0
+        for segment in segments {
+            output += utf16Substring(text, from: previousEnd, to: segment.start)
+            output += "\u{2067}"
+            output += utf16Substring(text, from: segment.start, to: segment.end)
+            output += "\u{2069}"
+            previousEnd = segment.end
+        }
+        output += utf16Substring(text, from: previousEnd, to: textLength)
+
+        let insertionOffsets = segments.flatMap { [$0.start, $0.end] }
+        let adjustedBold = boldRanges.map { bold in
+            let shiftedStart = bold.start + insertionOffsets.count(where: { $0 <= bold.start })
+            let shiftedEnd = bold.end + insertionOffsets.count(where: { $0 < bold.end })
+            return (shiftedStart, shiftedEnd)
+        }
+        return (output, adjustedBold)
+    }
+
+    private static func hebrewSegments(
+        in text: String,
+        from lowerBound: Int,
+        to upperBound: Int
+    ) -> [(start: Int, end: Int)] {
+        guard upperBound > lowerBound else { return [] }
+        let lowerIndex = String.Index(utf16Offset: lowerBound, in: text)
+        let upperIndex = String.Index(utf16Offset: upperBound, in: text)
+        var segments: [(start: Int, end: Int)] = []
+        var segmentStart: Int?
+        var lastHebrewEnd = lowerBound
+        var offset = lowerBound
+
+        func finishSegment(at boundary: Int) {
+            guard let start = segmentStart else { return }
+            let end = hebrewSegmentEnd(
+                in: text,
+                afterLastHebrew: lastHebrewEnd,
+                before: boundary
+            )
+            segments.append((start, end))
+            segmentStart = nil
+        }
+
+        for scalar in text[lowerIndex..<upperIndex].unicodeScalars {
+            let scalarEnd = offset + scalar.utf16.count
+            if isHebrew(scalar) {
+                if segmentStart == nil { segmentStart = offset }
+                lastHebrewEnd = scalarEnd
+            } else if CharacterSet.letters.contains(scalar) {
+                finishSegment(at: offset)
+            }
+            offset = scalarEnd
+        }
+        finishSegment(at: upperBound)
+        return segments
+    }
+
+    private static func hebrewSegmentEnd(
+        in text: String,
+        afterLastHebrew lastHebrewEnd: Int,
+        before boundary: Int
+    ) -> Int {
+        let pending = utf16Substring(text, from: lastHebrewEnd, to: boundary)
+        guard let lastNonspace = pending.rangeOfCharacter(
+            from: .whitespacesAndNewlines.inverted,
+            options: .backwards
+        ) else {
+            return lastHebrewEnd
+        }
+        let meaningful = String(pending[..<lastNonspace.upperBound])
+        if meaningful.contains(where: { "([{<".contains($0) }) {
+            return lastHebrewEnd
+        }
+        return lastHebrewEnd + meaningful.utf16.count
+    }
+
+    private static func utf16Substring(_ text: String, from start: Int, to end: Int) -> String {
+        let startIndex = String.Index(utf16Offset: start, in: text)
+        let endIndex = String.Index(utf16Offset: end, in: text)
+        return String(text[startIndex..<endIndex])
     }
 
     private static func mergeConsecutive(

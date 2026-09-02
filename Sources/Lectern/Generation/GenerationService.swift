@@ -15,8 +15,10 @@ final class GenerationService {
 
     private(set) var activeJob: ActiveJob?
     private(set) var lastError: String?
+    private var generationTask: Task<Void, Never>?
 
     private let modelContainer: ModelContainer
+    private let completionNotifier: any CompletionNotifying
 
     private struct GeneratedOutput: Sendable {
         let kind: GenerationJobKind
@@ -35,8 +37,12 @@ final class GenerationService {
     /// Directory agents work in and where imported images land.
     private let workspaceDirectory: URL
 
-    init(modelContainer: ModelContainer) {
+    init(
+        modelContainer: ModelContainer,
+        completionNotifier: any CompletionNotifying = SystemCompletionNotifier.shared
+    ) {
         self.modelContainer = modelContainer
+        self.completionNotifier = completionNotifier
 
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         workspaceDirectory = support.appendingPathComponent("Lectern/Workspace", isDirectory: true)
@@ -50,21 +56,30 @@ final class GenerationService {
                   thinkingLevel: ThinkingLevel = .medium,
                   modelOverride: String? = nil,
                   quizFocus: String? = nil) {
-        guard activeJob == nil else { return }
+        guard generationTask == nil else { return }
         let ordered = GenerationJobKind.ordered.filter { kinds.contains($0) }
         guard !ordered.isEmpty else { return }
 
         activeJob = ActiveJob(lectureTitle: lecture.title, remaining: ordered)
         lastError = nil
+        completionNotifier.prepare()
 
-        Task { await run(lectureID: lecture.persistentModelID,
-                         lectureTitle: lecture.title,
-                         kinds: ordered,
-                         profile: profile,
-                         quizOptions: quizOptions,
-                         thinkingLevel: thinkingLevel,
-                         modelOverride: modelOverride,
-                         quizFocus: quizFocus) }
+        generationTask = Task {
+            await run(lectureID: lecture.persistentModelID,
+                      lectureTitle: lecture.title,
+                      kinds: ordered,
+                      profile: profile,
+                      quizOptions: quizOptions,
+                      thinkingLevel: thinkingLevel,
+                      modelOverride: modelOverride,
+                      quizFocus: quizFocus)
+        }
+    }
+
+    func cancel() {
+        guard generationTask != nil else { return }
+        lastError = nil
+        generationTask?.cancel()
     }
 
     // MARK: - Job runner
@@ -77,7 +92,10 @@ final class GenerationService {
                      thinkingLevel: ThinkingLevel,
                      modelOverride: String?,
                      quizFocus: String?) async {
-        defer { activeJob = nil }
+        defer {
+            activeJob = nil
+            generationTask = nil
+        }
 
         let context = modelContainer.mainContext
         guard let lecture = context.model(for: lectureID) as? Lecture,
@@ -107,6 +125,7 @@ final class GenerationService {
                     language: language,
                     supplementaryInputs: supplementaryInputs
                 ).content.trimmingCharacters(in: .whitespacesAndNewlines)
+                try Task.checkCancellation()
                 upsertArtifact(kind: .cleanedTranscript,
                                content: cleaned,
                                modelInfo: profile.title,
@@ -146,6 +165,7 @@ final class GenerationService {
                 }
                 return completed
             }
+            try Task.checkCancellation()
 
             for output in outputs.sorted(by: { orderedIndex($0.kind) < orderedIndex($1.kind) }) {
                 switch output.kind {
@@ -160,6 +180,12 @@ final class GenerationService {
                 }
             }
             try context.save()
+            completionNotifier.deliver(.generationFinished(
+                lectureTitle: lectureTitle,
+                items: kinds.map(\.title)
+            ))
+        } catch is CancellationError {
+            lastError = nil
         } catch {
             lastError = "\(profile.title): \(error.localizedDescription)"
         }

@@ -152,13 +152,16 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
             ? "English-Hebrew shiur"
             : "English lecture"
         let speakerRule = request.connection.diarizationEnabled
-            ? "Add stable speaker labels when the audio supports them."
+            ? "When distinct speakers can be tracked, use stable role labels such as Professor, Student, or Speaker 1 after each timestamp."
             : "Omit speaker labels."
         let timestampRule: String
         switch request.connection.timestampGranularity {
-        case .none: timestampRule = "Omit segment timestamps."
-        case .segment: timestampRule = "Include grounded segment timestamps in milliseconds."
-        case .word: timestampRule = "Include grounded segment timestamps; word timestamps are not required by this schema."
+        case .none:
+            timestampRule = "Omit timestamps and return natural transcript paragraphs."
+        case .segment:
+            timestampRule = "Start every natural segment with a grounded [HH:MM:SS] timestamp."
+        case .word:
+            timestampRule = "Start every natural segment with a grounded [HH:MM:SS] timestamp; word timestamps are not needed."
         }
         let prompt = """
         Apply the lectern-transcription skill to @\(audioName).
@@ -167,7 +170,7 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
         Language branch: \(languageBranch).
         \(speakerRule)
         \(timestampRule)
-        Return only the complete transcript JSON object.
+        Return only the complete transcript text. Do not return JSON, a schema, an overview, commentary, or a completion report. Once the final spoken passage is transcribed, return the transcript immediately without creating scripts or performing a second formatting pass.
         """
 
         await onUpdate(.init(state: .processing))
@@ -180,8 +183,7 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
                 modelID: modelID,
                 thinkingLevel: AntigravityCLI.thinkingLevel(fromModelID: modelID),
                 inputs: [.file(request.audioURL, named: audioName)],
-                skills: [.transcription],
-                jsonSchema: Self.outputSchema
+                skills: [.transcription]
             )
             return try Self.result(from: output, request: request)
         } catch is CancellationError {
@@ -206,50 +208,8 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
     }
 
     static func result(from output: String, request: ExternalTranscriptionRequest) throws -> TranscriptionResult {
-        struct Payload: Decodable {
-            struct Segment: Decodable {
-                let startMs: Int64?
-                let endMs: Int64?
-                let text: String
-                let speakerID: String?
-                let languageCode: String?
-            }
-
-            let text: String
-            let detectedLanguages: [String]
-            let segments: [Segment]
-        }
-
-        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        let json: String
-        if let start = trimmed.firstIndex(of: "{"), let end = trimmed.lastIndex(of: "}"), start <= end {
-            json = String(trimmed[start...end])
-        } else {
-            json = trimmed
-        }
-        guard let data = json.data(using: .utf8),
-              let payload = try? JSONDecoder().decode(Payload.self, from: data) else {
-            throw ExternalTranscriptionError(
-                code: .malformedResponse,
-                retryable: false,
-                fallbackEligible: true,
-                userMessage: "Antigravity CLI returned transcript text that was not valid JSON."
-            )
-        }
-        let text = payload.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let segments = payload.segments.compactMap { segment -> NormalizedTranscriptionSegment? in
-            let segmentText = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !segmentText.isEmpty else { return nil }
-            return .init(
-                startMilliseconds: segment.startMs,
-                endMilliseconds: segment.endMs,
-                text: segmentText,
-                speakerID: segment.speakerID,
-                languageCode: segment.languageCode,
-                confidence: nil
-            )
-        }
-        guard !text.isEmpty || !segments.isEmpty else {
+        let transcript = removingOptionalMarkdownFence(from: output)
+        guard !transcript.isEmpty else {
             throw ExternalTranscriptionError(
                 code: .malformedResponse,
                 retryable: false,
@@ -257,13 +217,22 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
                 userMessage: "Antigravity CLI returned an empty transcript."
             )
         }
-        let resolvedText = text.isEmpty ? segments.map(\.text).joined(separator: " ") : text
-        let resolvedSegments = segments.isEmpty ? [.init(text: resolvedText)] : segments
+
+        let audioDuration = request.durationSeconds > 0
+            ? Int64((request.durationSeconds * 1_000).rounded())
+            : nil
+        let segments = parsedSegments(
+            from: transcript,
+            audioDurationMilliseconds: audioDuration,
+            includeSpeakers: request.connection.diarizationEnabled,
+            lectureLanguage: request.lectureLanguage
+        )
+        let resolvedText = segments.map(\.text).joined(separator: "\n\n")
         return .init(
             text: resolvedText,
-            segments: resolvedSegments,
+            segments: segments,
             words: nil,
-            detectedLanguages: payload.detectedLanguages,
+            detectedLanguages: detectedLanguages(in: resolvedText, branch: request.lectureLanguage),
             providerInfo: .init(
                 connectionID: request.connection.id,
                 provider: request.connection.provider,
@@ -276,9 +245,155 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
                 processingMode: request.connection.processingMode,
                 completedAt: Date()
             ),
-            audioDurationMilliseconds: Int64(request.durationSeconds * 1_000),
+            audioDurationMilliseconds: audioDuration,
             warnings: []
         )
+    }
+
+    private struct ParsedSegment {
+        var startMilliseconds: Int64
+        var text: String
+        var speakerID: String?
+    }
+
+    private static func parsedSegments(
+        from transcript: String,
+        audioDurationMilliseconds: Int64?,
+        includeSpeakers: Bool,
+        lectureLanguage: LectureLanguage
+    ) -> [NormalizedTranscriptionSegment] {
+        let pattern = #"(?m)^[ \t]*\[(\d{1,3}(?::\d{1,2}){1,2})(?:[.,](\d{1,3}))?\][ \t]*"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return [.init(text: transcript)]
+        }
+        let fullRange = NSRange(transcript.startIndex..., in: transcript)
+        let matches = regex.matches(in: transcript, range: fullRange)
+        guard !matches.isEmpty else {
+            return [.init(
+                text: transcript,
+                languageCode: languageCode(for: transcript, branch: lectureLanguage)
+            )]
+        }
+
+        let source = transcript as NSString
+        var drafts: [ParsedSegment] = []
+        var previousStart: Int64 = 0
+        for (index, match) in matches.enumerated() {
+            let bodyStart = NSMaxRange(match.range)
+            let bodyEnd = index + 1 < matches.count ? matches[index + 1].range.location : source.length
+            guard bodyEnd >= bodyStart else { continue }
+            let rawBody = source.substring(
+                with: NSRange(location: bodyStart, length: bodyEnd - bodyStart)
+            ).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !rawBody.isEmpty else { continue }
+
+            let timestamp = source.substring(with: match.range(at: 1))
+            let fraction = match.range(at: 2).location == NSNotFound
+                ? nil
+                : source.substring(with: match.range(at: 2))
+            guard let parsedStart = timestampMilliseconds(timestamp, fraction: fraction) else { continue }
+            var start = max(previousStart, parsedStart)
+            if let audioDurationMilliseconds {
+                start = min(start, audioDurationMilliseconds)
+            }
+            previousStart = start
+
+            let parsedBody = speakerAndText(from: rawBody, enabled: includeSpeakers)
+            guard !parsedBody.text.isEmpty else { continue }
+            drafts.append(.init(
+                startMilliseconds: start,
+                text: parsedBody.text,
+                speakerID: parsedBody.speaker
+            ))
+        }
+
+        guard !drafts.isEmpty else {
+            return [.init(
+                text: transcript,
+                languageCode: languageCode(for: transcript, branch: lectureLanguage)
+            )]
+        }
+        return drafts.enumerated().map { index, draft in
+            let nextStart = drafts.indices.contains(index + 1)
+                ? drafts[index + 1].startMilliseconds
+                : audioDurationMilliseconds
+            return .init(
+                startMilliseconds: draft.startMilliseconds,
+                endMilliseconds: nextStart.map { max(draft.startMilliseconds, $0) },
+                text: draft.text,
+                speakerID: draft.speakerID,
+                languageCode: languageCode(for: draft.text, branch: lectureLanguage),
+                confidence: nil
+            )
+        }
+    }
+
+    private static func timestampMilliseconds(_ timestamp: String, fraction: String?) -> Int64? {
+        let parts = timestamp.split(separator: ":").compactMap { Int64($0) }
+        guard parts.count == 2 || parts.count == 3 else { return nil }
+        let seconds = parts.count == 3
+            ? parts[0] * 3_600 + parts[1] * 60 + parts[2]
+            : parts[0] * 60 + parts[1]
+        let fractional = fraction.flatMap { value -> Int64? in
+            let padded = String((value + "000").prefix(3))
+            return Int64(padded)
+        } ?? 0
+        return seconds * 1_000 + fractional
+    }
+
+    private static func speakerAndText(from body: String, enabled: Bool) -> (speaker: String?, text: String) {
+        guard enabled else { return (nil, body) }
+        let pattern = #"(?is)^(?:\*\*)?([^:\n]{1,40}):(?:\*\*)?[ \t]+(.+)$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: body, range: NSRange(body.startIndex..., in: body)),
+              let speakerRange = Range(match.range(at: 1), in: body),
+              let textRange = Range(match.range(at: 2), in: body) else {
+            return (nil, body)
+        }
+        let speaker = body[speakerRange].trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = speaker.lowercased()
+        let knownRoles = ["speaker", "professor", "teacher", "student", "rabbi", "rav", "rebbe", "audience", "questioner"]
+        guard knownRoles.contains(where: normalized.contains) else { return (nil, body) }
+        return (speaker, body[textRange].trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private static func removingOptionalMarkdownFence(from output: String) -> String {
+        var lines = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .newlines)
+        if lines.first?.trimmingCharacters(in: .whitespaces).hasPrefix("```") == true {
+            lines.removeFirst()
+        }
+        if lines.last?.trimmingCharacters(in: .whitespaces) == "```" {
+            lines.removeLast()
+        }
+        return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func detectedLanguages(in text: String, branch: LectureLanguage) -> [String] {
+        guard branch == .hebrewEnglish else { return ["en"] }
+        let hasHebrew = containsHebrew(text)
+        let hasLatin = text.unicodeScalars.contains {
+            (65...90).contains($0.value) || (97...122).contains($0.value)
+        }
+        if hasHebrew && hasLatin { return ["en", "he"] }
+        if hasHebrew { return ["he"] }
+        return ["en"]
+    }
+
+    private static func languageCode(for text: String, branch: LectureLanguage) -> String? {
+        guard branch == .hebrewEnglish else { return "en" }
+        let hasHebrew = containsHebrew(text)
+        let hasLatin = text.unicodeScalars.contains {
+            (65...90).contains($0.value) || (97...122).contains($0.value)
+        }
+        if hasHebrew == hasLatin { return nil }
+        return hasHebrew ? "he" : "en"
+    }
+
+    private static func containsHebrew(_ text: String) -> Bool {
+        text.unicodeScalars.contains {
+            (0x0590...0x05FF).contains($0.value) || (0xFB1D...0xFB4F).contains($0.value)
+        }
     }
 
     private static func classify(_ error: Error) -> ExternalTranscriptionError {
@@ -291,37 +406,11 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
             return .init(code: .unsupportedModel, retryable: false, fallbackEligible: true, userMessage: message)
         }
         if lower.contains("timed out") || lower.contains("timeout") {
-            return .init(code: .timeout, retryable: true, fallbackEligible: true, userMessage: message)
+            return .init(code: .timeout, retryable: false, fallbackEligible: true, userMessage: message)
         }
         return .init(code: .providerUnavailable, retryable: false, fallbackEligible: true, userMessage: message)
     }
 
-    private static let outputSchema = """
-    {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "text": { "type": "string" },
-        "detectedLanguages": { "type": "array", "items": { "type": "string" } },
-        "segments": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "startMs": { "type": "integer" },
-              "endMs": { "type": "integer" },
-              "text": { "type": "string" },
-              "speakerID": { "type": "string" },
-              "languageCode": { "type": "string" }
-            },
-            "required": ["text"]
-          }
-        }
-      },
-      "required": ["text", "detectedLanguages", "segments"]
-    }
-    """
 }
 
 private struct UnsupportedCloudAdapter: TranscriptionProviderAdapter {

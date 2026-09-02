@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SQLite3
 import SwiftData
@@ -176,6 +177,9 @@ struct LecternApp: App {
                 .environment(appUpdater)
                 .environment(onboardingState)
                 .preferredColorScheme(surfacePreferences.appearance.colorScheme)
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                    transcriptionService.cancelAll()
+                }
         }
         .modelContainer(container)
         .windowToolbarStyle(.unified)

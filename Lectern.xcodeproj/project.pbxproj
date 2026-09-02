@@ -40,8 +40,10 @@
 		59CF92FA7A12C257DE19A5CC /* NotesMarkdownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */; };
 		5BA88FED8AAA4DF17E087287 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE5C3AABA6B34AD14F5DB646 /* AppUpdater.swift */; };
 		5BC92167A2C70F9FD1E0AC0D /* TranscriptionProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87CA75D98C0B0A79B24C31A6 /* TranscriptionProviders.swift */; };
+		5CC2CA3F302C627237B9794E /* CompletionNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165645A8C3854D55C5824601 /* CompletionNotifier.swift */; };
 		5D0E6B5F3A3CEC54B91B9C44 /* NotesMarkdownConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD3E8ECFA5DBAF53FDF24214 /* NotesMarkdownConverter.swift */; };
 		5F08F096764B873351ED1A90 /* QuizReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E407430088644634374A45C /* QuizReviewView.swift */; };
+		5F48CA518FE926E6F2B01953 /* CompletionNotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */; };
 		6432103455669EF48B23FC76 /* Lecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6158A28C0BB3D26FAEAE192F /* Lecture.swift */; };
 		64D1BB7B2C4864F6221429AE /* CanvasHTMLTextCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */; };
 		66FEF621C726AB98517FB265 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F761716AB6F39B0F119719 /* OnboardingView.swift */; };
@@ -80,6 +82,7 @@
 		AAF12042D3F7E714EF8264E3 /* NotesMarkdownConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD3E8ECFA5DBAF53FDF24214 /* NotesMarkdownConverter.swift */; };
 		AC3C861513403C15790CBE44 /* AntigravityCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B68EA81889B408D94CB43B77 /* AntigravityCLI.swift */; };
 		AD86591E3E90890763F6171D /* GoogleDocsError.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF820DB24255443A5561D031 /* GoogleDocsError.swift */; };
+		B0183D74ECA0C677FCFD815A /* CompletionNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165645A8C3854D55C5824601 /* CompletionNotifier.swift */; };
 		B1C8626312E7CF92B5F96D1A /* CanvasConnectionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09DF40420E86AFCF7499E39F /* CanvasConnectionSettings.swift */; };
 		B5E2B6A82B90454D78C45EA4 /* ExportAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2ECE882547DAE6ABCD5EC51 /* ExportAvailabilityTests.swift */; };
 		B939ECE1EC73DF3FCE35CB4D /* GoogleDocsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBF49011BFA6F50BCA8A7598 /* GoogleDocsClient.swift */; };
@@ -128,6 +131,7 @@
 		0B59062BA24987B047FA43FD /* CanvasHTMLTextCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasHTMLTextCache.swift; sourceTree = "<group>"; };
 		0B7D0F6D80C445E9723332BE /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
 		0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasHTMLTextCacheTests.swift; sourceTree = "<group>"; };
+		165645A8C3854D55C5824601 /* CompletionNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionNotifier.swift; sourceTree = "<group>"; };
 		16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasClient.swift; sourceTree = "<group>"; };
 		173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recording.swift; sourceTree = "<group>"; };
 		19629351EB498E76FFBC6AF2 /* lectern-transcription */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "lectern-transcription"; path = ".agents/skills/lectern-transcription"; sourceTree = SOURCE_ROOT; };
@@ -135,6 +139,7 @@
 		1F4553C1CACE105140BCDE50 /* Artifact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artifact.swift; sourceTree = "<group>"; };
 		2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LecternBundleOptions.swift; sourceTree = "<group>"; };
 		29CA61043373B5435D7F00F2 /* RetentionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetentionService.swift; sourceTree = "<group>"; };
+		2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionNotificationTests.swift; sourceTree = "<group>"; };
 		2B528438D307A5B4FB6EAF1B /* LecternApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LecternApp.swift; sourceTree = "<group>"; };
 		2F195A8A3ED220D64F9F54D6 /* LectureAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureAudioPlayer.swift; sourceTree = "<group>"; };
 		31FE176891F8FD111C81F219 /* CanvasWorkspaceViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasWorkspaceViews.swift; sourceTree = "<group>"; };
@@ -275,6 +280,14 @@
 			path = Domain;
 			sourceTree = "<group>";
 		};
+		2489DBF6B64B0D74CD8BEA6F /* System */ = {
+			isa = PBXGroup;
+			children = (
+				165645A8C3854D55C5824601 /* CompletionNotifier.swift */,
+			);
+			path = System;
+			sourceTree = "<group>";
+		};
 		2928059511E08DBA0D61DCA4 /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -360,6 +373,7 @@
 				E84584CA17279DC67909F94C /* AppUpdaterTests.swift */,
 				832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */,
 				0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */,
+				2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */,
 				F2ECE882547DAE6ABCD5EC51 /* ExportAvailabilityTests.swift */,
 				60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */,
 				518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */,
@@ -506,6 +520,7 @@
 				32B2723A56AB6D65DEFBC786 /* Onboarding */,
 				79DF3FC9D9044DFF8596F9CB /* Playback */,
 				EB5FA05316086CBB9824A308 /* Polish */,
+				2489DBF6B64B0D74CD8BEA6F /* System */,
 				BF45E89D7A9ABE2958901FAB /* Theme */,
 				42751661E03031911341C0C3 /* Transcription */,
 				3CFC1BEB5B7F757827B0B7E2 /* Updates */,
@@ -620,6 +635,8 @@
 				B1C8626312E7CF92B5F96D1A /* CanvasConnectionSettings.swift in Sources */,
 				A2603490A7FBF8826A31E9C6 /* CanvasHTMLTextCache.swift in Sources */,
 				64D1BB7B2C4864F6221429AE /* CanvasHTMLTextCacheTests.swift in Sources */,
+				5F48CA518FE926E6F2B01953 /* CompletionNotificationTests.swift in Sources */,
+				B0183D74ECA0C677FCFD815A /* CompletionNotifier.swift in Sources */,
 				2D3FB854C9E2918F5BEC2FF6 /* Enums.swift in Sources */,
 				B5E2B6A82B90454D78C45EA4 /* ExportAvailabilityTests.swift in Sources */,
 				C2044C6A831C4420526C5F27 /* ExternalTranscriptionEngine.swift in Sources */,
@@ -659,6 +676,7 @@
 				81AEF8ECD24F2CA06E7E9EA8 /* ChatMarkdownRenderer.swift in Sources */,
 				8BE649B38DF898AC27E78800 /* ChatMessage.swift in Sources */,
 				11B676CDDFEDF8FCE083CA1F /* Color+Hex.swift in Sources */,
+				5CC2CA3F302C627237B9794E /* CompletionNotifier.swift in Sources */,
 				BCC4C4D4D041A3049E9A0007 /* Course.swift in Sources */,
 				DCA25DC41D36D19446E842B2 /* CourseSynthesisService.swift in Sources */,
 				04A2587DE03F9385C9796948 /* CourseSynthesisView.swift in Sources */,

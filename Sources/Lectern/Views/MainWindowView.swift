@@ -179,7 +179,7 @@ struct MainWindowView: View {
                 HStack(spacing: 6) {
                     ProgressView()
                         .controlSize(.mini)
-                    Text("Generating \(generation.activeJob?.remaining.first?.title.lowercased() ?? "")…")
+                    Text("Generating \(generation.activeJob?.remaining.first?.title.lowercased() ?? "") in the background…")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

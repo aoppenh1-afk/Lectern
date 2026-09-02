@@ -98,6 +98,7 @@ targets:
       - Sources/Lectern/Canvas/CanvasConnectionSettings.swift
       - Sources/Lectern/ImportExport/LecternBundleOptions.swift
       - Sources/Lectern/ImportExport/LectureExportAvailability.swift
+      - Sources/Lectern/System/CompletionNotifier.swift
     settings:
       base:
         PRODUCT_NAME: LecternTests

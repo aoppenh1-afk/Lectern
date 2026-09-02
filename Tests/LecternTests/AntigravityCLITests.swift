@@ -1,4 +1,5 @@
 import XCTest
+import Darwin
 
 final class AntigravityCLITests: XCTestCase {
     func testModelListParserFindsVerifiedHighModelSlug() {
@@ -40,7 +41,7 @@ final class AntigravityCLITests: XCTestCase {
         }
     }
 
-    func testTranscriptionUsesAtFileInPrivateWorkspaceAndInstallsSkill() async throws {
+    func testTranscriptionUsesDirectTimestampedOutputWithoutSchemaLoop() async throws {
         let fixtureRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("LecternAntigravityTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: fixtureRoot, withIntermediateDirectories: true)
@@ -71,7 +72,10 @@ final class AntigravityCLITests: XCTestCase {
                 skillInstalled: FileManager.default.fileExists(atPath: installedSkill.path)
             )
 
-            let transcript = #"{"text":"Hello world","detectedLanguages":["en"],"segments":[{"startMs":0,"endMs":1000,"text":"Hello world","languageCode":"en"}]}"#
+            let transcript = """
+            [00:00] Professor: Hello world.
+            [00:01] Student: Is this a question?
+            """
             return try JSONSerialization.data(withJSONObject: [
                 "status": "SUCCESS",
                 "response": transcript,
@@ -81,6 +85,7 @@ final class AntigravityCLITests: XCTestCase {
             displayName: "Antigravity",
             provider: .antigravityCLI,
             modelID: "gemini-3.8-flash-low",
+            diarizationEnabled: true,
             cloudUploadConsent: true
         )
         let request = ExternalTranscriptionRequest(
@@ -92,14 +97,24 @@ final class AntigravityCLITests: XCTestCase {
         )
 
         let result = try await ExternalTranscriptionEngine(antigravity: cli).transcribe(request) { _ in }
-        XCTAssertEqual(result.text, "Hello world")
+        XCTAssertEqual(result.text, "Hello world.\n\nIs this a question?")
+        XCTAssertEqual(result.segments.count, 2)
+        XCTAssertEqual(result.segments[0].startMilliseconds, 0)
+        XCTAssertEqual(result.segments[0].endMilliseconds, 1_000)
+        XCTAssertEqual(result.segments[0].speakerID, "Professor")
+        XCTAssertEqual(result.segments[1].startMilliseconds, 1_000)
+        XCTAssertEqual(result.segments[1].endMilliseconds, 1_000)
+        XCTAssertEqual(result.segments[1].speakerID, "Student")
         XCTAssertEqual(result.providerInfo.provider, .antigravityCLI)
         XCTAssertEqual(result.providerInfo.requestedModelID, "gemini-3.8-flash-low")
         XCTAssertEqual(result.providerInfo.resolvedModelID, "gemini-3.8-flash-low")
 
         let invocation = try XCTUnwrap(recorder.snapshot())
         XCTAssertEqual(invocation.request, "", "Short prompts travel inline instead of through request.md.")
-        XCTAssertTrue(invocation.arguments.contains("--json-schema"))
+        XCTAssertFalse(
+            invocation.arguments.contains("--json-schema"),
+            "Structured-output mode makes Antigravity loop after it has already transcribed the audio."
+        )
         let printArgument = try XCTUnwrap(invocation.arguments.firstIndex(of: "-p"))
         let printPrompt = invocation.arguments[printArgument + 1]
         XCTAssertTrue(
@@ -119,7 +134,7 @@ final class AntigravityCLITests: XCTestCase {
         let timeoutArgument = try XCTUnwrap(invocation.arguments.firstIndex(of: "--print-timeout"))
         XCTAssertEqual(
             invocation.arguments[timeoutArgument + 1],
-            AntigravityCLI.effectivelyUnlimitedPrintTimeout
+            AntigravityCLI.defaultPrintTimeout
         )
         let newProjectArgument = try XCTUnwrap(invocation.arguments.firstIndex(of: "--new-project"))
         XCTAssertGreaterThan(newProjectArgument, printArgument + 1)
@@ -286,6 +301,98 @@ final class AntigravityCLITests: XCTestCase {
         XCTAssertEqual(environment["PWD"], workspace.path)
     }
 
+    func testCancellationTerminatesAntigravityProcessTree() async throws {
+        let fixtureRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LecternAntigravityCancellationTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: fixtureRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: fixtureRoot) }
+
+        let executable = fixtureRoot.appendingPathComponent("fake-agy.sh")
+        let parentPIDFile = fixtureRoot.appendingPathComponent("parent.pid")
+        let childPIDFile = fixtureRoot.appendingPathComponent("child.pid")
+        let script = """
+        #!/bin/sh
+        echo $$ > '\(parentPIDFile.path)'
+        /bin/sh -c 'trap "" HUP TERM; while :; do sleep 1; done' &
+        child=$!
+        echo $child > '\(childPIDFile.path)'
+        wait $child
+        """
+        try Data(script.utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+
+        var observedPIDs: [pid_t] = []
+        defer {
+            for pid in observedPIDs where Self.processExists(pid) {
+                _ = Darwin.kill(pid, SIGKILL)
+            }
+        }
+
+        let task = Task {
+            try await AntigravityCLI(executableURL: executable).run(prompt: "Wait for cancellation.")
+        }
+        let parentPID = try await Self.waitForPID(in: parentPIDFile)
+        let childPID = try await Self.waitForPID(in: childPIDFile)
+        observedPIDs = [childPID, parentPID]
+
+        task.cancel()
+        do {
+            _ = try await task.value
+            XCTFail("Cancellation should stop the Antigravity command.")
+        } catch is CancellationError {
+            // Expected.
+        }
+
+        try await Self.waitUntilStopped(parentPID)
+        try await Self.waitUntilStopped(childPID)
+        XCTAssertFalse(Self.processExists(parentPID))
+        XCTAssertFalse(Self.processExists(childPID))
+    }
+
+    func testTranscriptionTimeoutIsNotRetried() async throws {
+        let fixtureRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LecternAntigravityTimeoutTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: fixtureRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: fixtureRoot) }
+
+        let audio = fixtureRoot.appendingPathComponent("fixture.wav")
+        try Data("synthetic-audio".utf8).write(to: audio)
+        let skill = fixtureRoot.appendingPathComponent("SKILL.md")
+        try Data("---\nname: lectern-transcription\ndescription: Test fixture\n---\nTranscribe.\n".utf8)
+            .write(to: skill)
+
+        let attempts = InvocationCounter()
+        let cli = AntigravityCLI(
+            executableURL: URL(fileURLWithPath: "/usr/bin/true"),
+            transcriptionSkillURL: skill
+        ) { _, _, _ in
+            attempts.increment()
+            throw AntigravityCLI.CLIError.failed("print timeout exceeded")
+        }
+        let connection = TranscriptionConnection(
+            displayName: "Antigravity",
+            provider: .antigravityCLI,
+            modelID: "gemini-3.8-flash-high",
+            cloudUploadConsent: true
+        )
+        let request = ExternalTranscriptionRequest(
+            audioURL: audio,
+            durationSeconds: 60,
+            lectureLanguage: .english,
+            connection: connection,
+            attemptNumber: 1
+        )
+
+        do {
+            _ = try await ExternalTranscriptionEngine(antigravity: cli).transcribe(request) { _ in }
+            XCTFail("A timed-out Antigravity run should fail.")
+        } catch let error as ExternalTranscriptionError {
+            XCTAssertEqual(error.code, .timeout)
+            XCTAssertFalse(error.retryable)
+        }
+        XCTAssertEqual(attempts.value, 1, "A stuck local agent should not be launched again automatically.")
+    }
+
     func testSharedPromptUsesStableCorpusDerivedNotesContract() {
         let contract = """
         Begin with exactly one # source title. Use ## topic sections. Use a chronological numbered outline when the lecture is chronological. Use source-first shiur structure with Q:, A1:, רש״י, תוס׳, מיגו, and נ״מ. Never force Summary or Key Takeaways. If an image-generation tool is available, create a textbook-style labeled diagram or illustration at /absolute/local/path.png.
@@ -338,6 +445,31 @@ final class AntigravityCLITests: XCTestCase {
     private static func permissions(of url: URL) throws -> Int {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         return (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0
+    }
+
+    private static func waitForPID(in file: URL) async throws -> pid_t {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while ContinuousClock.now < deadline {
+            if let value = try? String(contentsOf: file, encoding: .utf8),
+               let pid = pid_t(value.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                return pid
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        throw NSError(domain: "AntigravityCLITests", code: 1, userInfo: [
+            NSLocalizedDescriptionKey: "Timed out waiting for fixture process ID."
+        ])
+    }
+
+    private static func waitUntilStopped(_ pid: pid_t) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while ContinuousClock.now < deadline, processExists(pid) {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
+    private static func processExists(_ pid: pid_t) -> Bool {
+        Darwin.kill(pid, 0) == 0 || errno == EPERM
     }
 }
 
@@ -421,5 +553,22 @@ private final class InvocationRecorder: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return value
+    }
+}
+
+private final class InvocationCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func increment() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
     }
 }

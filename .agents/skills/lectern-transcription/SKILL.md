@@ -17,7 +17,7 @@ Do not combine transcription with note-taking. Never summarize, outline, explain
 ## Cover the whole recording
 
 - Transcribe from the first spoken word to the last. A 40-minute lecture yields a transcript that reaches its last minute; never stop early, skip a stretch, compress a passage into a paraphrase, or write a placeholder such as `[continues]` or `...`.
-- If the recording is long, keep working through it; the caller has no timeout and will wait. Partial coverage is a failed transcription.
+- If the recording is long, work through it in one pass and return promptly after the final spoken passage. Partial coverage is a failed transcription.
 - Include student questions and the speaker's replies. They are part of the lecture.
 
 ## Preserve the record
@@ -75,8 +75,9 @@ When the recognizer produced gibberish at a language boundary, use the audio fir
 - Keep timestamps monotonic and within the recording. Include a timestamp only when it is grounded in the audio.
 - Add speaker labels only when distinct speakers can be tracked consistently. Otherwise omit them.
 - Use BCP 47 language codes such as `en`, `he`, and `arc` when the requested schema includes language fields.
-- Set the top-level `text` to the complete transcript in segment order. Every spoken passage in a segment must also appear in `text`.
+- When a schema is supplied, set its top-level `text` to the complete transcript in segment order. Every spoken passage in a segment must also appear in `text`.
 - Return only the requested JSON object when a schema is supplied. Do not wrap it in a Markdown fence.
+- When the caller requests timestamped text instead of JSON, start each natural segment with `[HH:MM:SS]`, add any requested speaker label after it, and return only the transcript immediately after the final segment.
 
 ## Transcript cleanup output
 

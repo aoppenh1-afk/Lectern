@@ -13,16 +13,23 @@ final class TranscriptionService {
 
     private let modelContainer: ModelContainer
     private let preferences: TranscriptionPreferences
+    private let completionNotifier: any CompletionNotifying
     private let engine = TranscriptionEngine()
     private let whisperEngine = WhisperTranscriptionEngine()
     private let externalEngine: ExternalTranscriptionEngine
     private let jobStore = TranscriptionJobStore()
     private var pendingIDs: [PersistentIdentifier] = []
     private var activeID: PersistentIdentifier?
+    private var activeTask: Task<Void, Never>?
 
-    init(modelContainer: ModelContainer, preferences: TranscriptionPreferences) {
+    init(
+        modelContainer: ModelContainer,
+        preferences: TranscriptionPreferences,
+        completionNotifier: any CompletionNotifying = SystemCompletionNotifier.shared
+    ) {
         self.modelContainer = modelContainer
         self.preferences = preferences
+        self.completionNotifier = completionNotifier
         let antigravityProfile = AgentProfiles.profile(id: AgentProfiles.antigravityID)
         self.externalEngine = ExternalTranscriptionEngine(
             antigravity: antigravityProfile.map { AntigravityCLI.configured(for: $0) } ?? AntigravityCLI()
@@ -36,8 +43,16 @@ final class TranscriptionService {
               !pendingIDs.contains(lectureID) else {
             return
         }
+        completionNotifier.prepare()
         pendingIDs.append(lectureID)
         drainQueue()
+    }
+
+    /// Stops queued and active work. Active external commands receive task
+    /// cancellation, which also tears down their complete process tree.
+    func cancelAll() {
+        pendingIDs.removeAll()
+        activeTask?.cancel()
     }
 
     /// Scan the store for lectures that need transcription and enqueue them.
@@ -123,7 +138,7 @@ final class TranscriptionService {
         pendingIDs.removeFirst()
         isRunning = true
         activeID = nextID
-        Task { await self.run(nextID) }
+        activeTask = Task { await self.run(nextID) }
     }
 
     private func run(_ id: PersistentIdentifier) async {
@@ -135,6 +150,7 @@ final class TranscriptionService {
         isRunning = false
         activeID = nil
         activeLectureTitle = nil
+        activeTask = nil
         drainQueue()
     }
 
@@ -299,6 +315,13 @@ final class TranscriptionService {
             lecture.status = .ready
             lecture.statusMessage = nil
             try? context.save()
+            completionNotifier.deliver(.transcriptionFinished(lectureTitle: lecture.title))
+        } catch is CancellationError {
+            lecture.statusMessage = "Transcription paused"
+            try? context.save()
+        } catch let error as ExternalTranscriptionError where error.code == .cancelled {
+            lecture.statusMessage = "Transcription paused"
+            try? context.save()
         } catch {
             lecture.status = .failed
             lecture.statusMessage = error.localizedDescription
@@ -458,6 +481,12 @@ final class TranscriptionService {
                 return result
             } catch let error as ExternalTranscriptionError {
                 if let persisted = await jobStore.job(id: jobID) { job = persisted }
+                if error.code == .cancelled {
+                    job.state = .queued
+                    job.attempts[index].error = nil
+                    await jobStore.upsert(job)
+                    throw error
+                }
                 lastError = error
                 job.attempts[index].error = error
                 if error.code == .acceptedStateUnknown {

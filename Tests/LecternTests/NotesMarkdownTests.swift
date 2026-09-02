@@ -156,12 +156,95 @@ final class NotesMarkdownTests: XCTestCase {
         let firstBulletIndex = kinds.firstIndex(of: "createParagraphBullets")!
         XCTAssertTrue(kinds[..<firstBulletIndex].allSatisfy { $0 != "createParagraphBullets" })
         XCTAssertFalse(kinds[firstBulletIndex...].contains("updateTextStyle"), "Bullets apply after every style.")
+        XCTAssertFalse(
+            kinds[firstBulletIndex...].contains("updateParagraphStyle"),
+            "Paragraph direction applies before Docs removes the depth tabs."
+        )
         let starts = requests.compactMap { request -> Int? in
             guard let bullets = request["createParagraphBullets"] as? [String: Any],
                   let range = bullets["range"] as? [String: Any] else { return nil }
             return range["startIndex"] as? Int
         }
         XCTAssertEqual(starts, starts.sorted(by: >), "Bullets apply from the end of the document backwards.")
+    }
+
+    func testGoogleDocsPlanKeepsHebrewListBulletsLTRAndIsolatesTheirText() {
+        let markdown = """
+        # דין בישול אחר בישול בדבר לח (שבת לד.-לד:)
+
+        - **משנה:** בפרק במה טומנין (דף מז:): Distinguishes between two classes.
+            - גזירה שמא ירתיח (שבת)
+        - Q (רש״י, ד״ה וטומנין): Derived from the משנה.
+        - English with דבר לח (liquids, broth).
+        2026 — דבר לח שנצטנן
+        """
+        let plan = NotesMarkdownConverter.plan(markdown: markdown)
+        let lines = plan.text.components(separatedBy: "\n")
+
+        XCTAssertEqual(
+            lines[1],
+            "\u{2067}משנה:\u{2069} \u{2067}בפרק במה טומנין (דף מז:):\u{2069} Distinguishes between two classes."
+        )
+        XCTAssertEqual(lines[2], "\t\u{2067}גזירה שמא ירתיח (שבת)\u{2069}")
+        XCTAssertEqual(
+            (plan.text as NSString).substring(
+                with: NSRange(
+                    location: plan.boldRanges[0].start - 1,
+                    length: plan.boldRanges[0].end - plan.boldRanges[0].start
+                )
+            ),
+            "משנה:"
+        )
+
+        let requests = plan.requests(tabId: "t", existingBodyEndIndex: 1)
+
+        let directions = requests.compactMap { request -> String? in
+            guard let update = request["updateParagraphStyle"] as? [String: Any],
+                  let style = update["paragraphStyle"] as? [String: Any] else { return nil }
+            return style["direction"] as? String
+        }
+        let alignments = requests.compactMap { request -> String? in
+            guard let update = request["updateParagraphStyle"] as? [String: Any],
+                  let style = update["paragraphStyle"] as? [String: Any],
+                  style["direction"] != nil else { return nil }
+            return style["alignment"] as? String
+        }
+
+        XCTAssertEqual(
+            directions,
+            [
+                "RIGHT_TO_LEFT",
+                "LEFT_TO_RIGHT",
+                "LEFT_TO_RIGHT",
+                "LEFT_TO_RIGHT",
+                "LEFT_TO_RIGHT",
+                "RIGHT_TO_LEFT",
+            ]
+        )
+        XCTAssertEqual(alignments, ["END", "START", "START", "START", "START", "END"])
+    }
+
+    func testGoogleDocsPlanKeepsLeadingHebrewBoldLabelBeforeEnglishContinuation() {
+        let markdown = """
+        - **שיטת שאר ראשונים (תוס׳, ריטב״א):** שהייה and הטמנה are two entirely separate realms with distinct mechanisms
+        """
+        let plan = NotesMarkdownConverter.plan(markdown: markdown)
+
+        XCTAssertEqual(
+            plan.text,
+            "\u{2067}שיטת שאר ראשונים (תוס׳, ריטב״א):\u{2069} "
+                + "\u{2067}שהייה\u{2069} and \u{2067}הטמנה\u{2069} "
+                + "are two entirely separate realms with distinct mechanisms"
+        )
+        XCTAssertEqual(
+            (plan.text as NSString).substring(
+                with: NSRange(
+                    location: plan.boldRanges[0].start - 1,
+                    length: plan.boldRanges[0].end - plan.boldRanges[0].start
+                )
+            ),
+            "שיטת שאר ראשונים (תוס׳, ריטב״א):"
+        )
     }
 
     private static func depths(of markdown: String) -> [Int] {

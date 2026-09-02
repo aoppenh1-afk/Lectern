@@ -15,6 +15,9 @@ struct LectureDetailView: View {
 
     @State private var selectedTab: Tab = .rawTranscript
     @State private var antigravityCatalog = AgentModelCatalog.empty
+    @State private var transcriptionPickerOpen = false
+    @State private var transcriptionModelSearch = ""
+    @State private var hoveredTranscriberID: String?
 
     enum Tab: Hashable {
         case rawTranscript, cleanedTranscript, notes, flashcards, quiz, bookmarks, attachments
@@ -121,6 +124,7 @@ struct LectureDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
+                    recordingLanguagePicker
                     Button("Transcribe") {
                         transcription.retranscribe(lecture, as: lecture.language)
                     }
@@ -177,6 +181,42 @@ struct LectureDetailView: View {
         ).progressSubtitle(connectionName: lecture.transcriptConnectionName)
     }
 
+    private var recordingLanguagePicker: some View {
+        HStack(spacing: 0) {
+            recordingLanguageOption(.english, label: "A", help: "English")
+            recordingLanguageOption(.hebrewEnglish, label: "A/א", help: "English and Hebrew")
+        }
+        .padding(2)
+        .background(Color.primary.opacity(0.035), in: Capsule())
+        .overlay(Capsule().stroke(LecternTheme.hairline))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Audio language")
+    }
+
+    private func recordingLanguageOption(
+        _ language: LectureLanguage,
+        label: String,
+        help: String
+    ) -> some View {
+        Button {
+            lecture.language = language
+        } label: {
+            Text(label)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(lecture.language == language ? LecternTheme.accent : LecternTheme.ink)
+                .frame(width: 45, height: 30)
+                .background(
+                    lecture.language == language ? LecternTheme.accent.opacity(0.13) : Color.clear,
+                    in: Capsule()
+                )
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(help)
+        .accessibilityAddTraits(lecture.language == language ? .isSelected : [])
+        .help(help)
+    }
+
     @ViewBuilder
     private var transcriptProvenance: some View {
         if lecture.status == .ready,
@@ -213,54 +253,242 @@ struct LectureDetailView: View {
     }
 
     private func transcriptionChoiceMenu(label: String) -> some View {
-        Menu(label) {
-            Section("Models available on this Mac") {
-                ForEach(BuiltInTranscriptionModel.allCases.filter { !$0.usesAntigravity }) { model in
-                    Button {
-                        transcription.retranscribe(
-                            lecture,
-                            as: lecture.language,
-                            source: .local,
-                            builtInModelID: model.id
-                        )
-                    } label: {
-                        Label(model.title, systemImage: "macbook")
-                    }
-                }
-                Menu("Antigravity CLI") {
-                    ForEach(antigravityMenuModels) { model in
-                        Button {
-                            transcription.retranscribe(
-                                lecture,
-                                as: lecture.language,
-                                source: .local,
-                                builtInModelID: model.id
-                            )
-                        } label: {
-                            Label(model.name, systemImage: "sparkles")
-                        }
-                    }
-                }
+        Button {
+            transcriptionPickerOpen.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Text(label)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .lineLimit(1)
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.secondary)
             }
-            if !transcriptionPreferences.connections.filter(\.enabled).isEmpty {
-                Divider()
-                Section("API connections") {
-                    ForEach(transcriptionPreferences.connections.filter(\.enabled)) { connection in
-                        Button {
-                            transcription.retranscribe(
-                                lecture,
-                                as: lecture.language,
-                                source: .external,
-                                connectionID: connection.id
-                            )
-                        } label: {
-                            Text("\(connection.displayName) · \(connection.modelID)")
-                        }
-                    }
-                }
+            .foregroundStyle(LecternTheme.ink)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(minWidth: 160)
+            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
             }
         }
-        .controlSize(.small)
+        .buttonStyle(.plain)
+        .popover(isPresented: $transcriptionPickerOpen, arrowEdge: .top) {
+            transcriptionPicker
+                .onDisappear {
+                    transcriptionModelSearch = ""
+                    hoveredTranscriberID = nil
+                }
+        }
+    }
+
+    private var transcriptionPicker: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Choose a transcriber")
+                    .font(.system(size: 17, weight: .bold, design: .serif))
+                    .foregroundStyle(LecternTheme.ink)
+                Text("Run locally on this Mac or use a connected API.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
+            HStack(spacing: 7) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                TextField("Search models", text: $transcriptionModelSearch)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12.5))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 10)
+
+            Divider()
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if !filteredBuiltInModels.isEmpty {
+                        transcriptionPickerSection("On this Mac")
+                        ForEach(filteredBuiltInModels) { model in
+                            transcriptionPickerRow(
+                                id: model.id,
+                                title: model.title,
+                                subtitle: "Private, on-device transcription"
+                            ) {
+                                Image(systemName: "macbook")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(LecternTheme.accent)
+                            } action: {
+                                chooseLocalTranscriber(model.id)
+                            }
+                        }
+                    }
+
+                    if !filteredAntigravityModels.isEmpty {
+                        transcriptionPickerSection("Antigravity CLI")
+                        ForEach(filteredAntigravityModels) { model in
+                            transcriptionPickerRow(
+                                id: model.id,
+                                title: model.name,
+                                subtitle: model.id == model.name ? "Runs through Antigravity CLI" : model.id
+                            ) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(LecternTheme.processingTint)
+                            } action: {
+                                chooseLocalTranscriber(model.id)
+                            }
+                        }
+                    }
+
+                    if !filteredTranscriptionConnections.isEmpty {
+                        transcriptionPickerSection("API connections")
+                        ForEach(filteredTranscriptionConnections) { connection in
+                            transcriptionPickerRow(
+                                id: "connection-\(connection.id)",
+                                title: connection.displayName,
+                                subtitle: connection.modelID
+                            ) {
+                                ProviderLogo(provider: connection.provider, size: 26)
+                            } action: {
+                                chooseAPITranscriber(connection.id)
+                            }
+                        }
+                    }
+
+                    if filteredBuiltInModels.isEmpty,
+                       filteredAntigravityModels.isEmpty,
+                       filteredTranscriptionConnections.isEmpty {
+                        VStack(spacing: 7) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 17))
+                                .foregroundStyle(.tertiary)
+                            Text("No models match \"\(transcriptionModelSearch)\".")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 28)
+                    }
+                }
+                .padding(.vertical, 5)
+            }
+        }
+        .frame(width: 380, height: 440)
+        .background(LecternTheme.paper)
+    }
+
+    private func transcriptionPickerSection(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(size: 9.5, weight: .semibold))
+            .tracking(0.5)
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 14)
+            .padding(.top, 10)
+            .padding(.bottom, 4)
+    }
+
+    private func transcriptionPickerRow<Icon: View>(
+        id: String,
+        title: String,
+        subtitle: String,
+        @ViewBuilder icon: () -> Icon,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 11) {
+                icon()
+                    .frame(width: 28, height: 28)
+                    .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(LecternTheme.ink)
+                    Text(subtitle)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(hoveredTranscriberID == id ? Color.primary.opacity(0.055) : .clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 5)
+        .onHover { hovering in
+            hoveredTranscriberID = hovering ? id : nil
+        }
+    }
+
+    private var filteredBuiltInModels: [BuiltInTranscriptionModel] {
+        BuiltInTranscriptionModel.allCases.filter { model in
+            !model.usesAntigravity && transcriptionSearchMatches(model.title, model.id)
+        }
+    }
+
+    private var filteredAntigravityModels: [AgentModel] {
+        antigravityMenuModels.filter { model in
+            transcriptionSearchMatches(model.name, model.id, model.provider ?? "")
+        }
+    }
+
+    private var filteredTranscriptionConnections: [TranscriptionConnection] {
+        transcriptionPreferences.connections.filter { connection in
+            connection.enabled && transcriptionSearchMatches(
+                connection.displayName,
+                connection.modelID,
+                connection.provider.rawValue
+            )
+        }
+    }
+
+    private func transcriptionSearchMatches(_ values: String...) -> Bool {
+        let query = transcriptionModelSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return true }
+        return values.contains { $0.localizedCaseInsensitiveContains(query) }
+    }
+
+    private func chooseLocalTranscriber(_ modelID: String) {
+        transcriptionPickerOpen = false
+        transcription.retranscribe(
+            lecture,
+            as: lecture.language,
+            source: .local,
+            builtInModelID: modelID
+        )
+    }
+
+    private func chooseAPITranscriber(_ connectionID: UUID) {
+        transcriptionPickerOpen = false
+        transcription.retranscribe(
+            lecture,
+            as: lecture.language,
+            source: .external,
+            connectionID: connectionID
+        )
     }
 
     private var antigravityMenuModels: [AgentModel] {

@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 struct AntigravityCLI: Sendable {
@@ -54,10 +55,9 @@ struct AntigravityCLI: Sendable {
         return String(id[suffixRange])
     }
 
-    /// `agy` 1.1.23 has no disabled value for `--print-timeout`; omitting the
-    /// flag restores its five-minute default. The largest Go duration gives
-    /// Lectern an effectively unbounded wait while preserving task cancellation.
-    static let effectivelyUnlimitedPrintTimeout = "2562047h47m16.854775807s"
+    /// Long enough for lecture transcription while still bounding a stuck
+    /// agent run. Cancellation remains the normal way to stop work sooner.
+    static let defaultPrintTimeout = "10m"
 
     struct AvailableModel: Equatable, Sendable {
         let id: String
@@ -158,7 +158,7 @@ struct AntigravityCLI: Sendable {
         inputs: [WorkspaceInput] = [],
         skills: Set<LecternAgentSkill> = [],
         jsonSchema: String? = nil,
-        timeout: String = AntigravityCLI.effectivelyUnlimitedPrintTimeout
+        timeout: String = AntigravityCLI.defaultPrintTimeout
     ) async throws -> String {
         let executable = try resolvedExecutable()
         let workspace = try PrivateWorkspace()
@@ -326,7 +326,7 @@ struct AntigravityCLI: Sendable {
         let status: Int32 = await withTaskCancellationHandler {
             await statusTask.value
         } onCancel: {
-            if process.isRunning { process.terminate() }
+            terminateProcessTree(rootPID: process.processIdentifier)
         }
 
         let output = (try? await stdoutRead.value) ?? Data()
@@ -337,6 +337,56 @@ struct AntigravityCLI: Sendable {
             throw CLIError.failed(diagnostic)
         }
         return output
+    }
+
+    private static func terminateProcessTree(rootPID: pid_t) {
+        let descendants = descendantProcessIDs(of: rootPID)
+        let targets = [rootPID] + descendants.reversed()
+        for pid in targets {
+            _ = Darwin.kill(pid, SIGTERM)
+        }
+
+        Task.detached(priority: .high) {
+            try? await Task.sleep(for: .milliseconds(250))
+            for pid in targets where processExists(pid) {
+                _ = Darwin.kill(pid, SIGKILL)
+            }
+        }
+    }
+
+    private static func descendantProcessIDs(of rootPID: pid_t) -> [pid_t] {
+        var descendants: [pid_t] = []
+        var pending = [rootPID]
+        var index = 0
+
+        while index < pending.count {
+            let children = childProcessIDs(of: pending[index])
+            descendants.append(contentsOf: children)
+            pending.append(contentsOf: children)
+            index += 1
+        }
+        return descendants
+    }
+
+    private static func childProcessIDs(of parentPID: pid_t) -> [pid_t] {
+        var capacity = 16
+        while capacity <= 4_096 {
+            var children = [pid_t](repeating: 0, count: capacity)
+            let bufferSize = Int32(children.count * MemoryLayout<pid_t>.stride)
+            let childCount = proc_listchildpids(parentPID, &children, bufferSize)
+            guard childCount > 0 else { return [] }
+
+            let count = Int(childCount)
+            if count < capacity {
+                return Array(children.prefix(count)).filter { $0 > 0 }
+            }
+            capacity *= 2
+        }
+        return []
+    }
+
+    private static func processExists(_ pid: pid_t) -> Bool {
+        Darwin.kill(pid, 0) == 0 || errno == EPERM
     }
 
     enum CLIError: LocalizedError, Sendable {

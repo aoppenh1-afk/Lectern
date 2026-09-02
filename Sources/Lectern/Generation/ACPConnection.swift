@@ -270,11 +270,16 @@ final class ACPConnection: @unchecked Sendable {
             ]
         })
 
-        let result = try await request(
-            method: "session/prompt",
-            params: ["sessionId": sessionID,
-                     "prompt": prompt]
-        )
+        let result = try await withTaskCancellationHandler {
+            try await request(
+                method: "session/prompt",
+                params: ["sessionId": sessionID,
+                         "prompt": prompt]
+            )
+        } onCancel: {
+            cancel(sessionID: sessionID)
+        }
+        try Task.checkCancellation()
 
         if let dict = result as? [String: Any],
            dict["stopReason"] as? String == "refusal" {
