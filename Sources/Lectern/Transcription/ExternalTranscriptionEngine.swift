@@ -219,12 +219,24 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
                 partRequest.durationSeconds = chunk.durationSeconds
                 let part = try Self.result(from: output, request: partRequest)
                 let offset = Int64((chunk.startSeconds * 1_000).rounded())
-                combinedSegments.append(contentsOf: part.segments.map { segment in
+                let shiftedSegments = part.segments.map { segment in
                     var shifted = segment
                     shifted.startMilliseconds = segment.startMilliseconds.map { $0 + offset }
                     shifted.endMilliseconds = segment.endMilliseconds.map { $0 + offset }
                     return shifted
-                })
+                }
+                if index == 0 {
+                    combinedSegments = shiftedSegments
+                } else {
+                    combinedSegments = AntigravityTranscriptMerger.merge(
+                        accumulated: combinedSegments,
+                        incoming: shiftedSegments,
+                        boundaryMilliseconds: Int64((chunk.coreStartSeconds * 1_000).rounded()),
+                        overlapMilliseconds: Int64((
+                            max(0, chunk.coreStartSeconds - chunk.startSeconds) * 1_000
+                        ).rounded())
+                    )
+                }
                 detectedLanguages.formUnion(part.detectedLanguages)
             }
 
@@ -476,10 +488,163 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
 
 }
 
+struct AntigravityTranscriptMerger {
+    private struct TokenReference {
+        let normalized: String
+    }
+
+    static func merge(
+        accumulated: [NormalizedTranscriptionSegment],
+        incoming: [NormalizedTranscriptionSegment],
+        boundaryMilliseconds: Int64,
+        overlapMilliseconds: Int64
+    ) -> [NormalizedTranscriptionSegment] {
+        guard !accumulated.isEmpty else { return incoming }
+        guard !incoming.isEmpty else { return accumulated }
+
+        let lowerBound = boundaryMilliseconds - overlapMilliseconds
+        let upperBound = boundaryMilliseconds + overlapMilliseconds
+        let existingIndexes = boundarySuffixIndexes(
+            in: accumulated,
+            lowerBound: lowerBound
+        )
+        let incomingIndexes = boundaryPrefixIndexes(
+            in: incoming,
+            upperBound: upperBound
+        )
+        let existingTokens = tokens(in: accumulated, indexes: existingIndexes).suffix(80)
+        let incomingTokens = tokens(in: incoming, indexes: incomingIndexes).prefix(80)
+        let duplicateCount = longestConfidentOverlap(
+            suffix: Array(existingTokens),
+            prefix: Array(incomingTokens)
+        )
+        let trimmedIncoming = removingPrefixTokens(
+            duplicateCount,
+            from: incoming,
+            boundaryMilliseconds: boundaryMilliseconds
+        )
+        return normalizeTimeline(accumulated + trimmedIncoming)
+    }
+
+    private static func boundarySuffixIndexes(
+        in segments: [NormalizedTranscriptionSegment],
+        lowerBound: Int64
+    ) -> [Int] {
+        let matches = segments.indices.filter { index in
+            let segment = segments[index]
+            return (segment.endMilliseconds ?? segment.startMilliseconds).map { $0 >= lowerBound } ?? false
+        }
+        return matches.isEmpty ? [segments.count - 1] : matches
+    }
+
+    private static func boundaryPrefixIndexes(
+        in segments: [NormalizedTranscriptionSegment],
+        upperBound: Int64
+    ) -> [Int] {
+        let matches = segments.indices.filter { index in
+            let segment = segments[index]
+            return segment.startMilliseconds.map { $0 <= upperBound } ?? false
+        }
+        return matches.isEmpty ? [0] : matches
+    }
+
+    private static func tokens(
+        in segments: [NormalizedTranscriptionSegment],
+        indexes: [Int]
+    ) -> [TokenReference] {
+        indexes.flatMap { index in
+            segments[index].text
+                .split(whereSeparator: { $0.isWhitespace })
+                .compactMap { word -> TokenReference? in
+                    let normalized = normalize(String(word))
+                    guard !normalized.isEmpty else { return nil }
+                    return .init(normalized: normalized)
+                }
+        }
+    }
+
+    private static func normalize(_ token: String) -> String {
+        String(token.lowercased().unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0)
+        })
+    }
+
+    private static func longestConfidentOverlap(
+        suffix: [TokenReference],
+        prefix: [TokenReference]
+    ) -> Int {
+        let maximum = min(suffix.count, prefix.count)
+        guard maximum > 0 else { return 0 }
+        for count in stride(from: maximum, through: 1, by: -1) {
+            let left = suffix.suffix(count).map(\.normalized)
+            let right = prefix.prefix(count).map(\.normalized)
+            guard left == right else { continue }
+            let characterCount = right.reduce(0) { $0 + $1.count }
+            if count >= 3 || characterCount >= 12 {
+                return count
+            }
+        }
+        return 0
+    }
+
+    private static func removingPrefixTokens(
+        _ count: Int,
+        from segments: [NormalizedTranscriptionSegment],
+        boundaryMilliseconds: Int64
+    ) -> [NormalizedTranscriptionSegment] {
+        guard count > 0 else { return segments }
+        var remaining = count
+        var result: [NormalizedTranscriptionSegment] = []
+        for var segment in segments {
+            let words = segment.text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+            var rawWordsToRemove = 0
+            var normalizedWordsRemoved = 0
+            for word in words where normalizedWordsRemoved < remaining {
+                rawWordsToRemove += 1
+                if !normalize(word).isEmpty {
+                    normalizedWordsRemoved += 1
+                }
+            }
+            remaining -= normalizedWordsRemoved
+            let kept = words.dropFirst(rawWordsToRemove)
+            guard !kept.isEmpty else { continue }
+            segment.text = kept.joined(separator: " ")
+            if rawWordsToRemove > 0 {
+                segment.startMilliseconds = max(
+                    segment.startMilliseconds ?? boundaryMilliseconds,
+                    boundaryMilliseconds
+                )
+            }
+            result.append(segment)
+        }
+        return result
+    }
+
+    private static func normalizeTimeline(
+        _ segments: [NormalizedTranscriptionSegment]
+    ) -> [NormalizedTranscriptionSegment] {
+        var previousStart: Int64?
+        return segments.map { segment in
+            var adjusted = segment
+            if let start = adjusted.startMilliseconds, let previousStart {
+                adjusted.startMilliseconds = max(start, previousStart)
+            }
+            if let start = adjusted.startMilliseconds,
+               let end = adjusted.endMilliseconds {
+                adjusted.endMilliseconds = max(start, end)
+            }
+            previousStart = adjusted.startMilliseconds ?? previousStart
+            return adjusted
+        }
+    }
+}
+
 struct AntigravityAudioPreparer {
     struct PlannedRange: Equatable, Sendable {
-        let startSeconds: Double
-        let endSeconds: Double
+        let coreStartSeconds: Double
+        let coreEndSeconds: Double
+        let exportStartSeconds: Double
+        let exportEndSeconds: Double
         let estimatedBytes: Int64
     }
 
@@ -487,6 +652,27 @@ struct AntigravityAudioPreparer {
         let url: URL
         let startSeconds: Double
         let durationSeconds: Double
+        let coreStartSeconds: Double
+        let coreEndSeconds: Double
+
+        init(
+            url: URL,
+            startSeconds: Double,
+            durationSeconds: Double,
+            coreStartSeconds: Double? = nil,
+            coreEndSeconds: Double? = nil
+        ) {
+            self.url = url
+            self.startSeconds = startSeconds
+            self.durationSeconds = durationSeconds
+            self.coreStartSeconds = coreStartSeconds ?? startSeconds
+            self.coreEndSeconds = coreEndSeconds ?? startSeconds + durationSeconds
+        }
+    }
+
+    struct EnergyPoint: Equatable, Sendable {
+        let timeSeconds: Double
+        let rootMeanSquare: Double
     }
 
     final class PreparedAudio: @unchecked Sendable {
@@ -510,6 +696,9 @@ struct AntigravityAudioPreparer {
     }
 
     static let targetBytes: Int64 = 16 * 1_024 * 1_024
+    static let overlapSeconds = 5.0
+    static let silenceSearchRadiusSeconds = 15.0
+    private static let sizeHeadroomBytes: Int64 = 64 * 1_024
 
     static func plannedRanges(
         fileBytes: Int64,
@@ -518,19 +707,86 @@ struct AntigravityAudioPreparer {
     ) -> [PlannedRange] {
         guard fileBytes > targetBytes, durationSeconds > 0, targetBytes > 0 else {
             return [.init(
-                startSeconds: 0,
-                endSeconds: max(0, durationSeconds),
+                coreStartSeconds: 0,
+                coreEndSeconds: max(0, durationSeconds),
+                exportStartSeconds: 0,
+                exportEndSeconds: max(0, durationSeconds),
                 estimatedBytes: max(0, fileBytes)
             )]
         }
         let count = max(1, Int(ceil(Double(fileBytes) / Double(targetBytes))))
-        return (0..<count).map { index in
-            let start = durationSeconds * Double(index) / Double(count)
-            let end = durationSeconds * Double(index + 1) / Double(count)
+        let boundaries = (1..<count).map {
+            durationSeconds * Double($0) / Double(count)
+        }
+        return ranges(
+            fileBytes: fileBytes,
+            durationSeconds: durationSeconds,
+            boundaries: boundaries
+        )
+    }
+
+    static func quietestBoundary(
+        near targetSeconds: Double,
+        searchRadiusSeconds: Double,
+        energy: [EnergyPoint]
+    ) -> Double {
+        let candidates = energy.filter {
+            abs($0.timeSeconds - targetSeconds) <= searchRadiusSeconds
+        }
+        guard !candidates.isEmpty else { return targetSeconds }
+        let smoothed = candidates.map { candidate -> EnergyPoint in
+            let neighbors = candidates.filter {
+                abs($0.timeSeconds - candidate.timeSeconds) <= 0.35
+            }
+            let meanSquare = neighbors.reduce(0) {
+                $0 + $1.rootMeanSquare * $1.rootMeanSquare
+            } / Double(max(1, neighbors.count))
             return .init(
-                startSeconds: start,
-                endSeconds: end,
-                estimatedBytes: Int64(ceil(Double(fileBytes) * (end - start) / durationSeconds))
+                timeSeconds: candidate.timeSeconds,
+                rootMeanSquare: sqrt(meanSquare)
+            )
+        }
+        let minimum = smoothed.map(\.rootMeanSquare).min() ?? 0
+        let quiet = smoothed.filter {
+            $0.rootMeanSquare <= minimum * 1.25 + 0.000_01
+        }
+        return quiet.min {
+            abs($0.timeSeconds - targetSeconds) < abs($1.timeSeconds - targetSeconds)
+        }?.timeSeconds ?? targetSeconds
+    }
+
+    private static func ranges(
+        fileBytes: Int64,
+        durationSeconds: Double,
+        boundaries: [Double]
+    ) -> [PlannedRange] {
+        let coreBoundaries = [0] + boundaries + [durationSeconds]
+        let bytesPerSecond = Double(fileBytes) / durationSeconds
+        let maximumDuration = Double(
+            Int64(AntigravityACPContent.maximumAudioBytes) - sizeHeadroomBytes
+        ) / bytesPerSecond
+        return zip(coreBoundaries, coreBoundaries.dropFirst()).enumerated().map { index, pair in
+            let coreStart = pair.0
+            let coreEnd = pair.1
+            let desiredBefore = index == 0 ? 0 : min(overlapSeconds, coreStart)
+            let desiredAfter = index == boundaries.count
+                ? 0
+                : min(overlapSeconds, durationSeconds - coreEnd)
+            let desiredOverlap = desiredBefore + desiredAfter
+            let availableOverlap = max(0, maximumDuration - (coreEnd - coreStart))
+            let overlapScale = desiredOverlap > 0
+                ? min(1, availableOverlap / desiredOverlap)
+                : 0
+            let exportStart = coreStart - desiredBefore * overlapScale
+            let exportEnd = coreEnd + desiredAfter * overlapScale
+            return .init(
+                coreStartSeconds: coreStart,
+                coreEndSeconds: coreEnd,
+                exportStartSeconds: exportStart,
+                exportEndSeconds: exportEnd,
+                estimatedBytes: Int64(ceil(
+                    Double(fileBytes) * (exportEnd - exportStart) / durationSeconds
+                ))
             )
         }
     }
@@ -557,13 +813,48 @@ struct AntigravityAudioPreparer {
         let duration = loadedDuration.isFinite && loadedDuration > 0
             ? loadedDuration
             : requestedDuration
-        let ranges = plannedRanges(fileBytes: fileBytes, durationSeconds: duration)
-        guard ranges.count > 1 else {
+        let nominalRanges = plannedRanges(fileBytes: fileBytes, durationSeconds: duration)
+        guard nominalRanges.count > 1 else {
             return PreparedAudio(
                 chunks: [.init(url: source, startSeconds: 0, durationSeconds: duration)],
                 temporaryDirectory: nil
             )
         }
+        let nominalBoundaries = nominalRanges.dropLast().map(\.coreEndSeconds)
+        var refinedBoundaries: [Double] = []
+        let bytesPerSecond = Double(fileBytes) / duration
+        let maximumCoreDuration = Double(
+            Int64(AntigravityACPContent.maximumAudioBytes) - sizeHeadroomBytes
+        ) / bytesPerSecond
+        for (index, nominal) in nominalBoundaries.enumerated() {
+            let energy = (try? await energyPoints(
+                in: asset,
+                around: nominal,
+                searchRadiusSeconds: silenceSearchRadiusSeconds
+            )) ?? []
+            let refined = quietestBoundary(
+                near: nominal,
+                searchRadiusSeconds: silenceSearchRadiusSeconds,
+                energy: energy
+            )
+            let minimumSpacing = duration / Double((nominalBoundaries.count + 1) * 10)
+            let previous = refinedBoundaries.last ?? 0
+            let remaining = nominalBoundaries.count - index
+            let lower = max(
+                previous + minimumSpacing,
+                duration - maximumCoreDuration * Double(remaining)
+            )
+            let upper = min(
+                previous + maximumCoreDuration,
+                duration - minimumSpacing * Double(remaining)
+            )
+            refinedBoundaries.append(min(upper, max(lower, refined)))
+        }
+        let ranges = ranges(
+            fileBytes: fileBytes,
+            durationSeconds: duration,
+            boundaries: refinedBoundaries
+        )
 
         let directory = fileManager.temporaryDirectory
             .appendingPathComponent("Lectern-Antigravity-Audio-\(UUID().uuidString)", isDirectory: true)
@@ -585,8 +876,8 @@ struct AntigravityAudioPreparer {
                     )
                 }
                 exporter.timeRange = CMTimeRange(
-                    start: CMTime(seconds: range.startSeconds, preferredTimescale: 600),
-                    end: CMTime(seconds: range.endSeconds, preferredTimescale: 600)
+                    start: CMTime(seconds: range.exportStartSeconds, preferredTimescale: 600),
+                    end: CMTime(seconds: range.exportEndSeconds, preferredTimescale: 600)
                 )
                 try await exporter.export(to: output, as: .m4a)
                 let outputSize = try output.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
@@ -597,8 +888,10 @@ struct AntigravityAudioPreparer {
                 }
                 chunks.append(.init(
                     url: output,
-                    startSeconds: range.startSeconds,
-                    durationSeconds: range.endSeconds - range.startSeconds
+                    startSeconds: range.exportStartSeconds,
+                    durationSeconds: range.exportEndSeconds - range.exportStartSeconds,
+                    coreStartSeconds: range.coreStartSeconds,
+                    coreEndSeconds: range.coreEndSeconds
                 ))
             }
             return PreparedAudio(chunks: chunks, temporaryDirectory: directory)
@@ -606,6 +899,80 @@ struct AntigravityAudioPreparer {
             try? fileManager.removeItem(at: directory)
             throw error
         }
+    }
+
+    static func energyPoints(
+        in asset: AVAsset,
+        around targetSeconds: Double,
+        searchRadiusSeconds: Double
+    ) async throws -> [EnergyPoint] {
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
+            return []
+        }
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVLinearPCMBitDepthKey: 16,
+                AVLinearPCMIsFloatKey: false,
+                AVLinearPCMIsBigEndianKey: false,
+                AVLinearPCMIsNonInterleaved: false,
+            ]
+        )
+        output.alwaysCopiesSampleData = false
+        guard reader.canAdd(output) else { return [] }
+        reader.add(output)
+        let start = max(0, targetSeconds - searchRadiusSeconds)
+        let end = targetSeconds + searchRadiusSeconds
+        reader.timeRange = CMTimeRange(
+            start: CMTime(seconds: start, preferredTimescale: 600),
+            end: CMTime(seconds: end, preferredTimescale: 600)
+        )
+        guard reader.startReading() else {
+            throw reader.error ?? AntigravityACPError.unsupportedAttachment(
+                "Lectern couldn't inspect this recording for a safe split point."
+            )
+        }
+
+        var points: [EnergyPoint] = []
+        while let sampleBuffer = output.copyNextSampleBuffer() {
+            guard let block = CMSampleBufferGetDataBuffer(sampleBuffer) else { continue }
+            let byteCount = CMBlockBufferGetDataLength(block)
+            guard byteCount >= MemoryLayout<Int16>.size else { continue }
+            var bytes = Data(count: byteCount)
+            let status = bytes.withUnsafeMutableBytes { rawBuffer in
+                guard let baseAddress = rawBuffer.baseAddress else { return kCMBlockBufferBadCustomBlockSourceErr }
+                return CMBlockBufferCopyDataBytes(
+                    block,
+                    atOffset: 0,
+                    dataLength: byteCount,
+                    destination: baseAddress
+                )
+            }
+            guard status == noErr else { continue }
+            let rootMeanSquare = bytes.withUnsafeBytes { rawBuffer -> Double in
+                let samples = rawBuffer.bindMemory(to: Int16.self)
+                guard !samples.isEmpty else { return 0 }
+                let sum = samples.reduce(0.0) { partial, sample in
+                    let normalized = Double(sample) / Double(Int16.max)
+                    return partial + normalized * normalized
+                }
+                return sqrt(sum / Double(samples.count))
+            }
+            let presentation = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
+            let sampleDuration = CMSampleBufferGetDuration(sampleBuffer).seconds
+            let midpoint = presentation + (sampleDuration.isFinite ? sampleDuration / 2 : 0)
+            if midpoint.isFinite {
+                points.append(.init(timeSeconds: midpoint, rootMeanSquare: rootMeanSquare))
+            }
+        }
+        if reader.status == .failed {
+            throw reader.error ?? AntigravityACPError.unsupportedAttachment(
+                "Lectern couldn't inspect this recording for a safe split point."
+            )
+        }
+        return points
     }
 }
 

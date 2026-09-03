@@ -1,3 +1,4 @@
+import AVFoundation
 import XCTest
 
 final class AntigravityACPTests: XCTestCase {
@@ -82,13 +83,125 @@ final class AntigravityACPTests: XCTestCase {
         )
 
         XCTAssertEqual(chunks.count, 4)
-        XCTAssertEqual(chunks.first?.startSeconds, 0)
-        XCTAssertEqual(chunks.last?.endSeconds ?? 0, 3_335.253333, accuracy: 0.001)
-        XCTAssertTrue(chunks.allSatisfy { $0.estimatedBytes <= AntigravityAudioPreparer.targetBytes })
+        XCTAssertEqual(chunks.first?.exportStartSeconds, 0)
+        XCTAssertEqual(chunks.last?.exportEndSeconds ?? 0, 3_335.253333, accuracy: 0.001)
+        XCTAssertTrue(chunks.allSatisfy {
+            $0.estimatedBytes <= AntigravityACPContent.maximumAudioBytes
+        })
         XCTAssertEqual(
-            zip(chunks, chunks.dropFirst()).map { $0.endSeconds == $1.startSeconds },
+            zip(chunks, chunks.dropFirst()).map {
+                $1.coreStartSeconds - $0.exportEndSeconds
+            },
+            [-5, -5, -5]
+        )
+        XCTAssertEqual(
+            zip(chunks, chunks.dropFirst()).map {
+                $1.exportStartSeconds - $0.coreEndSeconds
+            },
+            [-5, -5, -5]
+        )
+    }
+
+    func testQuietBoundarySelectionPrefersNearbySilence() {
+        let points = stride(from: 85.0, through: 115.0, by: 0.25).map { time in
+            AntigravityAudioPreparer.EnergyPoint(
+                timeSeconds: time,
+                rootMeanSquare: abs(time - 103.25) < 0.4 ? 0.002 : 0.4
+            )
+        }
+
+        let boundary = AntigravityAudioPreparer.quietestBoundary(
+            near: 100,
+            searchRadiusSeconds: 15,
+            energy: points
+        )
+
+        XCTAssertEqual(boundary, 103.25, accuracy: 0.5)
+    }
+
+    func testOverlapShrinksForUnusuallyHighBitrateAudio() {
+        let chunks = AntigravityAudioPreparer.plannedRanges(
+            fileBytes: 50 * 1_024 * 1_024,
+            durationSeconds: 20
+        )
+
+        XCTAssertTrue(chunks.allSatisfy {
+            $0.estimatedBytes < AntigravityACPContent.maximumAudioBytes
+        })
+        XCTAssertTrue(chunks.dropFirst().allSatisfy {
+            $0.coreStartSeconds - $0.exportStartSeconds < AntigravityAudioPreparer.overlapSeconds
+        })
+        XCTAssertEqual(
+            zip(chunks, chunks.dropFirst()).map { $0.coreEndSeconds == $1.coreStartSeconds },
             [true, true, true]
         )
+    }
+
+    func testAudioEnergyInspectionFindsARealSilentBoundary() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Lectern-Silence-Test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let audioURL = directory.appendingPathComponent("silence.wav")
+        try makeToneWithSilence(at: audioURL, silenceCenterSeconds: 10)
+
+        let points = try await AntigravityAudioPreparer.energyPoints(
+            in: AVURLAsset(url: audioURL),
+            around: 8,
+            searchRadiusSeconds: 5
+        )
+        let boundary = AntigravityAudioPreparer.quietestBoundary(
+            near: 8,
+            searchRadiusSeconds: 5,
+            energy: points
+        )
+
+        XCTAssertEqual(boundary, 10, accuracy: 0.75)
+    }
+
+    func testBoundaryMergeRemovesRepeatedOverlapButPreservesLaterRepetition() {
+        let existing = [
+            NormalizedTranscriptionSegment(
+                startMilliseconds: 1_000,
+                endMilliseconds: 2_000,
+                text: "Again again."
+            ),
+            NormalizedTranscriptionSegment(
+                startMilliseconds: 8_000,
+                endMilliseconds: 12_000,
+                text: "The requirements are intent and consideration."
+            ),
+        ]
+        let incoming = [
+            NormalizedTranscriptionSegment(
+                startMilliseconds: 8_000,
+                endMilliseconds: 14_000,
+                text: "... Intent and consideration. Capacity matters."
+            ),
+            NormalizedTranscriptionSegment(
+                startMilliseconds: 16_000,
+                endMilliseconds: 18_000,
+                text: "Again again."
+            ),
+        ]
+
+        let merged = AntigravityTranscriptMerger.merge(
+            accumulated: existing,
+            incoming: incoming,
+            boundaryMilliseconds: 10_000,
+            overlapMilliseconds: 5_000
+        )
+
+        XCTAssertEqual(
+            merged.map(\.text),
+            [
+                "Again again.",
+                "The requirements are intent and consideration.",
+                "Capacity matters.",
+                "Again again.",
+            ]
+        )
+        XCTAssertEqual(merged.map(\.startMilliseconds), [1_000, 8_000, 10_000, 16_000])
     }
 
     func testOAuthHandoffOnlyAcceptsExpectedGoogleLoopbackFlow() throws {
@@ -364,7 +477,11 @@ for raw in sys.stdin:
         blocks = request["params"]["prompt"]
         audio = next(block for block in blocks if block.get("type") == "audio")
         payload = base64.b64decode(audio["data"])
-        transcript = "[00:01] First part." if payload == b"part one" else "[00:01] Second part."
+        transcript = (
+            "[00:08] The requirements are intent and consideration."
+            if payload == b"part one"
+            else "[00:03] Intent and consideration. Capacity matters."
+        )
         update = {"sessionId":"part","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":transcript}}}
         print(json.dumps({"jsonrpc":"2.0", "method":"session/update", "params":update}), flush=True)
         print(json.dumps({"jsonrpc":"2.0", "id":request_id, "result":{"stopReason":"end_turn"}}), flush=True)
@@ -397,8 +514,20 @@ for raw in sys.stdin:
             antigravityAudioPreparation: { _, _ in
                 AntigravityAudioPreparer.PreparedAudio(
                     chunks: [
-                        .init(url: first, startSeconds: 0, durationSeconds: 10),
-                        .init(url: second, startSeconds: 10, durationSeconds: 10),
+                        .init(
+                            url: first,
+                            startSeconds: 0,
+                            durationSeconds: 15,
+                            coreStartSeconds: 0,
+                            coreEndSeconds: 10
+                        ),
+                        .init(
+                            url: second,
+                            startSeconds: 5,
+                            durationSeconds: 15,
+                            coreStartSeconds: 10,
+                            coreEndSeconds: 20
+                        ),
                     ],
                     temporaryDirectory: nil
                 )
@@ -414,10 +543,40 @@ for raw in sys.stdin:
 
         let result = try await engine.transcribe(request) { _ in }
 
-        XCTAssertEqual(result.text, "First part.\n\nSecond part.")
-        XCTAssertEqual(result.segments.map(\.startMilliseconds), [1_000, 11_000])
+        XCTAssertEqual(
+            result.text,
+            "The requirements are intent and consideration.\n\nCapacity matters."
+        )
+        XCTAssertEqual(result.segments.map(\.startMilliseconds), [8_000, 10_000])
         XCTAssertEqual(result.audioDurationMilliseconds, 20_000)
         XCTAssertEqual(result.providerInfo.provider, .antigravityCLI)
+    }
+
+    private func makeToneWithSilence(
+        at url: URL,
+        silenceCenterSeconds: Double
+    ) throws {
+        let sampleRate = 8_000.0
+        let durationSeconds = 16.0
+        let format = try XCTUnwrap(AVAudioFormat(
+            standardFormatWithSampleRate: sampleRate,
+            channels: 1
+        ))
+        let frameCount = AVAudioFrameCount(sampleRate * durationSeconds)
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(
+            pcmFormat: format,
+            frameCapacity: frameCount
+        ))
+        buffer.frameLength = frameCount
+        let samples = try XCTUnwrap(buffer.floatChannelData?[0])
+        for frame in 0..<Int(frameCount) {
+            let time = Double(frame) / sampleRate
+            samples[frame] = abs(time - silenceCenterSeconds) <= 0.6
+                ? 0
+                : Float(sin(2 * Double.pi * 220 * time) * 0.3)
+        }
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        try file.write(from: buffer)
     }
 }
 
