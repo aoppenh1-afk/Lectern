@@ -8,6 +8,8 @@ struct GenerateSheet: View {
     @Environment(GenerationService.self) private var generation
     @Environment(\.dismiss) private var dismiss
 
+    @State private var antigravityACP = AntigravityACPManager.shared
+
     @State private var cleanedTranscriptOn = true
     @State private var notesOn = true
     @State private var flashcardsOn = false
@@ -68,6 +70,9 @@ struct GenerateSheet: View {
             loadStoredModel()
             refreshCatalog()
         }
+        .task {
+            await antigravityACP.refresh()
+        }
         .onChange(of: profileID) { _, _ in
             loadStoredModel()
             refreshCatalog()
@@ -116,10 +121,8 @@ struct GenerateSheet: View {
                 focusCard
             }
 
-            if let profile = selectedProfile,
-               AgentProfiles.resolveExecutable(profile.executablePath) == nil {
-                Label("\(profile.title) wasn't found — set its spawn command in Settings › Agents.",
-                      systemImage: "exclamationmark.triangle")
+            if let availabilityWarning {
+                Label(availabilityWarning, systemImage: "exclamationmark.triangle")
                     .font(.system(size: 11.5))
                     .foregroundStyle(LecternTheme.warningTint)
             }
@@ -251,7 +254,7 @@ struct GenerateSheet: View {
 
     private func agentRow(_ profile: AgentProfile) -> some View {
         let isSelected = profileID == profile.id
-        let installed = AgentProfiles.resolveExecutable(profile.executablePath) != nil
+        let availability = agentAvailability(profile)
         return Button {
             profileID = profile.id
         } label: {
@@ -268,9 +271,9 @@ struct GenerateSheet: View {
                     Text(profile.title)
                         .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
                         .foregroundStyle(LecternTheme.ink)
-                    Text(installed ? "Ready" : "Not installed")
+                    Text(availability.label)
                         .font(.system(size: 10.5))
-                        .foregroundStyle(installed ? Color.secondary : LecternTheme.warningTint)
+                        .foregroundStyle(availability.isReady ? Color.secondary : LecternTheme.warningTint)
                 }
                 Spacer()
             }
@@ -279,6 +282,47 @@ struct GenerateSheet: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private var availabilityWarning: String? {
+        guard let profile = selectedProfile else { return nil }
+        if profile.id != AgentProfiles.antigravityID {
+            return AgentProfiles.resolveExecutable(profile.executablePath) == nil
+                ? "\(profile.title) wasn't found — set its spawn command in Settings › Agents."
+                : nil
+        }
+
+        switch (antigravityACP.runtimeState, antigravityACP.authState) {
+        case (.notInstalled, _):
+            return "Install the Antigravity runtime in Settings › Agents before generating."
+        case (.ready, .signedOut), (.ready, .unavailable):
+            return "Sign in to Antigravity with Google in Settings › Agents before generating."
+        case (.ready, .failed(let message)), (.failed(let message), _):
+            return message
+        case (.cancelled, _):
+            return "Antigravity installation was cancelled. Finish setup in Settings › Agents."
+        default:
+            return nil
+        }
+    }
+
+    private func agentAvailability(_ profile: AgentProfile) -> (label: String, isReady: Bool) {
+        guard profile.id == AgentProfiles.antigravityID else {
+            let ready = AgentProfiles.resolveExecutable(profile.executablePath) != nil
+            return (ready ? "Ready" : "Not installed", ready)
+        }
+
+        return switch (antigravityACP.runtimeState, antigravityACP.authState) {
+        case (.ready, .signedIn): ("Ready", true)
+        case (.ready, .signingIn), (.ready, .waitingForBrowser): ("Signing in…", false)
+        case (.ready, .signingOut): ("Signing out…", false)
+        case (.ready, _): ("Sign-in needed", false)
+        case (.checking, _): ("Checking…", false)
+        case (.installing, _): ("Installing…", false)
+        case (.failed, _): ("Needs attention", false)
+        case (.cancelled, _): ("Setup cancelled", false)
+        case (.notInstalled, _): ("Not installed", false)
+        }
     }
 
     @ViewBuilder
