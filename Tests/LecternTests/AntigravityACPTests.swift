@@ -75,6 +75,22 @@ final class AntigravityACPTests: XCTestCase {
         )
     }
 
+    func testOversizeACPRecordingIsPlannedAsSafeOrderedChunks() {
+        let chunks = AntigravityAudioPreparer.plannedRanges(
+            fileBytes: 55_884_344,
+            durationSeconds: 3_335.253333
+        )
+
+        XCTAssertEqual(chunks.count, 4)
+        XCTAssertEqual(chunks.first?.startSeconds, 0)
+        XCTAssertEqual(chunks.last?.endSeconds ?? 0, 3_335.253333, accuracy: 0.001)
+        XCTAssertTrue(chunks.allSatisfy { $0.estimatedBytes <= AntigravityAudioPreparer.targetBytes })
+        XCTAssertEqual(
+            zip(chunks, chunks.dropFirst()).map { $0.endSeconds == $1.startSeconds },
+            [true, true, true]
+        )
+    }
+
     func testOAuthHandoffOnlyAcceptsExpectedGoogleLoopbackFlow() throws {
         let valid = try XCTUnwrap(URL(string:
             "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&state=state-123&redirect_uri=http%3A%2F%2F127.0.0.1%3A49152%2F"
@@ -318,6 +334,90 @@ for raw in sys.stdin:
         XCTAssertEqual(result.segments[1].startMilliseconds, 5_000)
         XCTAssertEqual(result.providerInfo.provider, .antigravityCLI)
         XCTAssertEqual(result.providerInfo.resolvedModelID, AntigravityACPClient.transcriptionModelID)
+    }
+
+    func testExternalTranscriptionSendsPreparedAudioPartsThroughACPInOrder() async throws {
+        let script = #"""
+import base64, json, sys
+model = "gemini-3.8-flash-high"
+for raw in sys.stdin:
+    request = json.loads(raw)
+    method = request.get("method")
+    request_id = request.get("id")
+    if method == "initialize":
+        result = {
+            "protocolVersion": 1,
+            "agentInfo": {"name": "antigravity-acp", "version": "fixture"},
+            "agentCapabilities": {},
+            "authMethods": [{"id": "oauth-personal", "name": "Google"}]
+        }
+        print(json.dumps({"jsonrpc":"2.0", "id":request_id, "result":result}), flush=True)
+    elif method == "authenticate":
+        print(json.dumps({"jsonrpc":"2.0", "id":request_id, "result":{}}), flush=True)
+    elif method == "session/new":
+        option = {
+            "id": "model", "category": "model", "currentValue": model,
+            "options": [{"value": model, "name": "Gemini 3.8 Flash (High)"}]
+        }
+        print(json.dumps({"jsonrpc":"2.0", "id":request_id, "result":{"sessionId":"part", "configOptions":[option]}}), flush=True)
+    elif method == "session/prompt":
+        blocks = request["params"]["prompt"]
+        audio = next(block for block in blocks if block.get("type") == "audio")
+        payload = base64.b64decode(audio["data"])
+        transcript = "[00:01] First part." if payload == b"part one" else "[00:01] Second part."
+        update = {"sessionId":"part","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":transcript}}}
+        print(json.dumps({"jsonrpc":"2.0", "method":"session/update", "params":update}), flush=True)
+        print(json.dumps({"jsonrpc":"2.0", "id":request_id, "result":{"stopReason":"end_turn"}}), flush=True)
+"""#
+        let fixtureRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Lectern-ACP-Parts-Test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: fixtureRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: fixtureRoot) }
+        let source = fixtureRoot.appendingPathComponent("source.wav")
+        let first = fixtureRoot.appendingPathComponent("first.wav")
+        let second = fixtureRoot.appendingPathComponent("second.wav")
+        try Data("source".utf8).write(to: source)
+        try Data("part one".utf8).write(to: first)
+        try Data("part two".utf8).write(to: second)
+        let skillURL = fixtureRoot.appendingPathComponent("SKILL.md")
+        try Data("fixture transcription instructions".utf8).write(to: skillURL)
+
+        let client = AntigravityACPClient(
+            connectionFactory: {
+                try await ACPConnection.connect(
+                    executableURL: URL(fileURLWithPath: "/usr/bin/python3"),
+                    arguments: ["-u", "-c", script],
+                    environment: ProcessInfo.processInfo.environment
+                )
+            },
+            skillURLOverrides: [.transcription: skillURL]
+        )
+        let engine = ExternalTranscriptionEngine(
+            antigravity: client,
+            antigravityAudioPreparation: { _, _ in
+                AntigravityAudioPreparer.PreparedAudio(
+                    chunks: [
+                        .init(url: first, startSeconds: 0, durationSeconds: 10),
+                        .init(url: second, startSeconds: 10, durationSeconds: 10),
+                    ],
+                    temporaryDirectory: nil
+                )
+            }
+        )
+        let request = ExternalTranscriptionRequest(
+            audioURL: source,
+            durationSeconds: 20,
+            lectureLanguage: .english,
+            connection: .builtInAntigravity(),
+            attemptNumber: 1
+        )
+
+        let result = try await engine.transcribe(request) { _ in }
+
+        XCTAssertEqual(result.text, "First part.\n\nSecond part.")
+        XCTAssertEqual(result.segments.map(\.startMilliseconds), [1_000, 11_000])
+        XCTAssertEqual(result.audioDurationMilliseconds, 20_000)
+        XCTAssertEqual(result.providerInfo.provider, .antigravityCLI)
     }
 }
 

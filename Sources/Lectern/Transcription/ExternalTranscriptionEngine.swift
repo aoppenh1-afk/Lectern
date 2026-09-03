@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 struct ExternalTranscriptionRequest: Sendable {
@@ -30,12 +31,22 @@ protocol TranscriptionProviderAdapter: Sendable {
 }
 
 struct ExternalTranscriptionEngine: Sendable {
+    typealias AntigravityAudioPreparation = @Sendable (URL, Double) async throws -> AntigravityAudioPreparer.PreparedAudio
+
     private let session: URLSession
     private let antigravity: AntigravityACPClient
+    private let antigravityAudioPreparation: AntigravityAudioPreparation
 
-    init(session: URLSession = .shared, antigravity: AntigravityACPClient = AntigravityACPClient()) {
+    init(
+        session: URLSession = .shared,
+        antigravity: AntigravityACPClient = AntigravityACPClient(),
+        antigravityAudioPreparation: @escaping AntigravityAudioPreparation = {
+            try await AntigravityAudioPreparer.prepare($0, durationSeconds: $1)
+        }
+    ) {
         self.session = session
         self.antigravity = antigravity
+        self.antigravityAudioPreparation = antigravityAudioPreparation
     }
 
     func transcribe(
@@ -126,7 +137,11 @@ struct ExternalTranscriptionEngine: Sendable {
         switch provider {
         case .deepgram: return DeepgramTranscriptionAdapter(session: session)
         case .googleGemini: return GeminiTranscriptionAdapter(session: session)
-        case .antigravityCLI: return AntigravityTranscriptionAdapter(cli: antigravity)
+        case .antigravityCLI:
+            return AntigravityTranscriptionAdapter(
+                cli: antigravity,
+                prepareAudio: antigravityAudioPreparation
+            )
         case .assemblyAI: return AssemblyAITranscriptionAdapter(session: session)
         case .modulate: return ModulateTranscriptionAdapter(session: session)
         case .mistral: return MistralTranscriptionAdapter(session: session)
@@ -140,6 +155,7 @@ struct ExternalTranscriptionEngine: Sendable {
 private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
     let providerID = TranscriptionProviderID.antigravityCLI
     let cli: AntigravityACPClient
+    let prepareAudio: ExternalTranscriptionEngine.AntigravityAudioPreparation
 
     func transcribe(
         _ request: ExternalTranscriptionRequest,
@@ -147,7 +163,6 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
         onUpdate: @escaping @Sendable (ProviderJobUpdate) async -> Void
     ) async throws -> TranscriptionResult {
         await onUpdate(.init(state: .uploading))
-        let audioName = "lecture-audio" + (request.audioURL.pathExtension.isEmpty ? "" : ".\(request.audioURL.pathExtension.lowercased())")
         let languageBranch = request.lectureLanguage == .hebrewEnglish
             ? "English-Hebrew shiur"
             : "English lecture"
@@ -163,29 +178,77 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
         case .word:
             timestampRule = "Start every natural segment with a grounded [HH:MM:SS] timestamp; word timestamps are not needed."
         }
-        let prompt = """
-        Apply the lectern-transcription skill to @\(audioName).
-        Transcribe with Gemini's native audio understanding. Do not invoke whisper-cli, ffmpeg, or another local speech-to-text tool.
-
-        Language branch: \(languageBranch).
-        \(speakerRule)
-        \(timestampRule)
-        Return only the complete transcript text. Do not return JSON, a schema, an overview, commentary, or a completion report. Once the final spoken passage is transcribed, return the transcript immediately without creating scripts or performing a second formatting pass.
-        """
-
         await onUpdate(.init(state: .processing))
         do {
             let modelID = request.connection.modelID.isEmpty
                 ? AntigravityACPClient.transcriptionModelID
                 : request.connection.modelID
-            let output = try await cli.run(
-                prompt: prompt,
-                modelID: modelID,
-                thinkingLevel: AntigravityACPClient.thinkingLevel(fromModelID: modelID),
-                inputs: [.file(request.audioURL, named: audioName)],
-                skills: [.transcription]
+            let prepared = try await prepareAudio(request.audioURL, request.durationSeconds)
+            defer { prepared.remove() }
+
+            var combinedSegments: [NormalizedTranscriptionSegment] = []
+            var detectedLanguages = Set<String>()
+            for (index, chunk) in prepared.chunks.enumerated() {
+                let audioExtension = chunk.url.pathExtension.lowercased()
+                let suffix = audioExtension.isEmpty ? "" : ".\(audioExtension)"
+                let audioName = prepared.chunks.count == 1
+                    ? "lecture-audio\(suffix)"
+                    : "lecture-audio-part-\(index + 1)-of-\(prepared.chunks.count)\(suffix)"
+                let partInstruction = prepared.chunks.count == 1 ? "" : """
+
+                This is part \(index + 1) of \(prepared.chunks.count), in chronological order. Timestamps must start at 00:00 for this part; Lectern will apply its offset after transcription.
+                """
+                let prompt = """
+                Apply the lectern-transcription skill to @\(audioName).
+                Transcribe with Gemini's native audio understanding. Do not invoke whisper-cli, ffmpeg, or another local speech-to-text tool.
+
+                Language branch: \(languageBranch).
+                \(speakerRule)
+                \(timestampRule)\(partInstruction)
+                Return only the complete transcript text. Do not return JSON, a schema, an overview, commentary, or a completion report. Once the final spoken passage is transcribed, return the transcript immediately without creating scripts or performing a second formatting pass.
+                """
+                let output = try await cli.run(
+                    prompt: prompt,
+                    modelID: modelID,
+                    thinkingLevel: AntigravityACPClient.thinkingLevel(fromModelID: modelID),
+                    inputs: [.file(chunk.url, named: audioName)],
+                    skills: [.transcription]
+                )
+                var partRequest = request
+                partRequest.audioURL = chunk.url
+                partRequest.durationSeconds = chunk.durationSeconds
+                let part = try Self.result(from: output, request: partRequest)
+                let offset = Int64((chunk.startSeconds * 1_000).rounded())
+                combinedSegments.append(contentsOf: part.segments.map { segment in
+                    var shifted = segment
+                    shifted.startMilliseconds = segment.startMilliseconds.map { $0 + offset }
+                    shifted.endMilliseconds = segment.endMilliseconds.map { $0 + offset }
+                    return shifted
+                })
+                detectedLanguages.formUnion(part.detectedLanguages)
+            }
+
+            let audioDuration = request.durationSeconds > 0
+                ? Int64((request.durationSeconds * 1_000).rounded())
+                : combinedSegments.last?.endMilliseconds
+            return .init(
+                text: combinedSegments.map(\.text).joined(separator: "\n\n"),
+                segments: combinedSegments,
+                words: nil,
+                detectedLanguages: detectedLanguages.sorted(),
+                providerInfo: .init(
+                    connectionID: request.connection.id,
+                    provider: request.connection.provider,
+                    requestedModelID: request.connection.modelID,
+                    resolvedModelID: modelID,
+                    providerJobID: nil,
+                    attemptNumber: request.attemptNumber,
+                    processingMode: request.connection.processingMode,
+                    completedAt: Date()
+                ),
+                audioDurationMilliseconds: audioDuration,
+                warnings: []
             )
-            return try Self.result(from: output, request: request)
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as ExternalTranscriptionError {
@@ -411,6 +474,139 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
         return .init(code: .providerUnavailable, retryable: false, fallbackEligible: true, userMessage: message)
     }
 
+}
+
+struct AntigravityAudioPreparer {
+    struct PlannedRange: Equatable, Sendable {
+        let startSeconds: Double
+        let endSeconds: Double
+        let estimatedBytes: Int64
+    }
+
+    struct Chunk: Sendable {
+        let url: URL
+        let startSeconds: Double
+        let durationSeconds: Double
+    }
+
+    final class PreparedAudio: @unchecked Sendable {
+        let chunks: [Chunk]
+        private let temporaryDirectory: URL?
+
+        init(chunks: [Chunk], temporaryDirectory: URL?) {
+            self.chunks = chunks
+            self.temporaryDirectory = temporaryDirectory
+        }
+
+        func remove(fileManager: FileManager = .default) {
+            guard let temporaryDirectory,
+                  temporaryDirectory.path.hasPrefix(fileManager.temporaryDirectory.path) else { return }
+            try? fileManager.removeItem(at: temporaryDirectory)
+        }
+
+        deinit {
+            remove()
+        }
+    }
+
+    static let targetBytes: Int64 = 16 * 1_024 * 1_024
+
+    static func plannedRanges(
+        fileBytes: Int64,
+        durationSeconds: Double,
+        targetBytes: Int64 = targetBytes
+    ) -> [PlannedRange] {
+        guard fileBytes > targetBytes, durationSeconds > 0, targetBytes > 0 else {
+            return [.init(
+                startSeconds: 0,
+                endSeconds: max(0, durationSeconds),
+                estimatedBytes: max(0, fileBytes)
+            )]
+        }
+        let count = max(1, Int(ceil(Double(fileBytes) / Double(targetBytes))))
+        return (0..<count).map { index in
+            let start = durationSeconds * Double(index) / Double(count)
+            let end = durationSeconds * Double(index + 1) / Double(count)
+            return .init(
+                startSeconds: start,
+                endSeconds: end,
+                estimatedBytes: Int64(ceil(Double(fileBytes) * (end - start) / durationSeconds))
+            )
+        }
+    }
+
+    static func prepare(
+        _ source: URL,
+        durationSeconds requestedDuration: Double,
+        fileManager: FileManager = .default
+    ) async throws -> PreparedAudio {
+        let values = try source.resourceValues(forKeys: [.fileSizeKey])
+        let fileBytes = Int64(values.fileSize ?? 0)
+        guard fileBytes > targetBytes else {
+            return PreparedAudio(
+                chunks: [.init(
+                    url: source,
+                    startSeconds: 0,
+                    durationSeconds: max(0, requestedDuration)
+                )],
+                temporaryDirectory: nil
+            )
+        }
+        let asset = AVURLAsset(url: source)
+        let loadedDuration = try await asset.load(.duration).seconds
+        let duration = loadedDuration.isFinite && loadedDuration > 0
+            ? loadedDuration
+            : requestedDuration
+        let ranges = plannedRanges(fileBytes: fileBytes, durationSeconds: duration)
+        guard ranges.count > 1 else {
+            return PreparedAudio(
+                chunks: [.init(url: source, startSeconds: 0, durationSeconds: duration)],
+                temporaryDirectory: nil
+            )
+        }
+
+        let directory = fileManager.temporaryDirectory
+            .appendingPathComponent("Lectern-Antigravity-Audio-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(
+            at: directory,
+            withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700]
+        )
+        do {
+            var chunks: [Chunk] = []
+            for (index, range) in ranges.enumerated() {
+                let output = directory.appendingPathComponent("part-\(index + 1).m4a")
+                guard let exporter = AVAssetExportSession(
+                    asset: asset,
+                    presetName: AVAssetExportPresetPassthrough
+                ) else {
+                    throw AntigravityACPError.unsupportedAttachment(
+                        "Lectern couldn't prepare this recording for Antigravity."
+                    )
+                }
+                exporter.timeRange = CMTimeRange(
+                    start: CMTime(seconds: range.startSeconds, preferredTimescale: 600),
+                    end: CMTime(seconds: range.endSeconds, preferredTimescale: 600)
+                )
+                try await exporter.export(to: output, as: .m4a)
+                let outputSize = try output.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+                guard outputSize <= AntigravityACPContent.maximumAudioBytes else {
+                    throw AntigravityACPError.unsupportedAttachment(
+                        "Lectern couldn't split this recording below Antigravity's native-audio limit."
+                    )
+                }
+                chunks.append(.init(
+                    url: output,
+                    startSeconds: range.startSeconds,
+                    durationSeconds: range.endSeconds - range.startSeconds
+                ))
+            }
+            return PreparedAudio(chunks: chunks, temporaryDirectory: directory)
+        } catch {
+            try? fileManager.removeItem(at: directory)
+            throw error
+        }
+    }
 }
 
 private struct UnsupportedCloudAdapter: TranscriptionProviderAdapter {
