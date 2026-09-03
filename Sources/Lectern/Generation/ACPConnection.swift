@@ -160,14 +160,22 @@ final class ACPConnection: @unchecked Sendable {
                 connection.initialization = Initialization(
                     protocolVersion: dict["protocolVersion"] as? Int ?? 0,
                     supportsLoadSession: capabilities?["loadSession"] as? Bool ?? false,
-                    supportsResume: sessions?["resume"] as? Bool ?? false,
-                    supportsLogout: auth?["logout"] as? Bool ?? false,
+                    supportsResume: capabilityIsSupported(sessions?["resume"]),
+                    supportsLogout: capabilityIsSupported(auth?["logout"]),
                     authMethodIDs: methods.compactMap { $0["id"] as? String }
                 )
             }
         }
 
         return connection
+    }
+
+    /// ACP represents some capabilities as configuration objects rather than
+    /// Boolean flags. Google currently advertises `resume` and `logout` as
+    /// empty objects, matching the protocol schema used by T3 Code.
+    private static func capabilityIsSupported(_ value: Any?) -> Bool {
+        if let boolean = value as? Bool { return boolean }
+        return value is [String: Any]
     }
 
     private init(

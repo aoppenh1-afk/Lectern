@@ -189,8 +189,8 @@ for raw in sys.stdin:
             "agentInfo": {"name": "antigravity-acp", "version": "fixture"},
             "agentCapabilities": {
                 "loadSession": True,
-                "sessionCapabilities": {"resume": True},
-                "auth": {"logout": True}
+                "sessionCapabilities": {"resume": {}},
+                "auth": {"logout": {}}
             },
             "authMethods": [{"id": "oauth-personal", "name": "Google"}]
         }
@@ -221,6 +221,8 @@ for raw in sys.stdin:
 
         XCTAssertEqual(connection.identity?.name, "antigravity-acp")
         XCTAssertEqual(connection.initialization?.authMethodIDs, ["oauth-personal"])
+        XCTAssertEqual(connection.initialization?.supportsResume, true)
+        XCTAssertEqual(connection.initialization?.supportsLogout, true)
         try await connection.authenticate(methodID: "oauth-personal")
 
         async let first = connection.newSession(workingDirectory: URL(fileURLWithPath: "/tmp/first"))
