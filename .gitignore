@@ -16,3 +16,10 @@ Shiur notes/
 prototype/
 Design/
 plan.md
+
+# Certificates and private keys
+*.p12
+*.pem
+*.key
+*.cer
+*.crt

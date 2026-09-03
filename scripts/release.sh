@@ -5,7 +5,7 @@
 #   scripts/release.sh 1.2.0 [--notes "What changed"]
 #
 # Requirements: clean git tree on main, `gh` signed in with access to the repo,
-# xcodegen on PATH.
+# xcodegen on PATH, and a persistent code signing certificate in Keychain.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -30,6 +30,28 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
+# Preflight signing identity: Releases MUST have a persistent code signing certificate
+# to avoid invalidating user Keychain access on update.
+export REQUIRE_CODE_SIGN_IDENTITY=1
+SIGN_IDENTITY="${LECTERN_SIGN_IDENTITY:-}"
+if [[ -z "$SIGN_IDENTITY" ]]; then
+  if security find-identity -p codesigning -v | grep -q "\"Lectern Release Signing\""; then
+    SIGN_IDENTITY="Lectern Release Signing"
+  elif security find-identity -p codesigning -v | grep -q "\"Developer ID Application:"; then
+    SIGN_IDENTITY="$(security find-identity -p codesigning -v | grep "\"Developer ID Application:" | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')"
+  elif security find-identity -p codesigning -v | grep -q "\"Apple Development:"; then
+    SIGN_IDENTITY="$(security find-identity -p codesigning -v | grep "\"Apple Development:" | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')"
+  fi
+fi
+
+if [[ -z "$SIGN_IDENTITY" ]]; then
+  echo "Error: Refusing to cut release without a persistent code signing certificate." >&2
+  echo "Ad-hoc signed releases cause macOS Keychain to prompt users for credentials on every update." >&2
+  echo "Run 'scripts/setup-signing-cert.sh' to create a permanent 'Lectern Release Signing' certificate." >&2
+  exit 1
+fi
+echo "Using signing identity: $SIGN_IDENTITY"
+
 REPO="$(grep -E '^[[:space:]]*LecternUpdateRepository:' project.yml | sed -E 's/.*:[[:space:]]*//')"
 if [[ -z "$REPO" ]]; then
   echo "LecternUpdateRepository is not set in project.yml" >&2
@@ -39,8 +61,8 @@ fi
 CURRENT_BUILD="$(grep -E '^[[:space:]]*CURRENT_PROJECT_VERSION:' project.yml | sed -E 's/.*"([0-9]+)".*/\1/')"
 NEXT_BUILD=$((CURRENT_BUILD + 1))
 
-sed -i '' -E "s/^([[:space:]]*MARKETING_VERSION:).*/\1 \"$VERSION\"/" project.yml
-sed -i '' -E "s/^([[:space:]]*CURRENT_PROJECT_VERSION:).*/\1 \"$NEXT_BUILD\"/" project.yml
+sed -i '' -E "s/^([[:space:]]*MARKETING_VERSION:).*/\\1 \"$VERSION\"/" project.yml
+sed -i '' -E "s/^([[:space:]]*CURRENT_PROJECT_VERSION:).*/\\1 \"$NEXT_BUILD\"/" project.yml
 xcodegen generate >/dev/null
 
 "$ROOT/scripts/build-app.sh"

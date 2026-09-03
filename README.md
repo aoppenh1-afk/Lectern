@@ -90,11 +90,23 @@ xcodebuild -scheme Lectern -destination 'platform=macOS' test
 
 ## Publishing a release (maintainer)
 
+Releases require a persistent code signing certificate so macOS Keychain items (Canvas tokens, Google Docs OAuth, transcription API keys) remain accessible across updates without repeatedly prompting the user.
+
+If you have not set up the release certificate on this Mac yet, run the one-time helper:
+
 ```bash
-scripts/release.sh 1.2.0 --notes "What changed"
+scripts/setup-signing-cert.sh
 ```
 
-This bumps `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml`, builds and ad-hoc signs, zips, commits, tags `v1.2.0`, pushes, and creates the GitHub release with the zip and its `.sha256`. Installed copies pick it up on their next check.
+This creates a 20-year self-signed `Lectern Release Signing` certificate in your login keychain and saves a backup `.p12` archive to your Desktop (`Lectern-Release-Signing-BACKUP.p12`, password: `lectern`). **Keep this `.p12` file backed up safely** so you can preserve the app's signing identity if you ever switch machines.
+
+To publish a release:
+
+```bash
+scripts/release.sh 1.3.1 --notes "What changed"
+```
+
+This verifies the signing identity, bumps `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml`, builds and signs the app bundle with the persistent certificate, zips, commits, tags `v1.3.1`, pushes, and creates the GitHub release with the zip and its `.sha256`. Installed copies pick it up on their next check.
 
 ## Privacy
 
