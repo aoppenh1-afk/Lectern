@@ -27,6 +27,14 @@ final class ACPConnection: @unchecked Sendable {
         var version: String
     }
 
+    struct Initialization: Sendable {
+        let protocolVersion: Int
+        let supportsLoadSession: Bool
+        let supportsResume: Bool
+        let supportsLogout: Bool
+        let authMethodIDs: [String]
+    }
+
     private final class StringAccumulator: @unchecked Sendable {
         private let mutex = Mutex()
         private var chunks: [String] = []
@@ -53,8 +61,12 @@ final class ACPConnection: @unchecked Sendable {
     private let stdoutQueue = DispatchQueue(label: "com.lectern.acp.stdout")
     private let writeQueue = DispatchQueue(label: "com.lectern.acp.write")
     private let stderrTail = StderrTail()
+    private let onAuthorizationURL: (@Sendable (URL) -> Void)?
+    private let onClose: (@Sendable () -> Void)?
+    private var didNotifyClose = false
 
     private(set) var identity: AgentIdentity?
+    private(set) var initialization: Initialization?
 
     private final class PendingCall: @unchecked Sendable {
         let continuation: CheckedContinuation<Any, Error>
@@ -70,13 +82,28 @@ final class ACPConnection: @unchecked Sendable {
             throw ACPError.spawnFailed("\(profile.executablePath) not found")
         }
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = profile.arguments
-
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + (environment["PATH"] ?? "")
+        return try await connect(
+            executableURL: URL(fileURLWithPath: executable),
+            arguments: profile.arguments,
+            environment: environment
+        )
+    }
+
+    static func connect(
+        executableURL: URL,
+        arguments: [String],
+        environment: [String: String],
+        workingDirectory: URL? = nil,
+        onAuthorizationURL: (@Sendable (URL) -> Void)? = nil,
+        onClose: (@Sendable () -> Void)? = nil
+    ) async throws -> ACPConnection {
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = arguments
         process.environment = environment
+        process.currentDirectoryURL = workingDirectory
 
         let stdinPipe = Pipe()
         let stdoutPipe = Pipe()
@@ -91,10 +118,21 @@ final class ACPConnection: @unchecked Sendable {
             throw ACPError.spawnFailed(error.localizedDescription)
         }
 
-        let connection = ACPConnection(process: process,
-                                       stdinHandle: stdinPipe.fileHandleForWriting,
-                                       stderrPipe: stderrPipe)
+        let connection = ACPConnection(
+            process: process,
+            stdinHandle: stdinPipe.fileHandleForWriting,
+            stderrPipe: stderrPipe,
+            onAuthorizationURL: onAuthorizationURL,
+            onClose: onClose
+        )
         connection.startReading(stdoutPipe.fileHandleForReading)
+
+        let initializeTimeout = Task {
+            try? await Task.sleep(for: .seconds(90))
+            guard !Task.isCancelled else { return }
+            connection.shutdown()
+        }
+        defer { initializeTimeout.cancel() }
 
         let result = try await connection.request(
             method: "initialize",
@@ -108,12 +146,23 @@ final class ACPConnection: @unchecked Sendable {
             ]
         )
 
-        if let dict = result as? [String: Any],
-           let info = dict["agentInfo"] as? [String: Any] {
+        if let dict = result as? [String: Any] {
+            let info = dict["agentInfo"] as? [String: Any]
+            let capabilities = dict["agentCapabilities"] as? [String: Any]
+            let sessions = capabilities?["sessionCapabilities"] as? [String: Any]
+            let auth = capabilities?["auth"] as? [String: Any]
+            let methods = dict["authMethods"] as? [[String: Any]] ?? []
             connection.mutex.with {
                 connection.identity = AgentIdentity(
-                    name: info["name"] as? String ?? "agent",
-                    version: info["version"] as? String ?? "?"
+                    name: info?["name"] as? String ?? "agent",
+                    version: info?["version"] as? String ?? "?"
+                )
+                connection.initialization = Initialization(
+                    protocolVersion: dict["protocolVersion"] as? Int ?? 0,
+                    supportsLoadSession: capabilities?["loadSession"] as? Bool ?? false,
+                    supportsResume: sessions?["resume"] as? Bool ?? false,
+                    supportsLogout: auth?["logout"] as? Bool ?? false,
+                    authMethodIDs: methods.compactMap { $0["id"] as? String }
                 )
             }
         }
@@ -121,9 +170,17 @@ final class ACPConnection: @unchecked Sendable {
         return connection
     }
 
-    private init(process: Process, stdinHandle: FileHandle, stderrPipe: Pipe) {
+    private init(
+        process: Process,
+        stdinHandle: FileHandle,
+        stderrPipe: Pipe,
+        onAuthorizationURL: (@Sendable (URL) -> Void)?,
+        onClose: (@Sendable () -> Void)?
+    ) {
         self.process = process
         self.stdinHandle = stdinHandle
+        self.onAuthorizationURL = onAuthorizationURL
+        self.onClose = onClose
 
         // Drain stderr (capped) so a chatty agent can never fill the pipe.
         stderrPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
@@ -136,12 +193,17 @@ final class ACPConnection: @unchecked Sendable {
                 self?.stderrTail.append(text)
             }
         }
+
+        process.terminationHandler = { [weak self] _ in
+            self?.processDidExit()
+        }
     }
 
     deinit {
         if process.isRunning {
             process.terminate()
         }
+        notifyClosed()
     }
 
     // MARK: - Sessions
@@ -199,6 +261,13 @@ final class ACPConnection: @unchecked Sendable {
         )
     }
 
+    private func requireConfigOption(sessionID: String, configID: String, value: String) async throws {
+        _ = try await request(
+            method: "session/set_config_option",
+            params: ["sessionId": sessionID, "configId": configID, "value": value]
+        )
+    }
+
     /// Legacy ACP model switch, used when the agent has no configOptions.
     func setModel(sessionID: String, modelID: String) async {
         _ = try? await request(
@@ -235,6 +304,41 @@ final class ACPConnection: @unchecked Sendable {
         }
     }
 
+    /// Antigravity's advertised configuration is authoritative. A saved model
+    /// that disappeared must surface an error instead of silently changing it.
+    func applyAntigravityGenerationSettings(
+        session: SessionInfo,
+        model: String?,
+        thinkingLevel: String
+    ) async throws {
+        if let model, !model.isEmpty {
+            guard let option = session.option(category: "model") else {
+                throw ACPError.requestFailed(
+                    code: -32602,
+                    message: "Antigravity did not advertise a model selector for this account."
+                )
+            }
+            guard option.values.contains(where: { $0.id == model }) else {
+                throw ACPError.requestFailed(
+                    code: -32602,
+                    message: "Antigravity model '\(model)' is unavailable for this Google account. Choose an available model."
+                )
+            }
+            if option.currentValue != model {
+                try await requireConfigOption(sessionID: session.id, configID: option.id, value: model)
+            }
+        }
+
+        if let option = session.option(category: "thought_level") {
+            let aliases = thinkingLevel == "xhigh" ? ["xhigh", "extra-high"] : [thinkingLevel]
+            if let value = aliases.first(where: { alias in
+                option.values.contains(where: { $0.id == alias })
+            }), option.currentValue != value {
+                try await requireConfigOption(sessionID: session.id, configID: option.id, value: value)
+            }
+        }
+    }
+
     /// Exact match first. Avoids substring traps (`high` vs `xhigh`).
     static func bestValueMatch(target: String, in values: [String]) -> String? {
         guard !target.isEmpty else { return nil }
@@ -244,6 +348,10 @@ final class ACPConnection: @unchecked Sendable {
 
     func authenticate(methodID: String) async throws {
         _ = try await request(method: "authenticate", params: ["methodId": methodID])
+    }
+
+    func logout() async throws {
+        _ = try await request(method: "logout", params: [:])
     }
 
     /// Runs one prompt turn, optionally publishing streamed text chunks while
@@ -257,12 +365,8 @@ final class ACPConnection: @unchecked Sendable {
                 text: String,
                 images: [PromptImage] = [],
                 onChunk: (@Sendable (String) -> Void)? = nil) async throws -> String {
-        let accumulator = StringAccumulator(onChunk: onChunk)
-        mutex.with { chunkBuffers[sessionID] = accumulator }
-        defer { _ = mutex.with { chunkBuffers.removeValue(forKey: sessionID) } }
-
-        var prompt: [[String: Any]] = [["type": "text", "text": text]]
-        prompt.append(contentsOf: images.map { image in
+        var encoded: [[String: Any]] = [["type": "text", "text": text]]
+        encoded.append(contentsOf: images.map { image in
             [
                 "type": "image",
                 "data": image.data.base64EncodedString(),
@@ -270,11 +374,48 @@ final class ACPConnection: @unchecked Sendable {
             ]
         })
 
+        return try await prompt(sessionID: sessionID, encodedBlocks: encoded, onChunk: onChunk)
+    }
+
+    func prompt(
+        sessionID: String,
+        blocks: [AntigravityACPContent.Block],
+        onChunk: (@Sendable (String) -> Void)? = nil
+    ) async throws -> String {
+        let encoded = blocks.map { block -> [String: Any] in
+            switch block {
+            case .text(let text):
+                return ["type": "text", "text": text]
+            case .image(let data, let mimeType):
+                return ["type": "image", "data": data.base64EncodedString(), "mimeType": mimeType]
+            case .audio(let data, let mimeType):
+                return ["type": "audio", "data": data.base64EncodedString(), "mimeType": mimeType]
+            case .resource(let text, let uri, let mimeType):
+                return [
+                    "type": "resource",
+                    "resource": ["uri": uri, "mimeType": mimeType, "text": text],
+                ]
+            case .resourceLink(let uri, let name, let mimeType):
+                return ["type": "resource_link", "uri": uri, "name": name, "mimeType": mimeType]
+            }
+        }
+        return try await prompt(sessionID: sessionID, encodedBlocks: encoded, onChunk: onChunk)
+    }
+
+    private func prompt(
+        sessionID: String,
+        encodedBlocks: [[String: Any]],
+        onChunk: (@Sendable (String) -> Void)?
+    ) async throws -> String {
+        let accumulator = StringAccumulator(onChunk: onChunk)
+        mutex.with { chunkBuffers[sessionID] = accumulator }
+        defer { _ = mutex.with { chunkBuffers.removeValue(forKey: sessionID) } }
+
         let result = try await withTaskCancellationHandler {
             try await request(
                 method: "session/prompt",
                 params: ["sessionId": sessionID,
-                         "prompt": prompt]
+                         "prompt": encodedBlocks]
             )
         } onCancel: {
             cancel(sessionID: sessionID)
@@ -326,6 +467,7 @@ final class ACPConnection: @unchecked Sendable {
         if process.isRunning {
             process.terminate()
         }
+        notifyClosed()
     }
 
     // MARK: - Wire plumbing
@@ -374,6 +516,23 @@ final class ACPConnection: @unchecked Sendable {
     }
 
     private func handleLine(_ line: Data) {
+        if let text = String(data: line, encoding: .utf8) {
+            let prefix = "Open the following link to authenticate the ACP server: "
+            if text.hasPrefix(prefix),
+               let url = URL(string: String(text.dropFirst(prefix.count))) {
+                if let onAuthorizationURL {
+                    do {
+                        try AntigravityACPAuthorization.validate(url)
+                        onAuthorizationURL(url)
+                    } catch {
+                        failPendingAuthentication(message: error.localizedDescription)
+                    }
+                } else {
+                    failPendingAuthentication(message: nil)
+                }
+                return
+            }
+        }
         guard let obj = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { return }
 
         let method = obj["method"] as? String
@@ -424,15 +583,59 @@ final class ACPConnection: @unchecked Sendable {
         accumulator?.append(text)
     }
 
-    /// Auto-permit tool calls so a chatty agent never deadlocks waiting on us.
+    /// One-off generation may approve a single action, but never grants a
+    /// permanent permission or mistakes an Antigravity user question for one.
     private func respondToPermissionRequest(_ envelope: [String: Any]) {
         guard let params = envelope["params"] as? [String: Any],
               let options = params["options"] as? [[String: Any]],
-              let optionID = options.first?["optionId"] else { return }
+              let toolCall = params["toolCall"] as? [String: Any],
+              let toolCallID = toolCall["toolCallId"] as? String,
+              !toolCallID.hasPrefix("interaction_"),
+              let optionID = options.first(where: { $0["kind"] as? String == "allow_once" })?["optionId"] else {
+            if envelope["id"] != nil {
+                send(["jsonrpc": "2.0", "id": envelope["id"] as Any,
+                      "result": ["outcome": ["outcome": "cancelled"]]])
+            }
+            return
+        }
 
         send(["jsonrpc": "2.0",
               "id": envelope["id"] as Any,
               "result": ["outcome": ["outcome": "selected", "optionId": optionID]]])
+    }
+
+    private func processDidExit() {
+        let waiters: [PendingCall] = mutex.with {
+            let values = Array(pending.values)
+            pending.removeAll()
+            return values
+        }
+        waiters.forEach { $0.continuation.resume(throwing: ACPError.connectionClosed) }
+        notifyClosed()
+    }
+
+    private func notifyClosed() {
+        let callback: (@Sendable () -> Void)? = mutex.with {
+            guard !didNotifyClose else { return nil }
+            didNotifyClose = true
+            return onClose
+        }
+        callback?()
+    }
+
+    private func failPendingAuthentication(message: String?) {
+        let waiters: [PendingCall] = mutex.with {
+            let values = Array(pending.values)
+            pending.removeAll()
+            return values
+        }
+        waiters.forEach {
+            if let message {
+                $0.continuation.resume(throwing: ACPError.requestFailed(code: -32000, message: message))
+            } else {
+                $0.continuation.resume(throwing: ACPError.authRequired(methods: ["oauth-personal"]))
+            }
+        }
     }
 
     private func send(_ message: [String: Any]) {

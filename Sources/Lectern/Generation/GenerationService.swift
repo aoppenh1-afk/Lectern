@@ -212,7 +212,7 @@ final class GenerationService {
         return rendered.joined(separator: "\n\n")
     }
 
-    private func antigravityReferenceInputs(for lecture: Lecture) -> [AntigravityCLI.WorkspaceInput] {
+    private func antigravityReferenceInputs(for lecture: Lecture) -> [AntigravityACPClient.WorkspaceInput] {
         let references = lecture.attachments
             .sorted { $0.addedAt < $1.addedAt }
             .map { (scope: "lecture", attachment: $0) }
@@ -266,16 +266,16 @@ final class GenerationService {
         workspaceDirectory: URL,
         effortHint: String,
         language: LectureLanguage,
-        supplementaryInputs: [AntigravityCLI.WorkspaceInput]
+        supplementaryInputs: [AntigravityACPClient.WorkspaceInput]
     ) async throws -> GeneratedOutput {
         if profile.id == AgentProfiles.antigravityID, kind == .notes {
-            let cli = AntigravityCLI.configured(for: profile)
-            let modelID = AntigravityCLI.applyThinking(
+            let cli = AntigravityACPClient.configured(for: profile)
+            let modelID = AntigravityACPClient.applyThinking(
                 thinkingLevel,
-                to: modelOverride ?? profile.model ?? AntigravityCLI.modelID
+                to: modelOverride ?? profile.model ?? AntigravityACPClient.modelID
             )
-            let source = AntigravityCLI.WorkspaceInput.text(transcript, named: "lecture-source.md")
-            let referenceInstruction = AntigravityCLI.supplementaryReferenceInstruction(
+            let source = AntigravityACPClient.WorkspaceInput.text(transcript, named: "lecture-source.md")
+            let referenceInstruction = AntigravityACPClient.supplementaryReferenceInstruction(
                 for: supplementaryInputs
             )
             var output = NotesMarkdownNormalizer.normalize(try await cli.run(
@@ -327,27 +327,27 @@ final class GenerationService {
 
         if profile.id == AgentProfiles.antigravityID {
             let antigravityPrompt = effortHint
-                + AntigravityCLI.supplementaryReferenceInstruction(for: supplementaryInputs)
+                + AntigravityACPClient.supplementaryReferenceInstruction(for: supplementaryInputs)
                 + prompt
-            let modelID = AntigravityCLI.applyThinking(
+            let modelID = AntigravityACPClient.applyThinking(
                 thinkingLevel,
-                to: modelOverride ?? profile.model ?? AntigravityCLI.modelID
+                to: modelOverride ?? profile.model ?? AntigravityACPClient.modelID
             )
-            var output = try await AntigravityCLI.configured(for: profile).run(
+            var output = try await AntigravityACPClient.configured(for: profile).run(
                 prompt: antigravityPrompt,
                 modelID: modelID,
                 thinkingLevel: thinkingLevel,
                 inputs: supplementaryInputs
             )
             if kind == .flashcards, parseCards(output) == nil {
-                output = try await AntigravityCLI.configured(for: profile).run(
+                output = try await AntigravityACPClient.configured(for: profile).run(
                     prompt: antigravityPrompt + "\n\nReturn ONLY the strict JSON array, with no fences or commentary.",
                     modelID: modelID,
                     thinkingLevel: thinkingLevel,
                     inputs: supplementaryInputs
                 )
             } else if kind == .quiz, parseQuestions(output) == nil {
-                output = try await AntigravityCLI.configured(for: profile).run(
+                output = try await AntigravityACPClient.configured(for: profile).run(
                     prompt: antigravityPrompt + "\n\nReturn ONLY the strict quiz JSON array in the specified schema, with no fences or commentary.",
                     modelID: modelID,
                     thinkingLevel: thinkingLevel,

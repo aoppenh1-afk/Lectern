@@ -57,16 +57,13 @@ final class AgentDetectorTests: XCTestCase {
         let detections = AgentDetector.detectAll(
             resolve: { name in
                 switch name {
-                case "agy": return "/Users/me/.local/bin/agy"
                 case "opencode": return "/opt/homebrew/bin/opencode"
                 default: return nil
                 }
-            },
-            antigravitySignedIn: { false }
+            }
         )
         let byID = Dictionary(uniqueKeysWithValues: detections.map { ($0.profileID, $0) })
-        XCTAssertEqual(byID[AgentProfiles.antigravityID]?.status, .installedNotSignedIn)
-        XCTAssertEqual(byID[AgentProfiles.antigravityID]?.suggestedCommand, "/Users/me/.local/bin/agy")
+        XCTAssertNil(byID[AgentProfiles.antigravityID], "The CLI detector must not stand in for managed ACP state.")
         XCTAssertEqual(byID[AgentProfiles.opencodeID]?.status, .ready)
         XCTAssertEqual(byID[AgentProfiles.opencodeID]?.suggestedCommand, "/opt/homebrew/bin/opencode acp")
         XCTAssertEqual(byID[AgentProfiles.codexID]?.status, .notInstalled)
@@ -77,11 +74,10 @@ final class AgentDetectorTests: XCTestCase {
         let defaults = UserDefaults(suiteName: "AgentDetectorTests-\(UUID().uuidString)")!
         AgentProfiles.setCommand("/custom/codex-acp", for: AgentProfiles.codexID, userDefaults: defaults)
         let detections = AgentDetector.detectAll(
-            resolve: { $0 == "agy" ? "/found/agy" : nil },
-            antigravitySignedIn: { true }
+            resolve: { $0 == "opencode" ? "/found/opencode" : nil }
         )
         AgentDetector.applyDetected(detections, userDefaults: defaults)
-        XCTAssertEqual(AgentProfiles.profile(id: AgentProfiles.antigravityID, userDefaults: defaults)?.command, "/found/agy")
+        XCTAssertEqual(AgentProfiles.profile(id: AgentProfiles.antigravityID, userDefaults: defaults)?.command, "managed://antigravity-acp")
         XCTAssertEqual(AgentProfiles.profile(id: AgentProfiles.codexID, userDefaults: defaults)?.command, "/custom/codex-acp")
     }
 }

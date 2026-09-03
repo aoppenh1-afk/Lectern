@@ -10,7 +10,9 @@
 		03AAB9FA7E7D37008040AF60 /* AgentProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13E515E0B5FEBA11763B7DA /* AgentProfile.swift */; };
 		04A2587DE03F9385C9796948 /* CourseSynthesisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD87EB0581FBD62DD9CC2F0B /* CourseSynthesisView.swift */; };
 		0932FFD48E3317DAB25BAB3C /* CanvasClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */; };
+		097B599C3CD156F1FE5B4DD1 /* AntigravityACPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */; };
 		0C8CA21E7C40DA908FCC5EFF /* ParakeetTDT in Frameworks */ = {isa = PBXBuildFile; productRef = DE53F9C541D2A8F57BAAA142 /* ParakeetTDT */; };
+		0E5075065DE9DAA2A5400B42 /* ACPConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF3D392A858A8A5FF43BE12F /* ACPConnection.swift */; };
 		0EA7814AC3CB85466CD5675D /* lectern-transcription in Resources */ = {isa = PBXBuildFile; fileRef = 19629351EB498E76FFBC6AF2 /* lectern-transcription */; };
 		11B676CDDFEDF8FCE083CA1F /* Color+Hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF40CBB383F0F13DB95789D6 /* Color+Hex.swift */; };
 		13DA820854CD0648709719F9 /* TranscriptionProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */; };
@@ -57,6 +59,7 @@
 		7461744B772DB8803A6BB84A /* LectureChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC2F44F19A8CD8C4379AC82 /* LectureChatView.swift */; };
 		769C8CF41FCE0C5A67B52A8E /* Recording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */; };
 		774E46198FF81D34D8A71C78 /* MenuBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73BEE40BCC364B58C68CEB62 /* MenuBarPopoverView.swift */; };
+		7AADBA9597A6FB92B7749D65 /* AntigravityACP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BFE16C6F2F14A491896949 /* AntigravityACP.swift */; };
 		7EFD4FF5B0C51EF749EEAEF3 /* AgentModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C260A0B06C75ACB5BBD3905 /* AgentModelCatalog.swift */; };
 		7FA3A2E75CC1C3AE36E46AF4 /* TranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439436382A9383B21132AFA7 /* TranscriptionService.swift */; };
 		81AEF8ECD24F2CA06E7E9EA8 /* ChatMarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61B8478F30090A0838FA7BCC /* ChatMarkdownRenderer.swift */; };
@@ -65,9 +68,11 @@
 		82688AA7EC72B3D17C7DE1B1 /* NotesContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51D3E04EE9E7EAE2AA0AA37 /* NotesContentView.swift */; };
 		86CA65565DB52DB819C9C7BB /* CanvasWorkspaceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FE176891F8FD111C81F219 /* CanvasWorkspaceViews.swift */; };
 		8ADBECF8CDB31C153F5376F3 /* NotesMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D8E9C05E6FE70084DD545AC /* NotesMarkdown.swift */; };
+		8B4271F2568269D617E665C4 /* AntigravityACPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */; };
 		8BE649B38DF898AC27E78800 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872C99F2068ADE2855DB440D /* ChatMessage.swift */; };
 		8CEF00F77314A75DDAE1752F /* OnboardingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED5ED7AC83F9F7234C35460 /* OnboardingState.swift */; };
 		9265B1AAA24271D2A4BD864F /* LectureExportAvailability+Lecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C30D8A14329AC61D5345BC9 /* LectureExportAvailability+Lecture.swift */; };
+		92BA99F1D8777D835D66AFCF /* AntigravityACP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BFE16C6F2F14A491896949 /* AntigravityACP.swift */; };
 		93D3161AC57DF8C49442C3CB /* GoogleDocsNotesBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6883F2E69A64C8505C606EE /* GoogleDocsNotesBar.swift */; };
 		945656E2CCCE5BFD98EBA189 /* mermaid.min.js in Resources */ = {isa = PBXBuildFile; fileRef = E7DC166705C567DFF81BC6B6 /* mermaid.min.js */; };
 		94606A0CC4D7C272C6B01A50 /* GenerateSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDCDE601FE52EA2EF91E5594 /* GenerateSheet.swift */; };
@@ -80,7 +85,6 @@
 		A8E36437D00550E10D9FC228 /* CanvasConnectionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09DF40420E86AFCF7499E39F /* CanvasConnectionSettings.swift */; };
 		AA06B27A94F72E080521F647 /* ReferenceMaterialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B1F78BFD01E4667FE613F2 /* ReferenceMaterialService.swift */; };
 		AAF12042D3F7E714EF8264E3 /* NotesMarkdownConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD3E8ECFA5DBAF53FDF24214 /* NotesMarkdownConverter.swift */; };
-		AC3C861513403C15790CBE44 /* AntigravityCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B68EA81889B408D94CB43B77 /* AntigravityCLI.swift */; };
 		AD86591E3E90890763F6171D /* GoogleDocsError.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF820DB24255443A5561D031 /* GoogleDocsError.swift */; };
 		B0183D74ECA0C677FCFD815A /* CompletionNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165645A8C3854D55C5824601 /* CompletionNotifier.swift */; };
 		B1C8626312E7CF92B5F96D1A /* CanvasConnectionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09DF40420E86AFCF7499E39F /* CanvasConnectionSettings.swift */; };
@@ -98,15 +102,14 @@
 		C246DC1EB1FC9BCCA7C5C84A /* ACPConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF3D392A858A8A5FF43BE12F /* ACPConnection.swift */; };
 		C8BD1E39D756D4404C06735D /* LecternBundleOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */; };
 		CB51F1710B7BFE7BFED515EE /* SurfacePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363051532AA63A00332E82D7 /* SurfacePreferences.swift */; };
+		CBE08C8D503A31D46BFC2FA9 /* AntigravityACPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */; };
 		CC81062C168BF06111E4201E /* LecternBundleOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */; };
-		D0A469CA8134B1B9F8C23FB2 /* AntigravityCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B68EA81889B408D94CB43B77 /* AntigravityCLI.swift */; };
 		D850E1E9B74B2D1B0CBF2E16 /* CanvasClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */; };
 		D990E2BB9EF4969A3CB445F4 /* LectureDocumentExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 061C2A9944E44D8A633CC026 /* LectureDocumentExportService.swift */; };
 		DAD78AE30A61C7FF28F6D438 /* GlassStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F48400CBE26D86C8AA210BB /* GlassStyle.swift */; };
 		DC7FA22084818FFCEA370343 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80840764862370BCD46CACE /* SettingsView.swift */; };
 		DCA25DC41D36D19446E842B2 /* CourseSynthesisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627A2CDC9029D01B87C36A0C /* CourseSynthesisService.swift */; };
 		DD7641DD03C615916EFD50E2 /* ExternalTranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 576A2CBC9D67B86F6B125E6E /* ExternalTranscriptionEngine.swift */; };
-		DDD0AE6282AB37C483C2D404 /* AntigravityCLITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96A54894295C736FDBCCA267 /* AntigravityCLITests.swift */; };
 		DEA2627708C2C4172F0A4B08 /* AppAuth in Frameworks */ = {isa = PBXBuildFile; productRef = F13AF31704ECBCAC1405015C /* AppAuth */; };
 		DF356657AAF2E959F04C90CE /* RecordingFileLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DEC6C81E9D90FFBE3C748F /* RecordingFileLedger.swift */; };
 		E18F44EF0D299FB70D15D910 /* AgentProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13E515E0B5FEBA11763B7DA /* AgentProfile.swift */; };
@@ -134,6 +137,7 @@
 		165645A8C3854D55C5824601 /* CompletionNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionNotifier.swift; sourceTree = "<group>"; };
 		16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasClient.swift; sourceTree = "<group>"; };
 		173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recording.swift; sourceTree = "<group>"; };
+		17BFE16C6F2F14A491896949 /* AntigravityACP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACP.swift; sourceTree = "<group>"; };
 		19629351EB498E76FFBC6AF2 /* lectern-transcription */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "lectern-transcription"; path = ".agents/skills/lectern-transcription"; sourceTree = SOURCE_ROOT; };
 		1ED5ED7AC83F9F7234C35460 /* OnboardingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingState.swift; sourceTree = "<group>"; };
 		1F4553C1CACE105140BCDE50 /* Artifact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artifact.swift; sourceTree = "<group>"; };
@@ -175,7 +179,6 @@
 		87CA75D98C0B0A79B24C31A6 /* TranscriptionProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionProviders.swift; sourceTree = "<group>"; };
 		89A8D31EBDA459CA5FB32589 /* ReferenceMaterialPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceMaterialPicker.swift; sourceTree = "<group>"; };
 		8E407430088644634374A45C /* QuizReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizReviewView.swift; sourceTree = "<group>"; };
-		96A54894295C736FDBCCA267 /* AntigravityCLITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityCLITests.swift; sourceTree = "<group>"; };
 		97F761716AB6F39B0F119719 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		9B73D14E51C0E213359B9BDF /* CaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureController.swift; sourceTree = "<group>"; };
 		9C260A0B06C75ACB5BBD3905 /* AgentModelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentModelCatalog.swift; sourceTree = "<group>"; };
@@ -188,10 +191,11 @@
 		A763F772641D5D2F5F79CDB9 /* CanvasSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasSettingsView.swift; sourceTree = "<group>"; };
 		A80840764862370BCD46CACE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B1636BFF993825C1A1D7F801 /* LectureImportPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureImportPicker.swift; sourceTree = "<group>"; };
+		B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACPTests.swift; sourceTree = "<group>"; };
 		B3217A5B8A37DD8207DD0478 /* AnkiConnectClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnkiConnectClient.swift; sourceTree = "<group>"; };
-		B68EA81889B408D94CB43B77 /* AntigravityCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityCLI.swift; sourceTree = "<group>"; };
 		BB85EBEEFA4C4DD64A6BA221 /* LiveBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveBookmark.swift; sourceTree = "<group>"; };
 		BBF49011BFA6F50BCA8A7598 /* GoogleDocsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsClient.swift; sourceTree = "<group>"; };
+		BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACPClient.swift; sourceTree = "<group>"; };
 		BD87EB0581FBD62DD9CC2F0B /* CourseSynthesisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseSynthesisView.swift; sourceTree = "<group>"; };
 		BE5C3AABA6B34AD14F5DB646 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		C01528EDB75F8B898B2746A6 /* CardSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSyncService.swift; sourceTree = "<group>"; };
@@ -369,7 +373,7 @@
 		57C666E0599B31DACFA50FC1 /* LecternTests */ = {
 			isa = PBXGroup;
 			children = (
-				96A54894295C736FDBCCA267 /* AntigravityCLITests.swift */,
+				B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */,
 				E84584CA17279DC67909F94C /* AppUpdaterTests.swift */,
 				832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */,
 				0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */,
@@ -471,7 +475,8 @@
 				07DF18B64B18FC06E4CC2F90 /* AgentDetector.swift */,
 				9C260A0B06C75ACB5BBD3905 /* AgentModelCatalog.swift */,
 				A13E515E0B5FEBA11763B7DA /* AgentProfile.swift */,
-				B68EA81889B408D94CB43B77 /* AntigravityCLI.swift */,
+				17BFE16C6F2F14A491896949 /* AntigravityACP.swift */,
+				BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */,
 				61B8478F30090A0838FA7BCC /* ChatMarkdownRenderer.swift */,
 				627A2CDC9029D01B87C36A0C /* CourseSynthesisService.swift */,
 				E5496C48DE5EDC0027745A0E /* DiagramRenderer.swift */,
@@ -624,10 +629,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0E5075065DE9DAA2A5400B42 /* ACPConnection.swift in Sources */,
 				EC58924FF09B859FC286942E /* AgentDetector.swift in Sources */,
 				03AAB9FA7E7D37008040AF60 /* AgentProfile.swift in Sources */,
-				AC3C861513403C15790CBE44 /* AntigravityCLI.swift in Sources */,
-				DDD0AE6282AB37C483C2D404 /* AntigravityCLITests.swift in Sources */,
+				92BA99F1D8777D835D66AFCF /* AntigravityACP.swift in Sources */,
+				CBE08C8D503A31D46BFC2FA9 /* AntigravityACPClient.swift in Sources */,
+				097B599C3CD156F1FE5B4DD1 /* AntigravityACPTests.swift in Sources */,
 				41F9B3478E69F113377A6216 /* AppUpdater.swift in Sources */,
 				E5F1009B3531ED6CA5C9FA57 /* AppUpdaterTests.swift in Sources */,
 				D850E1E9B74B2D1B0CBF2E16 /* CanvasClient.swift in Sources */,
@@ -660,7 +667,8 @@
 				7EFD4FF5B0C51EF749EEAEF3 /* AgentModelCatalog.swift in Sources */,
 				E18F44EF0D299FB70D15D910 /* AgentProfile.swift in Sources */,
 				FD91D9A3281EA0A3E2804653 /* AnkiConnectClient.swift in Sources */,
-				D0A469CA8134B1B9F8C23FB2 /* AntigravityCLI.swift in Sources */,
+				7AADBA9597A6FB92B7749D65 /* AntigravityACP.swift in Sources */,
+				8B4271F2568269D617E665C4 /* AntigravityACPClient.swift in Sources */,
 				5BA88FED8AAA4DF17E087287 /* AppUpdater.swift in Sources */,
 				9FF80456F18EBE4D84A834F3 /* Artifact.swift in Sources */,
 				246D6AABE4A01260E36A1011 /* CanvasClient.swift in Sources */,

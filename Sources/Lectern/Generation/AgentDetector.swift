@@ -32,7 +32,7 @@ struct AgentDetection: Identifiable, Hashable, Sendable {
 
 /// Finds which agent CLIs exist on this machine so a fresh install does not
 /// have to hand-type paths for tools it does not own. Detection is filesystem
-/// only; nothing is launched except the optional Antigravity sign-in probe.
+/// only. Antigravity is managed separately by `AntigravityACPManager`.
 enum AgentDetector {
     struct Candidate: Sendable {
         let profileID: String
@@ -45,13 +45,6 @@ enum AgentDetector {
     }
 
     static let candidates: [Candidate] = [
-        Candidate(
-            profileID: AgentProfiles.antigravityID,
-            title: "Antigravity CLI",
-            executables: ["agy"],
-            arguments: "",
-            installHint: "curl -fsSL https://antigravity.google/cli/install.sh | bash"
-        ),
         Candidate(
             profileID: AgentProfiles.codexID,
             title: "ChatGPT (Codex)",
@@ -68,24 +61,14 @@ enum AgentDetector {
         ),
     ]
 
-    /// Antigravity keeps its OAuth profile here after the first interactive
-    /// `agy` launch. Presence is a cheap, reliable signed-in signal.
-    static var antigravityTokenURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".gemini/antigravity-cli/antigravity-oauth-token")
-    }
-
     static func detectAll(
-        resolve: (String) -> String? = AgentProfiles.resolveExecutable,
-        antigravitySignedIn: () -> Bool = { FileManager.default.fileExists(atPath: antigravityTokenURL.path) }
+        resolve: (String) -> String? = AgentProfiles.resolveExecutable
     ) -> [AgentDetection] {
         candidates.map { candidate in
             let path = candidate.executables.lazy.compactMap(resolve).first
             let status: AgentDetection.Status
             if path == nil {
                 status = .notInstalled
-            } else if candidate.profileID == AgentProfiles.antigravityID, !antigravitySignedIn() {
-                status = .installedNotSignedIn
             } else {
                 status = .ready
             }
@@ -117,53 +100,4 @@ enum AgentDetector {
         return detections
     }
 
-    /// Runs `agy models`, which succeeds only for a signed-in CLI. Used as the
-    /// "Check again" probe after the user signs in from Terminal.
-    static func verifyAntigravitySignIn(timeout: Duration = .seconds(20)) async -> Bool {
-        guard let path = AgentProfiles.resolveExecutable("agy") else { return false }
-        return await withCheckedContinuation { continuation in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: path)
-            process.arguments = ["models"]
-            process.standardOutput = Pipe()
-            process.standardError = Pipe()
-            var environment = ProcessInfo.processInfo.environment
-            environment["PATH"] = (environment["PATH"] ?? "") + ":/opt/homebrew/bin:/usr/local/bin:"
-                + FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin").path
-            process.environment = environment
-
-            let finished = ContinuationGuard(continuation)
-            process.terminationHandler = { process in
-                finished.resume(process.terminationStatus == 0)
-            }
-            do {
-                try process.run()
-            } catch {
-                finished.resume(false)
-                return
-            }
-            Task {
-                try? await Task.sleep(for: timeout)
-                if process.isRunning { process.terminate() }
-                finished.resume(false)
-            }
-        }
-    }
-
-    private final class ContinuationGuard: @unchecked Sendable {
-        private var continuation: CheckedContinuation<Bool, Never>?
-        private let lock = NSLock()
-
-        init(_ continuation: CheckedContinuation<Bool, Never>) {
-            self.continuation = continuation
-        }
-
-        func resume(_ value: Bool) {
-            lock.lock()
-            let pending = continuation
-            continuation = nil
-            lock.unlock()
-            pending?.resume(returning: value)
-        }
-    }
 }

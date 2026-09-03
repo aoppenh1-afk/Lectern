@@ -95,21 +95,21 @@ struct TranscriptionSettingsPane: View {
                         Spacer()
                         Picker("", selection: Binding(
                             get: {
-                                AntigravityCLI.thinkingLevel(
+                                AntigravityACPClient.thinkingLevel(
                                     fromModelID: BuiltInTranscriptionModel.resolvedAntigravityModelID(preferences.builtInModelID)
                                 ).rawValue
                             },
                             set: { raw in
                                 let level = ThinkingLevel(rawValue: raw) ?? .high
                                 let current = BuiltInTranscriptionModel.resolvedAntigravityModelID(preferences.builtInModelID)
-                                preferences.builtInModelID = AntigravityCLI.applyThinking(
+                                preferences.builtInModelID = AntigravityACPClient.applyThinking(
                                     level,
                                     to: current,
                                     availableIDs: antigravityCatalog.models.map(\.id)
                                 )
                             }
                         )) {
-                            ForEach(AntigravityCLI.thinkingLevels) { level in
+                            ForEach(AntigravityACPClient.thinkingLevels) { level in
                                 Text(level.title).tag(level.rawValue)
                             }
                         }
@@ -154,11 +154,11 @@ struct TranscriptionSettingsPane: View {
         if models.isEmpty {
             models = [
                 AgentModel(
-                    id: AntigravityCLI.modelID,
-                    name: AntigravityCLI.displayName,
+                    id: AntigravityACPClient.modelID,
+                    name: AntigravityACPClient.displayName,
                     provider: "Google",
                     isDefault: true,
-                    supportedThinkingLevels: AntigravityCLI.thinkingLevels,
+                    supportedThinkingLevels: AntigravityACPClient.thinkingLevels,
                     defaultThinkingLevel: .high
                 )
             ]
@@ -171,9 +171,9 @@ struct TranscriptionSettingsPane: View {
                     name: selected,
                     provider: "Google",
                     isDefault: false,
-                    supportedThinkingLevels: AntigravityCLI.isThinkingVariant(selected) ? AntigravityCLI.thinkingLevels : [],
-                    defaultThinkingLevel: AntigravityCLI.isThinkingVariant(selected)
-                        ? AntigravityCLI.thinkingLevel(fromModelID: selected)
+                    supportedThinkingLevels: AntigravityACPClient.isThinkingVariant(selected) ? AntigravityACPClient.thinkingLevels : [],
+                    defaultThinkingLevel: AntigravityACPClient.isThinkingVariant(selected)
+                        ? AntigravityACPClient.thinkingLevel(fromModelID: selected)
                         : nil
                 ),
                 at: 0
@@ -224,7 +224,7 @@ struct TranscriptionSettingsPane: View {
                 SettingsSectionHeader(
                     eyebrow: "CONNECTIONS",
                     title: "Your transcription providers",
-                    detail: "Save API connections or use the Antigravity CLI account already signed in on this Mac."
+                    detail: "Save API connections or use the Google account signed into Lectern's Antigravity ACP runtime."
                 )
                 Spacer()
                 Button {
@@ -322,7 +322,7 @@ struct TranscriptionSettingsPane: View {
                     .font(.system(size: 9.5, design: .monospaced))
                     .foregroundStyle(
                         testMessages[connection.id]?.hasPrefix("Credentials valid") == true
-                            || testMessages[connection.id]?.hasPrefix("Antigravity CLI signed in") == true
+                            || testMessages[connection.id]?.hasPrefix("Antigravity ACP signed in") == true
                             ? LecternTheme.successTint
                             : Color.secondary.opacity(0.65)
                     )
@@ -404,7 +404,7 @@ struct TranscriptionSettingsPane: View {
     }
 
     private func connectionStatus(_ connection: TranscriptionConnection) -> String {
-        if !connection.provider.requiresAPIKey { return "Uses Antigravity CLI sign-in" }
+        if !connection.provider.requiresAPIKey { return "Uses Lectern's Antigravity ACP sign-in" }
         return KeychainCredentialStore.maskedSuffix(reference: connection.credentialReference) ?? "No key stored"
     }
 }
@@ -487,7 +487,7 @@ private struct TranscriptionConnectionEditor: View {
                         .font(.system(size: 18, weight: .bold, design: .serif))
                     Text(draft.provider.requiresAPIKey
                          ? "Keys stay in your Mac's Keychain and are read only for transcription requests."
-                         : "Uses the Antigravity CLI sign-in already available on this Mac.")
+                         : "Uses the isolated Antigravity ACP sign-in configured in Lectern Settings.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -592,19 +592,19 @@ private struct TranscriptionConnectionEditor: View {
             Toggle("Use a custom model ID", isOn: $customModel)
                 .font(.system(size: 11))
 
-            if draft.provider == .antigravityCLI, AntigravityCLI.isThinkingVariant(draft.modelID) {
+            if draft.provider == .antigravityCLI, AntigravityACPClient.isThinkingVariant(draft.modelID) {
                 Picker("Thinking", selection: Binding(
-                    get: { AntigravityCLI.thinkingLevel(fromModelID: draft.modelID).rawValue },
+                    get: { AntigravityACPClient.thinkingLevel(fromModelID: draft.modelID).rawValue },
                     set: { raw in
                         let level = ThinkingLevel(rawValue: raw) ?? .high
-                        draft.modelID = AntigravityCLI.applyThinking(
+                        draft.modelID = AntigravityACPClient.applyThinking(
                             level,
                             to: draft.modelID,
                             availableIDs: antigravityCatalog.models.map(\.id)
                         )
                     }
                 )) {
-                    ForEach(AntigravityCLI.thinkingLevels) { level in
+                    ForEach(AntigravityACPClient.thinkingLevels) { level in
                         Text(level.title).tag(level.rawValue)
                     }
                 }
@@ -615,7 +615,7 @@ private struct TranscriptionConnectionEditor: View {
                 SecureField(KeychainCredentialStore.maskedSuffix(reference: draft.credentialReference) ?? "API key", text: $apiKey)
                     .textFieldStyle(.roundedBorder)
             } else {
-                Label("No API key required — authenticate once in the agy CLI.", systemImage: "terminal")
+                Label("No API key required — sign in under Settings › Agents.", systemImage: "person.crop.circle")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -676,7 +676,7 @@ private struct TranscriptionConnectionEditor: View {
                     subtitle: model.id,
                     capabilities: TranscriptionProviderCatalog.capabilities(
                         provider: .antigravityCLI,
-                        modelID: AntigravityCLI.transcriptionModelID
+                        modelID: AntigravityACPClient.transcriptionModelID
                     )
                 )
             }

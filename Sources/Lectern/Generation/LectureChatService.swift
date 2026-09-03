@@ -545,13 +545,13 @@ final class LectureChatService {
             }
             let name = "chat-image-\(index + 1).\(ext)"
             request += "\n\nAttached image \(index + 1): @\(name)"
-            return AntigravityCLI.WorkspaceInput.data(image.data, named: name)
+            return AntigravityACPClient.WorkspaceInput.data(image.data, named: name)
         }
-        let modelID = AntigravityCLI.applyThinking(
+        let modelID = AntigravityACPClient.applyThinking(
             thinkingLevel,
-            to: modelOverride ?? profile.model ?? AntigravityCLI.modelID
+            to: modelOverride ?? profile.model ?? AntigravityACPClient.modelID
         )
-        return try await AntigravityCLI.configured(for: profile).run(
+        return try await AntigravityACPClient.configured(for: profile).run(
             prompt: request,
             modelID: modelID,
             thinkingLevel: thinkingLevel,

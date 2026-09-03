@@ -2,13 +2,13 @@
 
 Lectern is a macOS app for students. It records lectures and shiurim, transcribes them (English and mixed English‑Hebrew), and turns them into nested outline notes, flashcards and quizzes. Optionally it syncs Canvas courses, deadlines and grades, and pushes notes to Google Docs.
 
-All AI work runs on your Mac through [Google's Antigravity CLI](https://antigravity.google/docs/cli/overview) using your own Google sign-in. Lectern has no server and collects nothing.
+Lectern launches [Google's official Antigravity ACP agent](https://github.com/agentclientprotocol/registry/tree/main/antigravity-acp) on your Mac and uses its separate Google sign-in. Lectern has no server and collects nothing.
 
 ## Requirements
 
 - macOS 26 or later, Apple silicon
 - Xcode 26 (full Xcode, not only Command Line Tools) to build from source
-- A Google account for Antigravity CLI
+- A Google account with access to Antigravity
 - Optional: a Canvas personal access token; a Google Cloud OAuth desktop client for Google Docs
 
 ## Install from a release
@@ -25,7 +25,7 @@ open /Applications/Lectern.app
 You can also do this from System Settings › Privacy & Security › Open Anyway. Either way, you only do it the first time; in-app updates do not trigger it again.
 
 4. Complete the setup assistant:
-   - **Antigravity CLI** (required). Install with the command it shows, run `agy` once in Terminal to sign in with Google, then click *Check again*. Lectern's transcription and notes skills are built into the app.
+   - **Antigravity** (required). Click *Install Antigravity* so Lectern can download and verify Google's official ACP runtime, then click *Sign in with Google*. The normal `agy` CLI is not required and its sign-in is intentionally separate.
    - **Canvas** (optional). School Canvas address plus a personal access token (Canvas › Account › Settings › Approved Integrations › New Access Token). Stored in Keychain.
    - **Google Docs** (optional). Needs your own OAuth client from Google Cloud Console. Most people skip this.
 
@@ -58,13 +58,8 @@ xattr -dr com.apple.quarantine /Applications/Lectern.app
 open /Applications/Lectern.app
 ```
 
-6. Install Antigravity CLI if `agy` is not on `PATH` (it usually lands in `~/.local/bin`):
-
-```bash
-curl -fsSL https://antigravity.google/cli/install.sh | bash
-```
-
-7. Tell the user to run `agy` once in Terminal and finish the Google sign-in in the browser. You cannot complete that sign-in for them. After they are done, Lectern's setup assistant *Check again* button should show Antigravity as ready.
+6. In Lectern's setup assistant, have the user click *Install Antigravity*. Lectern downloads the pinned official ACP runtime from Google, verifies its SHA-256 and identity, and keeps it under Application Support.
+7. Have the user click *Sign in with Google* and complete Google's browser flow. No Terminal command or normal Antigravity CLI installation is required.
 
 Do not commit tokens, `.env` files, or Keychain material. Do not change `git config`. Do not force-push.
 
@@ -76,7 +71,7 @@ You can also download any version from the [Releases page](https://github.com/ao
 
 ## Other agents
 
-Antigravity CLI is the default. **Settings › Agents › Detect installed agents** finds other supported agents on this Mac (ChatGPT via `codex-acp`, `opencode`) and fills in their paths.
+Antigravity ACP is the default. **Settings › Agents** manages its runtime and Google account separately, and detects other supported agents on this Mac (ChatGPT via `codex-acp`, OpenCode).
 
 ## Building from source
 
@@ -104,11 +99,10 @@ This bumps `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml`, bui
 ## Privacy
 
 - Recordings, transcripts and notes stay in `~/Library/Application Support/Lectern`.
-- Canvas tokens, Google OAuth state, transcription API keys and any GitHub token are stored in the macOS Keychain.
-- Each Antigravity job runs sandboxed in a fresh private temp folder that contains only the audio or transcript and Lectern's skill file, and is deleted afterwards.
+- Canvas tokens, Google Docs OAuth state, transcription API keys and any GitHub token are stored in the macOS Keychain. The official Antigravity ACP agent stores its own credential in a private Lectern profile.
+- Antigravity prompts and supported attachments are sent through ACP. Lecture audio uses ACP's native audio content block instead of a workspace path hint.
 - This repository does not contain credentials. Do not commit `.env` files or tokens.
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-

@@ -31,9 +31,9 @@ protocol TranscriptionProviderAdapter: Sendable {
 
 struct ExternalTranscriptionEngine: Sendable {
     private let session: URLSession
-    private let antigravity: AntigravityCLI
+    private let antigravity: AntigravityACPClient
 
-    init(session: URLSession = .shared, antigravity: AntigravityCLI = AntigravityCLI()) {
+    init(session: URLSession = .shared, antigravity: AntigravityACPClient = AntigravityACPClient()) {
         self.session = session
         self.antigravity = antigravity
     }
@@ -139,7 +139,7 @@ struct ExternalTranscriptionEngine: Sendable {
 
 private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
     let providerID = TranscriptionProviderID.antigravityCLI
-    let cli: AntigravityCLI
+    let cli: AntigravityACPClient
 
     func transcribe(
         _ request: ExternalTranscriptionRequest,
@@ -176,12 +176,12 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
         await onUpdate(.init(state: .processing))
         do {
             let modelID = request.connection.modelID.isEmpty
-                ? AntigravityCLI.transcriptionModelID
+                ? AntigravityACPClient.transcriptionModelID
                 : request.connection.modelID
             let output = try await cli.run(
                 prompt: prompt,
                 modelID: modelID,
-                thinkingLevel: AntigravityCLI.thinkingLevel(fromModelID: modelID),
+                thinkingLevel: AntigravityACPClient.thinkingLevel(fromModelID: modelID),
                 inputs: [.file(request.audioURL, named: audioName)],
                 skills: [.transcription]
             )
@@ -199,9 +199,9 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
         do {
             let models = try await cli.availableModels()
             guard models.contains(connection.modelID) else {
-                return .init(isValid: false, message: "Antigravity CLI does not currently expose \(connection.modelID).")
+                return .init(isValid: false, message: "Antigravity ACP does not currently expose \(connection.modelID).")
             }
-            return .init(isValid: true, message: "Antigravity CLI signed in; model available.")
+            return .init(isValid: true, message: "Antigravity ACP signed in; model available.")
         } catch {
             return .init(isValid: false, message: error.localizedDescription)
         }
@@ -214,7 +214,7 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
                 code: .malformedResponse,
                 retryable: false,
                 fallbackEligible: true,
-                userMessage: "Antigravity CLI returned an empty transcript."
+                userMessage: "Antigravity ACP returned an empty transcript."
             )
         }
 
@@ -238,7 +238,7 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
                 provider: request.connection.provider,
                 requestedModelID: request.connection.modelID,
                 resolvedModelID: request.connection.modelID.isEmpty
-                    ? AntigravityCLI.transcriptionModelID
+                    ? AntigravityACPClient.transcriptionModelID
                     : request.connection.modelID,
                 providerJobID: nil,
                 attemptNumber: request.attemptNumber,

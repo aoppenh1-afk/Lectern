@@ -9,7 +9,7 @@ final class TranscriptionProviderTests: XCTestCase {
             [
                 "parakeet-tdt-0.6b-v3-coreml",
                 "whisper-large-v3-q5_0",
-                AntigravityCLI.transcriptionModelID,
+                AntigravityACPClient.transcriptionModelID,
             ]
         )
     }
@@ -135,7 +135,7 @@ final class TranscriptionProviderTests: XCTestCase {
             .antigravity
         )
         XCTAssertEqual(
-            BuiltInTranscriptionModel.resolve(AntigravityCLI.modelID, language: .hebrewEnglish),
+            BuiltInTranscriptionModel.resolve(AntigravityACPClient.modelID, language: .hebrewEnglish),
             .antigravity
         )
         XCTAssertEqual(
@@ -156,7 +156,7 @@ final class TranscriptionProviderTests: XCTestCase {
         )
         XCTAssertEqual(
             BuiltInTranscriptionModel.resolvedAntigravityModelID("gemini-3.7-flash-high"),
-            AntigravityCLI.transcriptionModelID
+            AntigravityACPClient.transcriptionModelID
         )
         XCTAssertEqual(
             BuiltInTranscriptionModel.resolvedAntigravityModelID("gemini-3.8-flash-medium"),
@@ -174,7 +174,7 @@ final class TranscriptionProviderTests: XCTestCase {
         )
 
         XCTAssertEqual(plan, .local(.antigravity))
-        XCTAssertTrue(plan.usesAntigravityCLI)
+        XCTAssertTrue(plan.usesAntigravityACPClient)
         XCTAssertFalse(plan.usesWhisperCLI)
         XCTAssertFalse(plan.progressSubtitle().localizedCaseInsensitiveContains("whisper"))
         XCTAssertTrue(plan.progressSubtitle().localizedCaseInsensitiveContains("antigravity"))
@@ -191,7 +191,7 @@ final class TranscriptionProviderTests: XCTestCase {
 
         XCTAssertEqual(plan, .local(.whisper))
         XCTAssertTrue(plan.usesWhisperCLI)
-        XCTAssertFalse(plan.usesAntigravityCLI)
+        XCTAssertFalse(plan.usesAntigravityACPClient)
         XCTAssertTrue(plan.progressSubtitle().localizedCaseInsensitiveContains("whisper.cpp"))
     }
 

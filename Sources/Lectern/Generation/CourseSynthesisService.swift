@@ -267,13 +267,13 @@ final class CourseSynthesisService {
                 }
                 let name = "course-image-\(index + 1).\(ext)"
                 prompt += "\n\nCourse image \(index + 1): @\(name)"
-                return AntigravityCLI.WorkspaceInput.data(image.data, named: name)
+                return AntigravityACPClient.WorkspaceInput.data(image.data, named: name)
             }
-            let modelID = AntigravityCLI.applyThinking(
+            let modelID = AntigravityACPClient.applyThinking(
                 thinkingLevel,
-                to: modelOverride ?? profile.model ?? AntigravityCLI.modelID
+                to: modelOverride ?? profile.model ?? AntigravityACPClient.modelID
             )
-            let output = try await AntigravityCLI.configured(for: profile).run(
+            let output = try await AntigravityACPClient.configured(for: profile).run(
                 prompt: prompt,
                 modelID: modelID,
                 thinkingLevel: thinkingLevel,

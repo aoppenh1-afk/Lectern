@@ -34,7 +34,7 @@ enum AgentProfiles {
         case opencodeID:
             return "opencode/hy3-free"
         case antigravityID:
-            return AntigravityCLI.modelID
+            return AntigravityACPClient.modelID
         default:
             return nil
         }
@@ -74,9 +74,9 @@ enum AgentProfiles {
             ),
             AgentProfile(
                 id: antigravityID,
-                title: "Antigravity CLI",
-                command: stored[antigravityID] ?? "agy",
-                authMethodID: nil,
+                title: "Antigravity",
+                command: "managed://antigravity-acp",
+                authMethodID: "oauth-personal",
                 model: model(antigravityID) ?? defaultModelID(for: antigravityID)
             ),
         ]

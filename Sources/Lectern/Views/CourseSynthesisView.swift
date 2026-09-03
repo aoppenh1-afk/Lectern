@@ -659,8 +659,8 @@ struct CourseSynthesisView: View {
     }
 
     private func normalizeThinkingLevel() {
-        if let modelID = effectiveModelID, AntigravityCLI.isThinkingVariant(modelID) {
-            let next = AntigravityCLI.thinkingLevel(fromModelID: modelID).rawValue
+        if let modelID = effectiveModelID, AntigravityACPClient.isThinkingVariant(modelID) {
+            let next = AntigravityACPClient.thinkingLevel(fromModelID: modelID).rawValue
             if thinkingLevelRaw != next {
                 thinkingLevelRaw = next
             }
@@ -674,7 +674,7 @@ struct CourseSynthesisView: View {
         guard selectedProfile?.id == AgentProfiles.antigravityID,
               let current = effectiveModelID else { return }
         let catalogIDs = modelCatalogs[AgentProfiles.antigravityID]?.models.map(\.id) ?? []
-        let next = AntigravityCLI.applyThinking(thinkingLevel, to: current, availableIDs: catalogIDs)
+        let next = AntigravityACPClient.applyThinking(thinkingLevel, to: current, availableIDs: catalogIDs)
         guard next != current else { return }
         modelOverride = next
         AgentProfiles.setModel(next, for: AgentProfiles.antigravityID)

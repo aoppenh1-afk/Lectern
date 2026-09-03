@@ -229,44 +229,37 @@ enum AgentModelCatalogLoader {
         }
     }
 
-    // MARK: - Antigravity CLI
+    // MARK: - Antigravity ACP
 
     static func loadAntigravity(profile: AgentProfile) async -> AgentModelCatalog {
         let fallback = AgentModel(
-            id: AntigravityCLI.modelID,
-            name: AntigravityCLI.displayName,
+            id: AntigravityACPClient.modelID,
+            name: AntigravityACPClient.displayName,
             provider: "Google",
             isDefault: true,
-            supportedThinkingLevels: AntigravityCLI.thinkingLevels,
+            supportedThinkingLevels: AntigravityACPClient.thinkingLevels,
             defaultThinkingLevel: .high
         )
-        guard let executable = AgentProfiles.resolveExecutable(profile.executablePath),
-              let stdout = try? await runProcess(
-                executable: executable,
-                arguments: profile.arguments + ["models"],
-                timeout: 20
-              ) else {
-            return .init(models: [fallback], currentID: fallback.id)
-        }
-        let available = AntigravityCLI.parseModels(stdout)
-        guard !available.isEmpty else {
+        guard let available = try? await AntigravityACPClient.configured(for: profile).availableModelEntries(),
+              !available.isEmpty else {
             return .init(models: [fallback], currentID: fallback.id)
         }
 
-        let preferredID = profile.model.flatMap { selected in
-            available.contains(where: { $0.id == selected }) ? selected : nil
-        } ?? (available.contains(where: { $0.id == AntigravityCLI.modelID })
-              ? AntigravityCLI.modelID
-              : available[0].id)
+        // Keep a saved selection even when Google stops advertising it. The
+        // picker then has no matching row and generation reports that the user
+        // must choose an available model; it never silently changes accounts/models.
+        let preferredID = profile.model ?? available.first(where: {
+            $0.id == AntigravityACPClient.modelID
+        })?.id
         let models = available.map { listing in
-            let thinkingVariant = AntigravityCLI.isThinkingVariant(listing.id)
+            let thinkingVariant = AntigravityACPClient.isThinkingVariant(listing.id)
             return AgentModel(
                 id: listing.id,
                 name: listing.name,
                 provider: antigravityProviderName(for: listing.id),
                 isDefault: listing.id == preferredID,
-                supportedThinkingLevels: thinkingVariant ? AntigravityCLI.thinkingLevels : [],
-                defaultThinkingLevel: thinkingVariant ? AntigravityCLI.thinkingLevel(fromModelID: listing.id) : nil
+                supportedThinkingLevels: thinkingVariant ? AntigravityACPClient.thinkingLevels : [],
+                defaultThinkingLevel: thinkingVariant ? AntigravityACPClient.thinkingLevel(fromModelID: listing.id) : nil
             )
         }
         return .init(models: models, currentID: preferredID)

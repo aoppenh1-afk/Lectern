@@ -636,16 +636,16 @@ struct GenerateSheet: View {
         } else if !customModelText.isEmpty {
             modelID = customModelText
         } else {
-            modelID = selectedProfile?.model ?? AntigravityCLI.modelID
+            modelID = selectedProfile?.model ?? AntigravityACPClient.modelID
         }
-        guard AntigravityCLI.isThinkingVariant(modelID) else {
+        guard AntigravityACPClient.isThinkingVariant(modelID) else {
             let levels = availableThinkingLevels
             if !levels.isEmpty, !levels.contains(thinkingLevel) {
                 thinkingLevelRaw = (selectedModel?.defaultThinkingLevel ?? levels[0]).rawValue
             }
             return
         }
-        let next = AntigravityCLI.thinkingLevel(fromModelID: modelID).rawValue
+        let next = AntigravityACPClient.thinkingLevel(fromModelID: modelID).rawValue
         if thinkingLevelRaw != next {
             thinkingLevelRaw = next
         }
@@ -659,9 +659,9 @@ struct GenerateSheet: View {
         } else if !customModelText.isEmpty {
             current = customModelText
         } else {
-            current = selectedProfile?.model ?? AntigravityCLI.modelID
+            current = selectedProfile?.model ?? AntigravityACPClient.modelID
         }
-        let next = AntigravityCLI.applyThinking(thinkingLevel, to: current, availableIDs: catalogIDs)
+        let next = AntigravityACPClient.applyThinking(thinkingLevel, to: current, availableIDs: catalogIDs)
         guard next != current else { return }
         if catalogIDs.contains(next) {
             modelSelection = next
@@ -711,8 +711,8 @@ struct GenerateSheet: View {
             resolvedModel = modelSelection.isEmpty ? nil : modelSelection
         }
         if isAntigravityProfile {
-            let base = resolvedModel ?? profile.model ?? AntigravityCLI.modelID
-            resolvedModel = AntigravityCLI.applyThinking(thinkingLevel, to: base, availableIDs: catalogIDs)
+            let base = resolvedModel ?? profile.model ?? AntigravityACPClient.modelID
+            resolvedModel = AntigravityACPClient.applyThinking(thinkingLevel, to: base, availableIDs: catalogIDs)
         }
         AgentProfiles.setModel(resolvedModel, for: profile.id)
 

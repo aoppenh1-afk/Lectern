@@ -339,12 +339,12 @@ struct LectureDetailView: View {
                     }
 
                     if !filteredAntigravityModels.isEmpty {
-                        transcriptionPickerSection("Antigravity CLI")
+                        transcriptionPickerSection("Antigravity ACP")
                         ForEach(filteredAntigravityModels) { model in
                             transcriptionPickerRow(
                                 id: model.id,
                                 title: model.name,
-                                subtitle: model.id == model.name ? "Runs through Antigravity CLI" : model.id
+                                subtitle: model.id == model.name ? "Runs through Antigravity ACP" : model.id
                             ) {
                                 Image(systemName: "sparkles")
                                     .font(.system(size: 12, weight: .semibold))
@@ -495,11 +495,11 @@ struct LectureDetailView: View {
         if antigravityCatalog.models.isEmpty {
             return [
                 AgentModel(
-                    id: AntigravityCLI.modelID,
-                    name: AntigravityCLI.displayName,
+                    id: AntigravityACPClient.modelID,
+                    name: AntigravityACPClient.displayName,
                     provider: "Google",
                     isDefault: true,
-                    supportedThinkingLevels: AntigravityCLI.thinkingLevels,
+                    supportedThinkingLevels: AntigravityACPClient.thinkingLevels,
                     defaultThinkingLevel: .high
                 )
             ]

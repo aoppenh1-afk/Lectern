@@ -86,7 +86,9 @@ targets:
       - Sources/Lectern/Domain/Enums.swift
       - Sources/Lectern/Generation/AgentProfile.swift
       - Sources/Lectern/Generation/AgentDetector.swift
-      - Sources/Lectern/Generation/AntigravityCLI.swift
+      - Sources/Lectern/Generation/ACPConnection.swift
+      - Sources/Lectern/Generation/AntigravityACPClient.swift
+      - Sources/Lectern/Generation/AntigravityACP.swift
       - Sources/Lectern/Updates/AppUpdater.swift
       - Sources/Lectern/Generation/NotesMarkdown.swift
       - Sources/Lectern/Generation/Prompts.swift

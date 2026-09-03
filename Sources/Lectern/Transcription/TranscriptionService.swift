@@ -32,7 +32,7 @@ final class TranscriptionService {
         self.completionNotifier = completionNotifier
         let antigravityProfile = AgentProfiles.profile(id: AgentProfiles.antigravityID)
         self.externalEngine = ExternalTranscriptionEngine(
-            antigravity: antigravityProfile.map { AntigravityCLI.configured(for: $0) } ?? AntigravityCLI()
+            antigravity: antigravityProfile.map { AntigravityACPClient.configured(for: $0) } ?? AntigravityACPClient()
         )
     }
 
@@ -208,7 +208,7 @@ final class TranscriptionService {
         switch plan {
         case .local(.antigravity):
             lecture.transcriptProviderRaw = TranscriptionProviderID.antigravityCLI.rawValue
-            lecture.transcriptConnectionName = "Antigravity CLI"
+            lecture.transcriptConnectionName = "Antigravity ACP"
             lecture.transcriptModelID = BuiltInTranscriptionModel.resolvedAntigravityModelID(
                 lecture.transcriptionSourceOverride == .local
                     ? lecture.transcriptModelID

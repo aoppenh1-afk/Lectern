@@ -47,7 +47,7 @@ enum BuiltInTranscriptionModel: String, Codable, CaseIterable, Identifiable, Sen
         switch self {
         case .parakeet: return "Parakeet TDT 0.6B"
         case .whisper: return "Whisper Large v3"
-        case .antigravity: return "Antigravity CLI"
+        case .antigravity: return "Antigravity ACP"
         }
     }
 
@@ -55,7 +55,7 @@ enum BuiltInTranscriptionModel: String, Codable, CaseIterable, Identifiable, Sen
         switch self {
         case .parakeet: return "On-device · best for English lectures"
         case .whisper: return "On-device · best for English and Hebrew shiurim"
-        case .antigravity: return "Antigravity CLI · uses its signed-in account"
+        case .antigravity: return "Google Antigravity · official ACP connection"
         }
     }
 
@@ -85,27 +85,27 @@ enum BuiltInTranscriptionModel: String, Codable, CaseIterable, Identifiable, Sen
         return automatic(for: language)
     }
 
-    /// The slug sent to `agy --model`. The built-in Antigravity option and the
+    /// The model selected through ACP. The built-in Antigravity option and the
     /// retired Gemini 3.7 Flash High default both resolve to the current High model.
     static func resolvedAntigravityModelID(_ storedValue: String?) -> String {
         guard let storedValue, !storedValue.isEmpty else {
-            return AntigravityCLI.transcriptionModelID
+            return AntigravityACPClient.transcriptionModelID
         }
         if storedValue == antigravity.id
             || storedValue == "gemini-3.7-flash-high"
             || storedValue.caseInsensitiveCompare(antigravity.title) == .orderedSame
             || storedValue.caseInsensitiveCompare("Gemini 3.7 Flash (High)") == .orderedSame {
-            return AntigravityCLI.transcriptionModelID
+            return AntigravityACPClient.transcriptionModelID
         }
         if isAntigravityModelChoice(storedValue),
            !storedValue.lowercased().hasPrefix("gemini ") {
             return storedValue
         }
-        return AntigravityCLI.transcriptionModelID
+        return AntigravityACPClient.transcriptionModelID
     }
 
     static func isAntigravityModelChoice(_ storedValue: String) -> Bool {
-        if storedValue == AntigravityCLI.modelID
+        if storedValue == AntigravityACPClient.modelID
             || storedValue == antigravity.id
             || storedValue.caseInsensitiveCompare(antigravity.title) == .orderedSame {
             return true
@@ -130,7 +130,7 @@ enum TranscriptionJobPlan: Equatable, Sendable {
         self == .local(.whisper)
     }
 
-    var usesAntigravityCLI: Bool {
+    var usesAntigravityACPClient: Bool {
         if case .local(let model) = self { return model.usesAntigravity }
         return false
     }
@@ -168,7 +168,7 @@ enum TranscriptionJobPlan: Equatable, Sendable {
         case .local(.whisper):
             return "whisper.cpp is working through your recording locally."
         case .local(.antigravity):
-            return "\(AntigravityCLI.transcriptionDisplayName) is transcribing through the Antigravity CLI."
+            return "\(AntigravityACPClient.transcriptionDisplayName) is transcribing through Antigravity ACP."
         case .external:
             if let connectionName, !connectionName.isEmpty {
                 return "Uploading audio only to \(connectionName). Study generation stays on its current agent."
@@ -272,7 +272,7 @@ enum TranscriptionProviderCatalog {
             shortName: "MAC",
             assetName: "TranscriptionGemini",
             tintHex: "5D6B62",
-            summary: "Choose either on-device speech recognition or the signed-in Antigravity CLI.",
+            summary: "Choose either on-device speech recognition or the signed-in Antigravity ACP runtime.",
             models: BuiltInTranscriptionModel.allCases.map { model in
                 .init(
                     id: model.id,
@@ -284,7 +284,7 @@ enum TranscriptionProviderCatalog {
                         supportsSegmentTimestamps: true,
                         supportsContextPrompt: model != .parakeet,
                         privacyWarning: model.usesAntigravity
-                            ? "The recording is sent through the Antigravity CLI."
+                            ? "The recording is sent to Google as a native audio block through Antigravity ACP."
                             : nil
                     )
                 )
@@ -330,24 +330,24 @@ enum TranscriptionProviderCatalog {
         ),
         .init(
             id: .antigravityCLI,
-            name: "Antigravity CLI",
+            name: "Antigravity ACP",
             shortName: "AG",
             assetName: "TranscriptionGemini",
             tintHex: "4285F4",
-            summary: "Gemini 3.8 Flash High through the signed-in Antigravity CLI.",
+            summary: "Gemini 3.8 Flash High through Google's official Antigravity ACP runtime.",
             models: [
                 .init(
-                    id: AntigravityCLI.transcriptionModelID,
-                    title: AntigravityCLI.transcriptionDisplayName,
-                    subtitle: "Headless CLI · private temporary workspace",
+                    id: AntigravityACPClient.transcriptionModelID,
+                    title: AntigravityACPClient.transcriptionDisplayName,
+                    subtitle: "Official ACP runtime · isolated Google sign-in",
                     capabilities: .init(
                         supportsCodeSwitching: true,
                         supportsDiarization: true,
                         supportsSegmentTimestamps: true,
                         supportsContextPrompt: true,
                         maxContextPromptLength: 8_000,
-                        freeTierDescription: "Uses the account already signed into Antigravity CLI.",
-                        privacyWarning: "The recording is copied into a private temporary workspace and sent through Antigravity CLI."
+                        freeTierDescription: "Uses the Google account signed into Lectern's Antigravity ACP profile.",
+                        privacyWarning: "The recording is sent to Google as native audio through Antigravity ACP."
                     )
                 )
             ]
@@ -530,9 +530,9 @@ struct TranscriptionConnection: Identifiable, Codable, Hashable, Sendable {
     static func builtInAntigravity(modelID: String? = nil) -> TranscriptionConnection {
         .init(
             id: builtInAntigravityID,
-            displayName: "Antigravity CLI",
+            displayName: "Antigravity ACP",
             provider: .antigravityCLI,
-            modelID: modelID.flatMap { $0.isEmpty ? nil : $0 } ?? AntigravityCLI.transcriptionModelID,
+            modelID: modelID.flatMap { $0.isEmpty ? nil : $0 } ?? AntigravityACPClient.transcriptionModelID,
             diarizationEnabled: true,
             timestampGranularity: .segment,
             costTier: .free,
