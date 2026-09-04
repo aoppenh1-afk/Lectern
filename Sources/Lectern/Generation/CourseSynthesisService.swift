@@ -91,6 +91,7 @@ final class CourseSynthesisService {
 
     private(set) var isResponding = false
     private(set) var response = ""
+    private(set) var pendingQuestion: String?
     private(set) var lastError: String?
     private(set) var turns: [Turn] = []
     private var task: Task<Void, Never>?
@@ -130,6 +131,7 @@ final class CourseSynthesisService {
 
         isResponding = true
         response = ""
+        pendingQuestion = trimmed
         lastError = nil
         let priorConversation = turns.suffix(6).map {
             "Student: \($0.question)\n\nAssistant: \($0.answer)"
@@ -225,8 +227,10 @@ final class CourseSynthesisService {
                 }.trimmingCharacters(in: .whitespacesAndNewlines)
                 turns.append(Turn(question: trimmed, answer: answer))
                 response = ""
+                pendingQuestion = nil
             } catch {
                 lastError = error.localizedDescription
+                pendingQuestion = nil
             }
             isResponding = false
             task = nil
@@ -238,6 +242,7 @@ final class CourseSynthesisService {
         task = nil
         isResponding = false
         response = ""
+        pendingQuestion = nil
     }
 
     func clear() {

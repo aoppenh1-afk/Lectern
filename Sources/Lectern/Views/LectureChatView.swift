@@ -123,11 +123,13 @@ struct LectureChatView: View {
                             ForEach(lecture.orderedChatMessages) { message in
                                 messageRow(message)
                                     .id(message.persistentModelID)
+                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                             }
 
                             if chat.isResponding && chat.proposingMessageID == nil {
                                 streamingRow
                                     .id("streaming-response")
+                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                             }
 
                             if let error = chat.lastError {
@@ -275,15 +277,18 @@ struct LectureChatView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Group {
                     if content.isEmpty && isStreaming {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.mini)
-                            Text("Thinking about your lecture…")
-                                .foregroundStyle(.secondary)
-                        }
+                        TypingIndicatorView()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 4)
                     } else {
-                        markdownText(content)
-                            .textSelection(.enabled)
+                        VStack(alignment: .leading, spacing: 10) {
+                            markdownText(content)
+                                .textSelection(.enabled)
+                            if isStreaming {
+                                TypingIndicatorView(dotDiameter: 6)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
                     }
                 }
                 .font(.system(size: 12.5))
@@ -628,28 +633,32 @@ struct LectureChatView: View {
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
-        if chat.isResponding {
-            proxy.scrollTo("streaming-response", anchor: .bottom)
-        } else if let last = lecture.orderedChatMessages.last {
-            proxy.scrollTo(last.persistentModelID, anchor: .bottom)
+        withAnimation(LecternTheme.standardAnimation) {
+            if chat.isResponding {
+                proxy.scrollTo("streaming-response", anchor: .bottom)
+            } else if let last = lecture.orderedChatMessages.last {
+                proxy.scrollTo(last.persistentModelID, anchor: .bottom)
+            }
         }
     }
 
     private func send() {
         guard let profile = selectedProfile else { return }
         let question = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !question.isEmpty else { return }
-        draft = ""
+        guard !question.isEmpty, !chat.isResponding else { return }
         let attachments = pendingAttachments
-        pendingAttachments = []
-        chat.send(
-            question,
-            lecture: lecture,
-            profile: profile,
-            thinkingLevel: thinkingLevel,
-            modelOverride: effectiveModelID,
-            attachments: attachments
-        )
+        withAnimation(LecternTheme.standardAnimation) {
+            draft = ""
+            pendingAttachments = []
+            chat.send(
+                question,
+                lecture: lecture,
+                profile: profile,
+                thinkingLevel: thinkingLevel,
+                modelOverride: effectiveModelID,
+                attachments: attachments
+            )
+        }
     }
 
     private func proposeNoteChange(from message: ChatMessage) {

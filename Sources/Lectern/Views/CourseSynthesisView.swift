@@ -154,35 +154,78 @@ struct CourseSynthesisView: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
-                ScrollView {
-                    if synthesis.turns.isEmpty && synthesis.response.isEmpty {
-                        ContentUnavailableView(
-                            "Ask across the course",
-                            systemImage: "books.vertical",
-                            description: Text("Compare lectures or build a study guide from the selected material.")
-                        ).padding(.top, 60)
-                    } else {
-                        VStack(alignment: .leading, spacing: 16) {
-                            ForEach(synthesis.turns) { turn in
-                                VStack(alignment: .leading, spacing: 10) {
-                                    HStack { Spacer(minLength: 80); Text(turn.question).font(.system(size: 12.5, weight: .medium)).padding(.horizontal, 14).padding(.vertical, 10).background(LecternTheme.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 16)) }
-                                    HStack(alignment: .top, spacing: 12) {
-                                        assistantBadge
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            NotesContentView(markdown: turn.answer).padding(15).background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(LecternTheme.hairline))
-                                            sourceChips
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        if synthesis.turns.isEmpty && !synthesis.isResponding && synthesis.pendingQuestion == nil {
+                            ContentUnavailableView(
+                                "Ask across the course",
+                                systemImage: "books.vertical",
+                                description: Text("Compare lectures or build a study guide from the selected material.")
+                            ).padding(.top, 60)
+                        } else {
+                            VStack(alignment: .leading, spacing: 16) {
+                                ForEach(synthesis.turns) { turn in
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        HStack { Spacer(minLength: 80); Text(turn.question).font(.system(size: 12.5, weight: .medium)).padding(.horizontal, 14).padding(.vertical, 10).background(LecternTheme.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 16)) }
+                                        HStack(alignment: .top, spacing: 12) {
+                                            assistantBadge
+                                            VStack(alignment: .leading, spacing: 8) {
+                                                NotesContentView(markdown: turn.answer).padding(15).background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(LecternTheme.hairline))
+                                                sourceChips
+                                            }
                                         }
                                     }
+                                    .id(turn.id)
+                                }
+                                if let pending = synthesis.pendingQuestion {
+                                    HStack { Spacer(minLength: 80); Text(pending).font(.system(size: 12.5, weight: .medium)).padding(.horizontal, 14).padding(.vertical, 10).background(LecternTheme.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 16)) }
+                                        .id("pending-question")
+                                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                }
+                                if synthesis.isResponding {
+                                    HStack(alignment: .top, spacing: 12) {
+                                        assistantBadge
+                                        if synthesis.response.isEmpty {
+                                            TypingIndicatorView()
+                                                .padding(15)
+                                                .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+                                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(LecternTheme.hairline))
+                                        } else {
+                                            VStack(alignment: .leading, spacing: 10) {
+                                                NotesContentView(markdown: synthesis.response)
+                                                    .padding(15)
+                                                    .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+                                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(LecternTheme.hairline))
+                                                TypingIndicatorView(dotDiameter: 6)
+                                                    .padding(.leading, 8)
+                                            }
+                                        }
+                                    }
+                                    .id("course-typing")
+                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                                 }
                             }
-                            if !synthesis.response.isEmpty {
-                                HStack(alignment: .top, spacing: 8) {
-                                    ProgressView().controlSize(.small)
-                                    NotesContentView(markdown: synthesis.response)
-                                }
+                            .padding(18)
+                        }
+                    }
+                    .onChange(of: synthesis.turns.count) { _, _ in
+                        withAnimation(LecternTheme.standardAnimation) {
+                            if let last = synthesis.turns.last {
+                                proxy.scrollTo(last.id, anchor: .bottom)
                             }
                         }
-                        .padding(18)
+                    }
+                    .onChange(of: synthesis.pendingQuestion) { _, _ in
+                        withAnimation(LecternTheme.standardAnimation) {
+                            if synthesis.pendingQuestion != nil {
+                                proxy.scrollTo("pending-question", anchor: .bottom)
+                            } else {
+                                proxy.scrollTo("course-typing", anchor: .bottom)
+                            }
+                        }
+                    }
+                    .onChange(of: synthesis.response) { _, _ in
+                        proxy.scrollTo("course-typing", anchor: .bottom)
                     }
                 }
                 if let error = synthesis.lastError {
@@ -628,16 +671,18 @@ struct CourseSynthesisView: View {
     private func send(_ question: String) {
         guard let profile = selectedProfile else { return }
         let credentials = try? canvasConnection.credentials()
-        synthesis.send(question,
-                       course: course,
-                       lectures: selectedLectures,
-                       canvasSources: selectedCanvasSources,
-                       canvasResources: selectedResourceReferences,
-                       canvasCredentials: credentials,
-                       attachments: selectedAttachments,
-                       profile: profile,
-                       thinkingLevel: thinkingLevel,
-                       modelOverride: effectiveModelID)
+        withAnimation(LecternTheme.standardAnimation) {
+            synthesis.send(question,
+                           course: course,
+                           lectures: selectedLectures,
+                           canvasSources: selectedCanvasSources,
+                           canvasResources: selectedResourceReferences,
+                           canvasCredentials: credentials,
+                           attachments: selectedAttachments,
+                           profile: profile,
+                           thinkingLevel: thinkingLevel,
+                           modelOverride: effectiveModelID)
+        }
     }
 
     private var assistantBadge: some View {
@@ -799,7 +844,10 @@ private struct CourseSynthesisComposer: View {
     }
 
     private func submit() {
-        onSend(question)
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !synthesis.isResponding else { return }
+        question = ""
+        onSend(trimmed)
     }
 }
 

@@ -310,6 +310,50 @@ extension Course {
     }
 }
 
+// MARK: - Typing indicator
+
+/// iMessage-style "assistant is working" indicator: three dots that bounce
+/// in sequence (left, middle, right) and loop until removed from the view
+/// hierarchy. Each dot runs the same ease-in-out bounce with a staggered
+/// start delay so the wave reads left-to-right.
+struct TypingIndicatorView: View {
+    var dotDiameter: CGFloat = 7
+    var spacing: CGFloat = 5
+
+    var body: some View {
+        HStack(spacing: spacing) {
+            ForEach(0..<3, id: \.self) { index in
+                TypingDot(delay: Double(index) * 0.18, diameter: dotDiameter)
+            }
+        }
+        .accessibilityLabel("Assistant is typing")
+    }
+}
+
+private struct TypingDot: View {
+    let delay: Double
+    let diameter: CGFloat
+
+    @State private var bounce = false
+
+    var body: some View {
+        Circle()
+            .fill(Color.secondary)
+            .frame(width: diameter, height: diameter)
+            .offset(y: bounce ? -4.5 : 0)
+            .opacity(bounce ? 1.0 : 0.35)
+            .onAppear {
+                withAnimation(
+                    .easeInOut(duration: 0.42)
+                        .repeatForever(autoreverses: true)
+                        .delay(delay)
+                ) {
+                    bounce = true
+                }
+            }
+    }
+}
+
 // MARK: - Floating-chrome plumbing (pill, popover only)
 
 struct GlassPanelModifier: ViewModifier {
