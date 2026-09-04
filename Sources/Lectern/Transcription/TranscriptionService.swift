@@ -43,7 +43,7 @@ final class TranscriptionService {
               !pendingIDs.contains(lectureID) else {
             return
         }
-        completionNotifier.prepare()
+        completionNotifier.prepare(for: .transcription)
         pendingIDs.append(lectureID)
         drainQueue()
     }

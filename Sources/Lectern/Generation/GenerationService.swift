@@ -62,7 +62,7 @@ final class GenerationService {
 
         activeJob = ActiveJob(lectureTitle: lecture.title, remaining: ordered)
         lastError = nil
-        completionNotifier.prepare()
+        completionNotifier.prepare(for: .generation)
 
         generationTask = Task {
             await run(lectureID: lecture.persistentModelID,

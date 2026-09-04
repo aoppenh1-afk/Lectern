@@ -107,7 +107,7 @@ struct SuperAppShellView: View {
             while onboarding.isPresented, !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
             }
-            await updater.checkAutomaticallyIfDue()
+            await updater.checkOnLaunch()
         }
         .sheet(isPresented: Binding(
             get: { onboarding.isPresented },

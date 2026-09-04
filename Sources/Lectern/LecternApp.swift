@@ -4,6 +4,24 @@ import SQLite3
 import SwiftData
 import SwiftUI
 
+@MainActor
+final class LecternApplicationDelegate: NSObject, NSApplicationDelegate {
+    private var statusBarController: StatusBarController?
+    private var didFinishLaunching = false
+
+    func configure(statusBarController: StatusBarController) {
+        self.statusBarController = statusBarController
+        if didFinishLaunching {
+            statusBarController.installIfNeeded()
+        }
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        didFinishLaunching = true
+        statusBarController?.installIfNeeded()
+    }
+}
+
 enum LecternStoreLocation {
     private static let storeFileName = "Lectern.store"
     private static let requiredLegacyTables = ["ZCOURSE", "ZLECTURE"]
@@ -83,6 +101,9 @@ enum LecternStoreLocation {
 
 @main
 struct LecternApp: App {
+    @NSApplicationDelegateAdaptor(LecternApplicationDelegate.self)
+    private var applicationDelegate
+
     let container: ModelContainer
     private let captureController: CaptureController
     private let transcriptionPreferences: TranscriptionPreferences
@@ -97,11 +118,13 @@ struct LecternApp: App {
     private let audioPlayer: LectureAudioPlayer
     private let surfacePreferences: SurfacePreferences
     private let pillController: PillWindowController
+    private let statusBarController: StatusBarController
     private let canvasConnection: CanvasConnectionSettings
     private let canvasSync: CanvasSyncService
     private let canvasResourceOpener: CanvasResourceOpener
     private let appUpdater: AppUpdater
     private let onboardingState: OnboardingState
+    private let notificationPreferences: NotificationPreferences
 
     init() {
         do {
@@ -137,14 +160,18 @@ struct LecternApp: App {
         surfacePreferences = SurfacePreferences()
         pillController = PillWindowController(capture: captureController,
                                               surfacePreferences: surfacePreferences)
+        statusBarController = StatusBarController(capture: captureController,
+                                                  surfacePreferences: surfacePreferences)
         canvasConnection = CanvasConnectionSettings()
         canvasSync = CanvasSyncService(modelContainer: container, connection: canvasConnection)
         canvasResourceOpener = CanvasResourceOpener(connection: canvasConnection)
         appUpdater = AppUpdater()
         onboardingState = OnboardingState()
+        notificationPreferences = NotificationPreferences()
 
-        captureController.phaseChangeHandler = { [pillController] in
+        captureController.phaseChangeHandler = { [pillController, statusBarController] in
             pillController.refresh()
+            statusBarController.refresh()
         }
 
         retentionService.startPeriodicSweep()
@@ -154,6 +181,7 @@ struct LecternApp: App {
                 _ = captureController.addBookmark()
             }
         )
+        applicationDelegate.configure(statusBarController: statusBarController)
     }
 
     var body: some Scene {
@@ -176,6 +204,7 @@ struct LecternApp: App {
                 .environment(canvasResourceOpener)
                 .environment(appUpdater)
                 .environment(onboardingState)
+                .environment(notificationPreferences)
                 .preferredColorScheme(surfacePreferences.appearance.colorScheme)
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                     transcriptionService.cancelAll()
@@ -205,20 +234,6 @@ struct LecternApp: App {
             }
         }
 
-        MenuBarExtra(isInserted: Binding(
-            get: { surfacePreferences.popoverEnabled },
-            set: { surfacePreferences.setPopoverEnabled($0) }
-        )) {
-            MenuBarPopoverView()
-                .environment(captureController)
-                .preferredColorScheme(surfacePreferences.appearance.colorScheme)
-        } label: {
-            Label("Lectern", systemImage: "waveform.circle.fill")
-                .accessibilityLabel("Lectern menu bar controls")
-        }
-        .menuBarExtraStyle(.window)
-        .modelContainer(container)
-
         Settings {
             SettingsView()
                 .environment(surfacePreferences)
@@ -228,6 +243,7 @@ struct LecternApp: App {
                 .environment(canvasSync)
                 .environment(appUpdater)
                 .environment(onboardingState)
+                .environment(notificationPreferences)
         }
         .modelContainer(container)
     }

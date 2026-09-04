@@ -7,13 +7,14 @@ struct SettingsView: View {
     @State private var section: Section = .general
 
     enum Section: String, CaseIterable, Identifiable {
-        case general, appearance, recording, transcription, retention, canvas, anki, googleDocs, agents
+        case general, notifications, appearance, recording, transcription, retention, canvas, anki, googleDocs, agents
 
         var id: String { rawValue }
 
         var title: String {
             switch self {
             case .general: return "General"
+            case .notifications: return "Notifications"
             case .appearance: return "Appearance"
             case .recording: return "Recording"
             case .transcription: return "Transcription"
@@ -28,6 +29,7 @@ struct SettingsView: View {
         var icon: String {
             switch self {
             case .general: return "gearshape"
+            case .notifications: return "bell"
             case .appearance: return "paintbrush"
             case .recording: return "mic"
             case .transcription: return "waveform.and.mic"
@@ -116,6 +118,7 @@ struct SettingsView: View {
 
                 switch section {
                 case .general: GeneralPane()
+                case .notifications: NotificationsPane()
                 case .appearance: AppearancePane()
                 case .recording: RecordingPane()
                 case .transcription: TranscriptionSettingsPane()
@@ -128,6 +131,94 @@ struct SettingsView: View {
             }
             .padding(22)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+// MARK: - Notifications
+
+private struct NotificationsPane: View {
+    @Environment(NotificationPreferences.self) private var preferences
+
+    var body: some View {
+        SettingsCard {
+            SettingsRow(
+                title: "Allow notifications",
+                caption: authorizationCaption
+            ) {
+                Toggle("", isOn: Binding(
+                    get: {
+                        preferences.isEnabled && preferences.authorizationState == .authorized
+                    },
+                    set: { enabled in
+                        Task { await preferences.setEnabled(enabled) }
+                    }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .labelsHidden()
+            }
+
+            if preferences.isEnabled && preferences.authorizationState == .denied {
+                SettingsRow(
+                    title: "macOS notifications are off",
+                    caption: "Turn on Allow Notifications for Lectern in System Settings."
+                ) {
+                    Button("Open System Settings") {
+                        preferences.openSystemSettings()
+                    }
+                    .controlSize(.small)
+                }
+            }
+
+            SettingsRow(
+                title: "Transcription completed",
+                caption: "Notify when a lecture transcript is ready."
+            ) {
+                Toggle("", isOn: Binding(
+                    get: { preferences.transcriptionEnabled },
+                    set: { preferences.transcriptionEnabled = $0 }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .labelsHidden()
+                .disabled(!preferences.isEnabled)
+            }
+
+            SettingsRow(
+                title: "Study materials completed",
+                caption: "Notify when notes, flashcards, or a quiz finish generating.",
+                showsDivider: false
+            ) {
+                Toggle("", isOn: Binding(
+                    get: { preferences.generationEnabled },
+                    set: { preferences.generationEnabled = $0 }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .labelsHidden()
+                .disabled(!preferences.isEnabled)
+            }
+        }
+        .task { await preferences.refreshAuthorizationState() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await preferences.refreshAuthorizationState() }
+        }
+    }
+
+    private var authorizationCaption: String {
+        guard preferences.isEnabled else {
+            return "Lectern will not send notifications."
+        }
+        switch preferences.authorizationState {
+        case .unknown:
+            return "Checking the macOS notification setting."
+        case .notDetermined:
+            return "macOS will ask for permission when you turn this on."
+        case .denied:
+            return "Lectern is on, but macOS is blocking notifications."
+        case .authorized:
+            return "Lectern and macOS both allow notifications."
         }
     }
 }
@@ -219,7 +310,7 @@ private struct GeneralPane: View {
                 }
 
                 SettingsRow(title: "Check automatically",
-                            caption: "Once a day, when Lectern opens. Nothing installs without asking.") {
+                            caption: "Every time Lectern opens. Nothing installs without asking.") {
                     Toggle("", isOn: $autoCheck)
                         .toggleStyle(.switch)
                         .controlSize(.small)

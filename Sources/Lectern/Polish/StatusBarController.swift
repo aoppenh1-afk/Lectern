@@ -5,6 +5,8 @@ import SwiftUI
 /// user disables the menu-bar surface in Settings.
 @MainActor
 final class StatusBarController {
+    private static let autosaveName = "LecternMenuBarItem"
+
     private let capture: CaptureController
     private let surfacePreferences: SurfacePreferences
 
@@ -19,7 +21,7 @@ final class StatusBarController {
         // launch, NSApplication's own registerDefaults: posts
         // .didChangeNotification, and touching AppKit (status items) at that
         // moment re-enters NSApplication init and crashes the process.
-        // Observation begins in installIfNeeded(), called after the UI is up.
+        // Observation begins in installIfNeeded(), after app launch completes.
     }
 
     func installIfNeeded() {
@@ -48,22 +50,14 @@ final class StatusBarController {
         let wanted = surfacePreferences.popoverEnabled
 
         if wanted {
-            let item = statusItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+            let item = statusItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            item.autosaveName = Self.autosaveName
             let symbolName = capture.phase.isLive ? "record.circle.fill" : "waveform.circle"
             item.button?.image = NSImage(systemSymbolName: symbolName,
-                                         accessibilityDescription: "Lectern")?
+                                         accessibilityDescription: "Lectern menu bar controls")?
                 .withSymbolConfiguration(.init(paletteColors: [.labelColor]))
-
-            if popover == nil {
-                let pop = NSPopover()
-                pop.behavior = .transient
-                pop.contentSize = NSSize(width: 240, height: 260)
-                pop.contentViewController = NSHostingController(
-                    rootView: MenuBarPopoverView()
-                        .environment(capture)
-                )
-                popover = pop
-            }
+            item.button?.setAccessibilityLabel("Lectern menu bar controls")
+            item.button?.setAccessibilityTitle("Lectern menu bar controls")
             item.button?.action = #selector(togglePopover(_:))
             item.button?.target = self
 
@@ -78,12 +72,28 @@ final class StatusBarController {
         }
     }
 
+    private func buildPopover() -> NSPopover {
+        let pop = NSPopover()
+        pop.behavior = .transient
+        pop.contentSize = NSSize(width: 240, height: 260)
+        pop.contentViewController = NSHostingController(
+            rootView: AnyView(
+                MenuBarPopoverView()
+                    .environment(capture)
+                    .preferredColorScheme(surfacePreferences.appearance.colorScheme)
+            )
+        )
+        return pop
+    }
+
     @objc private func togglePopover(_ sender: AnyObject?) {
-        guard let button = statusItem?.button, let popover else { return }
-        if popover.isShown {
-            popover.performClose(nil)
+        guard let button = statusItem?.button else { return }
+        if let pop = popover, pop.isShown {
+            pop.performClose(nil)
         } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            let pop = popover ?? buildPopover()
+            self.popover = pop
+            pop.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
     }
 
@@ -91,6 +101,14 @@ final class StatusBarController {
     /// an open popover promptly.
     func refresh() {
         guard surfacePreferences.popoverEnabled else { return }
+        rebuild()
+        if let hosting = popover?.contentViewController as? NSHostingController<AnyView> {
+            hosting.rootView = AnyView(
+                MenuBarPopoverView()
+                    .environment(capture)
+                    .preferredColorScheme(surfacePreferences.appearance.colorScheme)
+            )
+        }
         if !capture.phase.isLive, popover?.isShown == true {
             // Give the user a beat to see the saved state before closing.
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in

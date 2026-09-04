@@ -124,6 +124,7 @@ final class AppUpdater {
     let currentVersion: String
     private let session: URLSession
     private let userDefaults: UserDefaults
+    private var attemptedLaunchCheck = false
 
     init(
         repository: String? = Bundle.main.object(forInfoDictionaryKey: AppUpdater.repositoryInfoKey) as? String,
@@ -169,7 +170,24 @@ final class AppUpdater {
 
     // MARK: Checking
 
-    /// Once-a-day automatic check. Silent on failure; only surfaces a result
+    /// Unconditional silent check run every time the app launches. Records the
+    /// check timestamp so the periodic timer won't double-fire right after.
+    func checkOnLaunch() async {
+        guard !attemptedLaunchCheck else { return }
+        attemptedLaunchCheck = true
+        guard autoCheckEnabled, repository != nil else { return }
+        do {
+            if let release = try await fetchNewerRelease() {
+                if userDefaults.string(forKey: Self.skippedVersionKey) != release.version {
+                    pendingPrompt = release
+                }
+            }
+        } catch {
+            // Launch checks stay quiet; the manual button reports errors.
+        }
+    }
+
+    /// Periodic automatic check. Silent on failure; only surfaces a result
     /// when a newer, not-yet-skipped version exists.
     func checkAutomaticallyIfDue(now: Date = Date()) async {
         guard autoCheckEnabled, repository != nil else { return }

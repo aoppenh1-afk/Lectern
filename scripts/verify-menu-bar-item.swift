@@ -78,7 +78,8 @@ guard lecternApps.count == 1, let lectern = lecternApps.first else {
 let lecternItems = menuBarItems(for: lectern)
 let matchingItems = lecternItems.filter { item, _ in
     let description = stringAttribute(item, kAXDescriptionAttribute)
-    return description == "Lectern menu bar controls"
+    let title = stringAttribute(item, kAXTitleAttribute)
+    return description == "Lectern menu bar controls" || title == "Lectern menu bar controls"
 }
 
 guard matchingItems.count == 1, let (_, itemFrame) = matchingItems.first else {
