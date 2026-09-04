@@ -738,6 +738,7 @@ struct CourseSynthesisView: View {
 private struct CourseSynthesisComposer: View {
     @Environment(CourseSynthesisService.self) private var synthesis
     @State private var question = ""
+    @FocusState private var composerFocused: Bool
 
     let profiles: [AgentProfile]
     let selectedProfile: AgentProfile?
@@ -757,29 +758,35 @@ private struct CourseSynthesisComposer: View {
         ThinkingLevel(rawValue: thinkingLevelRaw) ?? .medium
     }
 
+    private var shortModelLabel: String {
+        thinkingLevels.isEmpty ? modelLabel : ComposerShortModelLabel(modelLabel)
+    }
+
+    private var questionIsEmpty: Bool {
+        question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             TextField("Ask about this course…", text: $question, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12.5))
-                .lineLimit(1...5)
+                .font(.system(size: 15))
+                .lineLimit(1...6)
+                .focused($composerFocused)
                 .onSubmit(submit)
+                .padding(.horizontal, 18)
+                .padding(.top, 16)
+                .padding(.bottom, 10)
 
-            HStack(spacing: 10) {
-                Button { modelPickerOpen.toggle() } label: {
-                    HStack(spacing: 5) {
-                        AgentProviderLogo(profileID: selectedProfile?.id ?? AgentProfiles.codexID)
-                            .frame(width: 12, height: 12)
-                        Text(modelLabel).lineLimit(1)
-                        Image(systemName: "chevron.down").font(.system(size: 8))
-                    }
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 7))
+            HStack(spacing: 6) {
+                ComposerMenuButton {
+                    modelPickerOpen.toggle()
+                } content: {
+                    AgentProviderLogo(profileID: selectedProfile?.id ?? AgentProfiles.codexID)
+                        .frame(width: 14, height: 14)
+                    Text(shortModelLabel)
+                        .lineLimit(1)
                 }
-                .buttonStyle(.plain)
                 .fixedSize()
                 .popover(isPresented: $modelPickerOpen, arrowEdge: .bottom) {
                     LectureModelPicker(
@@ -793,19 +800,15 @@ private struct CourseSynthesisComposer: View {
                 }
 
                 if !thinkingLevels.isEmpty {
-                    Button { thinkingPickerOpen.toggle() } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "brain")
-                            Text(thinkingLevel.title)
-                            Image(systemName: "chevron.down").font(.system(size: 8))
-                        }
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 7))
+                    ComposerDivider()
+
+                    ComposerMenuButton {
+                        thinkingPickerOpen.toggle()
+                    } content: {
+                        Image(systemName: "brain")
+                            .font(.system(size: 12))
+                        Text(thinkingLevel.title)
                     }
-                    .buttonStyle(.plain)
                     .popover(isPresented: $thinkingPickerOpen, arrowEdge: .bottom) {
                         ThinkingLevelPicker(
                             levels: thinkingLevels,
@@ -817,30 +820,26 @@ private struct CourseSynthesisComposer: View {
                 }
 
                 Spacer()
+
                 if !synthesis.turns.isEmpty {
                     Button("Clear") { synthesis.clear() }
                         .buttonStyle(.plain)
-                        .font(.system(size: 10.5))
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
+                        .padding(.trailing, 4)
                 }
-                Button {
-                    synthesis.isResponding ? synthesis.cancel() : submit()
-                } label: {
-                    Image(systemName: synthesis.isResponding ? "stop.fill" : "arrow.up")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(synthesis.isResponding ? LecternTheme.warningTint : LecternTheme.accent))
-                }
-                .buttonStyle(.plain)
-                .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !synthesis.isResponding)
+
+                ComposerSendButton(
+                    canSend: !questionIsEmpty,
+                    isResponding: synthesis.isResponding,
+                    send: submit,
+                    cancel: { synthesis.cancel() }
+                )
             }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 17))
-        .overlay(RoundedRectangle(cornerRadius: 17).stroke(LecternTheme.hairline))
-        .shadow(color: .black.opacity(0.035), radius: 10, y: 3)
+        .composerContainer(focused: composerFocused)
     }
 
     private func submit() {

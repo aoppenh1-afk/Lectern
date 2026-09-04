@@ -409,12 +409,12 @@ struct LectureChatView: View {
     }
 
     private var composer: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             if !pendingAttachments.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(pendingAttachments) { attachment in
-                            HStack(spacing: 5) {
+                            HStack(spacing: 6) {
                                 Image(systemName: attachmentIcon(for: attachment.kind))
                                 Text(attachment.name)
                                     .lineLimit(1)
@@ -426,57 +426,39 @@ struct LectureChatView: View {
                                 }
                                 .buttonStyle(.plain)
                             }
-                            .font(.system(size: 10))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(Color.primary.opacity(0.045), in: Capsule())
+                            .font(.system(size: 11))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .background(
+                                Color.primary.opacity(0.045),
+                                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            )
                         }
                     }
+                    .padding(.horizontal, 18)
                 }
+                .padding(.top, 14)
             }
 
             TextField("Ask a follow-up question…", text: $draft, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12.5))
-                .lineLimit(1...5)
+                .font(.system(size: 15))
+                .lineLimit(1...6)
                 .focused($composerFocused)
                 .onSubmit { send() }
+                .padding(.horizontal, 18)
+                .padding(.top, 16)
+                .padding(.bottom, 10)
 
-            HStack(spacing: 10) {
-                Button {
-                    openAttachmentPanel()
-                } label: {
-                    Image(systemName: "paperclip")
-                        .font(.system(size: 12, weight: .medium))
-                        .frame(width: 26, height: 26)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .disabled(chat.isResponding)
-                .help("Attach files or folders")
-
-                Button {
+            HStack(spacing: 6) {
+                ComposerMenuButton {
                     modelPickerOpen.toggle()
-                } label: {
-                    HStack(spacing: 5) {
-                        AgentProviderLogo(profileID: selectedProfile?.id ?? AgentProfiles.codexID)
-                            .frame(width: 12, height: 12)
-                        Text(modelLabel)
-                            .lineLimit(1)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 8))
-                    }
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(Color.primary.opacity(0.045))
-                    )
+                } content: {
+                    AgentProviderLogo(profileID: selectedProfile?.id ?? AgentProfiles.codexID)
+                        .frame(width: 14, height: 14)
+                    Text(shortModelLabel)
+                        .lineLimit(1)
                 }
-                .buttonStyle(.plain)
                 .fixedSize()
                 .popover(isPresented: $modelPickerOpen, arrowEdge: .bottom) {
                     LectureModelPicker(
@@ -490,27 +472,15 @@ struct LectureChatView: View {
                 }
 
                 if !availableThinkingLevels.isEmpty {
-                    Button {
+                    ComposerDivider()
+
+                    ComposerMenuButton {
                         thinkingPickerOpen.toggle()
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "brain")
-                                .font(.system(size: 10))
-                            Text(thinkingLevel.title)
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 8))
-                        }
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(Color.primary.opacity(0.045))
-                        )
+                    } content: {
+                        Image(systemName: "brain")
+                            .font(.system(size: 12))
+                        Text(thinkingLevel.title)
                     }
-                    .buttonStyle(.plain)
-                    .fixedSize()
                     .popover(isPresented: $thinkingPickerOpen, arrowEdge: .bottom) {
                         ThinkingLevelPicker(
                             levels: availableThinkingLevels,
@@ -523,43 +493,30 @@ struct LectureChatView: View {
 
                 Spacer()
 
-                if chat.isResponding {
-                    Button {
-                        chat.cancelResponse()
-                    } label: {
-                        Image(systemName: "stop.fill")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 30, height: 30)
-                            .background(Circle().fill(LecternTheme.warningTint))
-                    }
-                    .buttonStyle(.plain)
-                    .help("Stop response")
-                } else {
-                    Button(action: send) {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 30, height: 30)
-                            .background(Circle().fill(canSend ? LecternTheme.accent : Color.secondary.opacity(0.35)))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!canSend)
-                    .help("Send")
+                Button {
+                    openAttachmentPanel()
+                } label: {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(composerFocused ? LecternTheme.ink : .secondary)
+                        .frame(width: 32, height: 34)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .disabled(chat.isResponding)
+                .help("Attach files or folders")
+
+                ComposerSendButton(
+                    canSend: canSend,
+                    isResponding: chat.isResponding,
+                    send: send,
+                    cancel: { chat.cancelResponse() }
+                )
             }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .fill(LecternTheme.cardFill)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .strokeBorder(LecternTheme.hairline, lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.035), radius: 10, y: 3)
+        .composerContainer(focused: composerFocused)
     }
 
     private var canSend: Bool {
@@ -575,6 +532,10 @@ struct LectureChatView: View {
         }
         return modelCatalogs[profile.id]?.models.first(where: { $0.id == modelID })?.name
             ?? modelID
+    }
+
+    private var shortModelLabel: String {
+        availableThinkingLevels.isEmpty ? modelLabel : ComposerShortModelLabel(modelLabel)
     }
 
     private var effectiveModelID: String? {

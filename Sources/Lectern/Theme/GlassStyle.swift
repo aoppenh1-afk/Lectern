@@ -354,6 +354,130 @@ private struct TypingDot: View {
     }
 }
 
+// MARK: - Chat composer
+//
+// Shared prompt-bar styling used by the lecture and course chat composers:
+// a tall rounded container with a focus ring, borderless menu buttons split
+// by hairline dividers, and a round send/stop button.
+
+struct ComposerContainer: ViewModifier {
+    var focused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(LecternTheme.cardFill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(
+                        focused ? LecternTheme.accent.opacity(0.55) : LecternTheme.hairline,
+                        lineWidth: focused ? 1.5 : 1
+                    )
+            )
+            .shadow(
+                color: focused ? LecternTheme.accent.opacity(0.10) : Color.black.opacity(0.05),
+                radius: 12, y: 4
+            )
+            .animation(LecternTheme.standardAnimation, value: focused)
+    }
+}
+
+extension View {
+    func composerContainer(focused: Bool = false) -> some View {
+        modifier(ComposerContainer(focused: focused))
+    }
+}
+
+/// Borderless dropdown button for the composer toolbar (model, thinking).
+struct ComposerMenuButton<Content: View>: View {
+    let action: () -> Void
+    @ViewBuilder let content: Content
+
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                content
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .medium))
+            }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(hovered ? LecternTheme.ink : .secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+    }
+}
+
+/// Thin vertical separator between composer toolbar menus.
+struct ComposerDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(LecternTheme.hairline)
+            .frame(width: 1, height: 20)
+    }
+}
+
+/// Round send/stop button: muted when idle, accent when ready, a high
+/// contrast circle with a stop glyph while responding.
+struct ComposerSendButton: View {
+    let canSend: Bool
+    let isResponding: Bool
+    let send: () -> Void
+    let cancel: () -> Void
+
+    @State private var hovered = false
+
+    var body: some View {
+        Button {
+            if isResponding { cancel() } else { send() }
+        } label: {
+            Image(systemName: isResponding ? "stop.fill" : "arrow.up")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(iconColor)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(circleFill))
+                .scaleEffect(hovered && interactive ? 1.06 : 1.0)
+        }
+        .buttonStyle(.plain)
+        .disabled(!interactive)
+        .help(isResponding ? "Stop response" : "Send")
+        .onHover { hovered = $0 }
+        .animation(LecternTheme.standardAnimation, value: interactive)
+        .animation(LecternTheme.standardAnimation, value: isResponding)
+    }
+
+    private var interactive: Bool { canSend || isResponding }
+
+    private var circleFill: Color {
+        if isResponding { return .primary }
+        if canSend { return LecternTheme.accent }
+        return Color.secondary.opacity(0.25)
+    }
+
+    private var iconColor: Color {
+        if isResponding { return Color(nsColor: .textBackgroundColor) }
+        return .white
+    }
+}
+
+/// Drops a redundant trailing "(…)" thinking suffix from a model display
+/// name when the thinking picker is shown separately (e.g.
+/// "Gemini 3.8 Flash (Low)" -> "Gemini 3.8 Flash").
+func ComposerShortModelLabel(_ label: String) -> String {
+    guard let open = label.lastIndex(of: "("),
+          label.hasSuffix(")"),
+          open > label.startIndex else { return label }
+    let prefix = label[..<open].trimmingCharacters(in: .whitespaces)
+    return prefix.isEmpty ? label : String(prefix)
+}
+
 // MARK: - Floating-chrome plumbing (pill, popover only)
 
 struct GlassPanelModifier: ViewModifier {
