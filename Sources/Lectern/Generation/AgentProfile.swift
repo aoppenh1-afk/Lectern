@@ -51,7 +51,7 @@ enum AgentProfiles {
 
         func model(_ id: String) -> String? {
             guard let value = models[id], !value.isEmpty else { return nil }
-            if id == antigravityID, value == "gemini-3.7-flash-high" {
+            if id == antigravityID, value.contains("3.7") {
                 return nil
             }
             return value

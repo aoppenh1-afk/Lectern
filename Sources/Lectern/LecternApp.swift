@@ -125,6 +125,10 @@ struct LecternApp: App {
     private let appUpdater: AppUpdater
     private let onboardingState: OnboardingState
     private let notificationPreferences: NotificationPreferences
+    private let remoteAudioDownloader: RemoteAudioDownloader
+    private let lectureImportService: LectureImportService
+    private let shiurAutomationService: ShiurAutomationService
+    private let automationScheduler: AutomationScheduler
 
     init() {
         do {
@@ -133,7 +137,8 @@ struct LecternApp: App {
                 Artifact.self, Flashcard.self, QuizItem.self, ChatMessage.self,
                 LiveBookmark.self, ReferenceAttachment.self,
                 CanvasAssignment.self, CanvasEvent.self, CanvasResource.self,
-                CanvasAnnouncement.self
+                CanvasAnnouncement.self,
+                ShiurSubscription.self, ShiurAutomationItem.self
             ])
             let storeURL = try LecternStoreLocation.preparedStoreURL()
             container = try ModelContainer(
@@ -168,6 +173,27 @@ struct LecternApp: App {
         appUpdater = AppUpdater()
         onboardingState = OnboardingState()
         notificationPreferences = NotificationPreferences()
+
+        let remoteAudioDownloader = RemoteAudioDownloader()
+        self.remoteAudioDownloader = remoteAudioDownloader
+        remoteAudioDownloader.sweepStaleDownloads()
+
+        let lectureImportService = LectureImportService(modelContainer: container)
+        self.lectureImportService = lectureImportService
+
+        let shiurAutomationService = ShiurAutomationService(
+            modelContainer: container,
+            importService: lectureImportService,
+            downloader: remoteAudioDownloader,
+            transcriptionService: transcriptionService,
+            transcriptionPreferences: transcriptionPreferences,
+            generationService: generationService
+        )
+        self.shiurAutomationService = shiurAutomationService
+
+        let automationScheduler = AutomationScheduler(automationService: shiurAutomationService)
+        self.automationScheduler = automationScheduler
+        automationScheduler.start()
 
         captureController.phaseChangeHandler = { [pillController, statusBarController] in
             pillController.refresh()
@@ -206,9 +232,11 @@ struct LecternApp: App {
                 .environment(appUpdater)
                 .environment(onboardingState)
                 .environment(notificationPreferences)
+                .environment(shiurAutomationService)
                 .preferredColorScheme(surfacePreferences.appearance.colorScheme)
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                     transcriptionService.cancelAll()
+                    automationScheduler.stop()
                 }
         }
         .modelContainer(container)

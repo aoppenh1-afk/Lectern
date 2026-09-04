@@ -41,6 +41,16 @@ final class Lecture {
     var lastNotesUndoContent: String?
     var lastNotesUndoAppliedHash: String?
 
+    /// Optional remote provenance metadata (e.g. for YU Torah shiur imports).
+    var sourceProviderRaw: String?
+    var sourceKey: String?
+    var sourcePageURL: String?
+    var sourceMediaURL: String?
+    var sourceTeacherName: String?
+    var sourceSeriesName: String?
+    var sourceImportedAt: Date?
+    var sourceSubscriptionID: UUID?
+
     @Relationship(deleteRule: .cascade)
     var recording: Recording?
 
@@ -81,6 +91,27 @@ final class Lecture {
     var transcriptionSourceOverride: TranscriptionSource? {
         get { transcriptionSourceRaw.flatMap(TranscriptionSource.init(rawValue:)) }
         set { transcriptionSourceRaw = newValue?.rawValue }
+    }
+
+    var isRemoteImport: Bool {
+        sourceProviderRaw != nil || sourceKey != nil
+    }
+
+    var sourceProviderName: String? {
+        guard let sourceProviderRaw else { return nil }
+        switch sourceProviderRaw.lowercased() {
+        case "yutorah": return "YU Torah"
+        default: return sourceProviderRaw
+        }
+    }
+
+    var sourceProvenanceSummary: String? {
+        guard isRemoteImport else { return nil }
+        var parts: [String] = []
+        if let provider = sourceProviderName { parts.append(provider) }
+        if let teacher = sourceTeacherName, !teacher.isEmpty { parts.append(teacher) }
+        if let series = sourceSeriesName, !series.isEmpty { parts.append(series) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     var isUnfiled: Bool { course == nil }

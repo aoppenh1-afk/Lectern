@@ -909,7 +909,7 @@ struct MainWindowView: View {
 /// Course creation: name plus the transcription language its lectures default
 /// to. English + Hebrew tells automatic on-device transcription to use whisper.cpp;
 /// an explicit Gemini/Antigravity default in Settings still applies to those lectures.
-private struct NewCourseSheet: View {
+struct NewCourseSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var language: LectureLanguage = .english

@@ -8,6 +8,7 @@ struct LectureDetailView: View {
     @Environment(GenerationService.self) private var generation
     @Environment(CardSyncService.self) private var cardSync
     @Environment(LectureAudioPlayer.self) private var audioPlayer
+    @Environment(ShiurAutomationService.self) private var automationService
     @Environment(\.modelContext) private var modelContext
 
     @Bindable var lecture: Lecture
@@ -83,6 +84,34 @@ struct LectureDetailView: View {
                     }
                 }
                 MetaText(heroMeta)
+            }
+
+            if let sourceSummary = lecture.sourceProvenanceSummary {
+                HStack(spacing: 8) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 11))
+                        .foregroundStyle(LecternTheme.accent)
+                    Text(sourceSummary)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(LecternTheme.ink)
+
+                    Spacer()
+
+                    if let pageURLString = lecture.sourcePageURL,
+                       let pageURL = URL(string: pageURLString) {
+                        Link(destination: pageURL) {
+                            HStack(spacing: 4) {
+                                Text("View on YU Torah")
+                                Image(systemName: "arrow.up.right")
+                            }
+                            .font(.system(size: 11))
+                            .foregroundStyle(LecternTheme.accent)
+                        }
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
         }
         .padding(.bottom, 2)
@@ -702,6 +731,7 @@ struct LectureDetailView: View {
 
 struct TranscriptView: View {
     @Environment(LectureAudioPlayer.self) private var audioPlayer
+    @Environment(ShiurAutomationService.self) private var automationService
 
     let lecture: Lecture
     let content: String
@@ -777,10 +807,25 @@ struct TranscriptView: View {
             }
 
             if !playable {
-                Label("Recording audio was pruned; timestamps are no longer clickable.",
-                      systemImage: "waveform.slash")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+                HStack {
+                    Label("Recording audio was pruned; timestamps are no longer clickable.",
+                          systemImage: "waveform.slash")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+
+                    Spacer()
+
+                    if lecture.sourceMediaURL != nil || lecture.sourcePageURL != nil {
+                        Button("Redownload Audio") {
+                            Task {
+                                try? await automationService.redownloadAudio(for: lecture)
+                            }
+                        }
+                        .font(.system(size: 11.5, weight: .medium))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(LecternTheme.accent)
+                    }
+                }
             }
         }
     }

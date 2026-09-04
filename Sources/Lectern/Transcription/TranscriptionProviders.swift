@@ -92,9 +92,10 @@ enum BuiltInTranscriptionModel: String, Codable, CaseIterable, Identifiable, Sen
             return AntigravityACPClient.transcriptionModelID
         }
         if storedValue == antigravity.id
-            || storedValue == "gemini-3.7-flash-high"
+            || storedValue.contains("3.7")
             || storedValue.caseInsensitiveCompare(antigravity.title) == .orderedSame
-            || storedValue.caseInsensitiveCompare("Gemini 3.7 Flash (High)") == .orderedSame {
+            || storedValue.caseInsensitiveCompare("Gemini 3.7 Flash (High)") == .orderedSame
+            || storedValue.caseInsensitiveCompare("Gemini 3.8 Flash (High)") == .orderedSame {
             return AntigravityACPClient.transcriptionModelID
         }
         if isAntigravityModelChoice(storedValue),
@@ -582,7 +583,7 @@ final class TranscriptionPreferences {
         if let data = defaults.data(forKey: Self.policyKey),
            let policy = try? JSONDecoder().decode(TranscriptionPreferencesSnapshot.self, from: data) {
             source = policy.source
-            builtInModelID = policy.builtInModelID
+            builtInModelID = Self.sanitizeBuiltInModelID(policy.builtInModelID)
             defaultConnectionID = policy.defaultConnectionID
             fallbackConnectionIDs = policy.fallbackConnectionIDs
             allowFallbackProviders = policy.allowFallbackProviders
@@ -677,7 +678,19 @@ final class TranscriptionPreferences {
         )
     }
 
+    static func sanitizeBuiltInModelID(_ modelID: String?) -> String? {
+        guard let modelID, !modelID.isEmpty else { return nil }
+        if modelID.contains("3.7") {
+            return modelID.replacingOccurrences(of: "3.7", with: "3.8")
+        }
+        return modelID
+    }
+
     private func sanitize() {
+        if let id = builtInModelID, id.contains("3.7") {
+            builtInModelID = Self.sanitizeBuiltInModelID(id)
+            persistPolicy()
+        }
         let valid = Set(connections.map(\.id))
         fallbackConnectionIDs = fallbackConnectionIDs.filter(valid.contains)
         if let defaultConnectionID, !valid.contains(defaultConnectionID) {

@@ -13,6 +13,7 @@ packages:
     from: "1.7.6"
 settings:
   base:
+    ONLY_ACTIVE_ARCH: YES
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     # Single source of truth for the app version. scripts/release.sh bumps
@@ -84,6 +85,29 @@ targets:
     sources:
       - Tests/LecternTests
       - Sources/Lectern/Domain/Enums.swift
+      - Sources/Lectern/Domain/Course.swift
+      - Sources/Lectern/Domain/Lecture.swift
+      - Sources/Lectern/Domain/Recording.swift
+      - Sources/Lectern/Domain/Artifact.swift
+      - Sources/Lectern/Domain/Flashcard.swift
+      - Sources/Lectern/Domain/QuizItem.swift
+      - Sources/Lectern/Domain/ChatMessage.swift
+      - Sources/Lectern/Domain/LiveBookmark.swift
+      - Sources/Lectern/Domain/ReferenceAttachment.swift
+      - Sources/Lectern/Automation/ShiurSubscription.swift
+      - Sources/Lectern/Automation/ShiurAutomationItem.swift
+      - Sources/Lectern/Automation/LaunchAtLoginManager.swift
+      - Sources/Lectern/Sources/ShiurSourceProvider.swift
+      - Sources/Lectern/Sources/YUTorah/YUTorahModels.swift
+      - Sources/Lectern/Sources/YUTorah/YUTorahURLResolver.swift
+      - Sources/Lectern/Sources/YUTorah/YUTorahRSSParser.swift
+      - Sources/Lectern/Sources/YUTorah/YUTorahFuzzyMatcher.swift
+      - Sources/Lectern/Sources/YUTorah/YUTorahSearchIndex.swift
+      - Sources/Lectern/Sources/YUTorah/YUTorahSearchParser.swift
+      - Sources/Lectern/Sources/YUTorah/YUTorahMediaResolver.swift
+      - Sources/Lectern/Sources/YUTorah/YUTorahSourceProvider.swift
+      - Sources/Lectern/Sources/YUTorah/YUTorahSearchService.swift
+      - Sources/Lectern/Import/RemoteAudioDownloader.swift
       - Sources/Lectern/Generation/AgentProfile.swift
       - Sources/Lectern/Generation/AgentDetector.swift
       - Sources/Lectern/Generation/ACPConnection.swift

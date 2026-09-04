@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 enum CommandStudioSection: String, CaseIterable, Identifiable {
-    case overview, calendar, assignments, courses, grades, resources, announcements, aiChat
+    case overview, calendar, assignments, courses, subscriptions, grades, resources, announcements, aiChat
 
     var id: String { rawValue }
     var title: String {
@@ -11,6 +11,7 @@ enum CommandStudioSection: String, CaseIterable, Identifiable {
         case .calendar: "Calendar"
         case .assignments: "Assignments"
         case .courses: "Courses"
+        case .subscriptions: "Subscriptions"
         case .grades: "Grades"
         case .resources: "Resources"
         case .announcements: "Announcements"
@@ -23,6 +24,7 @@ enum CommandStudioSection: String, CaseIterable, Identifiable {
         case .calendar: "calendar"
         case .assignments: "checklist"
         case .courses: "book.closed"
+        case .subscriptions: "antenna.radiowaves.left.and.right"
         case .grades: "chart.bar"
         case .resources: "folder"
         case .announcements: "megaphone"
@@ -245,6 +247,7 @@ struct SuperAppShellView: View {
         case .calendar: CanvasCalendarView(allowedCourseIDs: scopedCanvasIDs)
         case .assignments: CanvasAssignmentsView(courses: scopedCourses, allowedCourseIDs: scopedCanvasIDs)
         case .courses: MainWindowView(allowedCourseIDs: coursesLibraryPersistentIDs)
+        case .subscriptions: SubscriptionsView()
         case .grades: CanvasGradesView(courses: scopedCourses, allowedCourseIDs: scopedCanvasIDs)
         case .resources: CanvasResourcesView(courses: scopedCourses, allowedCourseIDs: scopedCanvasIDs)
         case .announcements: CanvasAnnouncementsView(courses: scopedCourses, allowedCourseIDs: scopedCanvasIDs)

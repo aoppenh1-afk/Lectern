@@ -82,6 +82,40 @@ final class GenerationService {
         generationTask?.cancel()
     }
 
+    /// Runs generation synchronously within an async context, serialized with other generation jobs.
+    func generateDirectly(
+        lecture: Lecture,
+        kinds: [GenerationJobKind],
+        profile: AgentProfile,
+        quizOptions: QuizOptions = QuizOptions(),
+        thinkingLevel: ThinkingLevel = .medium,
+        modelOverride: String? = nil,
+        quizFocus: String? = nil
+    ) async throws {
+        while activeJob != nil {
+            try Task.checkCancellation()
+            try await Task.sleep(for: .milliseconds(250))
+        }
+
+        let ordered = GenerationJobKind.ordered.filter { kinds.contains($0) }
+        guard !ordered.isEmpty else { return }
+
+        activeJob = ActiveJob(lectureTitle: lecture.title, remaining: ordered)
+        lastError = nil
+        defer { activeJob = nil }
+
+        try await executeGenerationCore(
+            lectureID: lecture.persistentModelID,
+            lectureTitle: lecture.title,
+            kinds: ordered,
+            profile: profile,
+            quizOptions: quizOptions,
+            thinkingLevel: thinkingLevel,
+            modelOverride: modelOverride,
+            quizFocus: quizFocus
+        )
+    }
+
     // MARK: - Job runner
 
     private func run(lectureID: PersistentIdentifier,
@@ -97,98 +131,123 @@ final class GenerationService {
             generationTask = nil
         }
 
-        let context = modelContainer.mainContext
-        guard let lecture = context.model(for: lectureID) as? Lecture,
-              let rawTranscript = lecture.artifact(of: .rawTranscript)?.content else {
-            lastError = "No raw transcript to generate from."
-            return
-        }
-
         do {
-            let effortHint = "Reasoning effort: \(thinkingLevel.rawValue).\n\n"
-            let language = lecture.language
-            let supplementaryInputs = antigravityReferenceInputs(for: lecture)
-            let rawSource = sourceWithReferences(transcript: rawTranscript, lecture: lecture)
-
-            if kinds.contains(.cleanedTranscript) {
-                activeJob?.remaining = kinds
-                let cleaned = try await Self.requestOutput(
-                    kind: .cleanedTranscript,
-                    transcript: rawSource,
-                    profile: profile,
-                    quizOptions: quizOptions,
-                    thinkingLevel: thinkingLevel,
-                    modelOverride: modelOverride,
-                    quizFocus: quizFocus,
-                    workspaceDirectory: workspaceDirectory,
-                    effortHint: effortHint,
-                    language: language,
-                    supplementaryInputs: supplementaryInputs
-                ).content.trimmingCharacters(in: .whitespacesAndNewlines)
-                try Task.checkCancellation()
-                upsertArtifact(kind: .cleanedTranscript,
-                               content: cleaned,
-                               modelInfo: profile.title,
-                               lecture: lecture,
-                               context: context)
-                try context.save()
-            }
-
-            let transcript = lecture.artifact(of: .cleanedTranscript)?.content ?? rawTranscript
-            let generationSource = sourceWithReferences(transcript: transcript, lecture: lecture)
-            let independentKinds = kinds.filter { $0 != .cleanedTranscript }
-            activeJob?.remaining = independentKinds
-
-            let outputs = try await withThrowingTaskGroup(of: GeneratedOutput.self) { group in
-                for kind in independentKinds {
-                    group.addTask {
-                        try await Self.requestOutput(
-                            kind: kind,
-                            transcript: generationSource,
-                            profile: profile,
-                            quizOptions: quizOptions,
-                            thinkingLevel: thinkingLevel,
-                            modelOverride: modelOverride,
-                            quizFocus: quizFocus,
-                            workspaceDirectory: self.workspaceDirectory,
-                            effortHint: effortHint,
-                            language: language,
-                            supplementaryInputs: supplementaryInputs
-                        )
-                    }
-                }
-
-                var completed: [GeneratedOutput] = []
-                for try await output in group {
-                    completed.append(output)
-                    activeJob?.remaining.removeAll { $0 == output.kind }
-                }
-                return completed
-            }
-            try Task.checkCancellation()
-
-            for output in outputs.sorted(by: { orderedIndex($0.kind) < orderedIndex($1.kind) }) {
-                switch output.kind {
-                case .cleanedTranscript:
-                    break
-                case .notes:
-                    storeNotes(lecture: lecture, markdown: output.content, profile: profile, context: context)
-                case .flashcards:
-                    try storeFlashcards(lecture: lecture, output: output.content, context: context)
-                case .quiz:
-                    try storeQuiz(lecture: lecture, output: output.content)
-                }
-            }
-            try context.save()
-            completionNotifier.deliver(.generationFinished(
+            try await executeGenerationCore(
+                lectureID: lectureID,
                 lectureTitle: lectureTitle,
-                items: kinds.map(\.title)
-            ))
+                kinds: kinds,
+                profile: profile,
+                quizOptions: quizOptions,
+                thinkingLevel: thinkingLevel,
+                modelOverride: modelOverride,
+                quizFocus: quizFocus
+            )
         } catch is CancellationError {
             lastError = nil
         } catch {
             lastError = "\(profile.title): \(error.localizedDescription)"
         }
+    }
+
+    private func executeGenerationCore(
+        lectureID: PersistentIdentifier,
+        lectureTitle: String,
+        kinds: [GenerationJobKind],
+        profile: AgentProfile,
+        quizOptions: QuizOptions,
+        thinkingLevel: ThinkingLevel,
+        modelOverride: String?,
+        quizFocus: String?
+    ) async throws {
+        let context = modelContainer.mainContext
+        guard let lecture = context.model(for: lectureID) as? Lecture,
+              let rawTranscript = lecture.artifact(of: .rawTranscript)?.content else {
+            throw NSError(
+                domain: "GenerationService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "No raw transcript to generate from."]
+            )
+        }
+
+        let effortHint = "Reasoning effort: \(thinkingLevel.rawValue).\n\n"
+        let language = lecture.language
+        let supplementaryInputs = antigravityReferenceInputs(for: lecture)
+        let rawSource = sourceWithReferences(transcript: rawTranscript, lecture: lecture)
+
+        if kinds.contains(.cleanedTranscript) {
+            activeJob?.remaining = kinds
+            let cleaned = try await Self.requestOutput(
+                kind: .cleanedTranscript,
+                transcript: rawSource,
+                profile: profile,
+                quizOptions: quizOptions,
+                thinkingLevel: thinkingLevel,
+                modelOverride: modelOverride,
+                quizFocus: quizFocus,
+                workspaceDirectory: workspaceDirectory,
+                effortHint: effortHint,
+                language: language,
+                supplementaryInputs: supplementaryInputs
+            ).content.trimmingCharacters(in: .whitespacesAndNewlines)
+            try Task.checkCancellation()
+            upsertArtifact(kind: .cleanedTranscript,
+                           content: cleaned,
+                           modelInfo: profile.title,
+                           lecture: lecture,
+                           context: context)
+            try context.save()
+        }
+
+        let transcript = lecture.artifact(of: .cleanedTranscript)?.content ?? rawTranscript
+        let generationSource = sourceWithReferences(transcript: transcript, lecture: lecture)
+        let independentKinds = kinds.filter { $0 != .cleanedTranscript }
+        activeJob?.remaining = independentKinds
+
+        let outputs = try await withThrowingTaskGroup(of: GeneratedOutput.self) { group in
+            for kind in independentKinds {
+                group.addTask {
+                    try await Self.requestOutput(
+                        kind: kind,
+                        transcript: generationSource,
+                        profile: profile,
+                        quizOptions: quizOptions,
+                        thinkingLevel: thinkingLevel,
+                        modelOverride: modelOverride,
+                        quizFocus: quizFocus,
+                        workspaceDirectory: self.workspaceDirectory,
+                        effortHint: effortHint,
+                        language: language,
+                        supplementaryInputs: supplementaryInputs
+                    )
+                }
+            }
+
+            var completed: [GeneratedOutput] = []
+            for try await output in group {
+                completed.append(output)
+                activeJob?.remaining.removeAll { $0 == output.kind }
+            }
+            return completed
+        }
+        try Task.checkCancellation()
+
+        for output in outputs.sorted(by: { orderedIndex($0.kind) < orderedIndex($1.kind) }) {
+            switch output.kind {
+            case .cleanedTranscript:
+                break
+            case .notes:
+                storeNotes(lecture: lecture, markdown: output.content, profile: profile, context: context)
+            case .flashcards:
+                try storeFlashcards(lecture: lecture, output: output.content, context: context)
+            case .quiz:
+                try storeQuiz(lecture: lecture, output: output.content)
+            }
+        }
+        try context.save()
+        completionNotifier.deliver(.generationFinished(
+            lectureTitle: lectureTitle,
+            items: kinds.map(\.title)
+        ))
     }
 
     private func orderedIndex(_ kind: GenerationJobKind) -> Int {

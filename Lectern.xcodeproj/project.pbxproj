@@ -11,55 +11,84 @@
 		04A2587DE03F9385C9796948 /* CourseSynthesisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD87EB0581FBD62DD9CC2F0B /* CourseSynthesisView.swift */; };
 		0932FFD48E3317DAB25BAB3C /* CanvasClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */; };
 		097B599C3CD156F1FE5B4DD1 /* AntigravityACPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */; };
+		0BE6A96BF3F7762C36D2F872 /* LiveBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB85EBEEFA4C4DD64A6BA221 /* LiveBookmark.swift */; };
 		0C8CA21E7C40DA908FCC5EFF /* ParakeetTDT in Frameworks */ = {isa = PBXBuildFile; productRef = DE53F9C541D2A8F57BAAA142 /* ParakeetTDT */; };
 		0E5075065DE9DAA2A5400B42 /* ACPConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF3D392A858A8A5FF43BE12F /* ACPConnection.swift */; };
 		0EA7814AC3CB85466CD5675D /* lectern-transcription in Resources */ = {isa = PBXBuildFile; fileRef = 19629351EB498E76FFBC6AF2 /* lectern-transcription */; };
 		11B676CDDFEDF8FCE083CA1F /* Color+Hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF40CBB383F0F13DB95789D6 /* Color+Hex.swift */; };
+		132314727F2516A98C2FD7BD /* YUTorahSourceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4992B00709F638881F00A8B3 /* YUTorahSourceProvider.swift */; };
 		13DA820854CD0648709719F9 /* TranscriptionProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */; };
 		14A64BE39ED16C6072DBDFAE /* LectureExportAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A0D799F1B023C3336AB825 /* LectureExportAvailability.swift */; };
 		14E043E466FE158C2935D6DF /* Prompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4803A2E0B42C392ED5460F0F /* Prompts.swift */; };
+		1E2C8FDA18A3C566CC1F9976 /* LaunchAtLoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B67FCCE28F74E8E6AC84F215 /* LaunchAtLoginManager.swift */; };
+		1EEF683B4D263A45FE4E6E94 /* Artifact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F4553C1CACE105140BCDE50 /* Artifact.swift */; };
+		1FD0871A05C063F20BD535DB /* ShiurSourceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F1D30F6F9F6D6F1E7515706 /* ShiurSourceProvider.swift */; };
+		21DE24DB5F083149A51666C0 /* YUTorahSubscriptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7DCD05473F0313914D4564 /* YUTorahSubscriptionTests.swift */; };
 		246D6AABE4A01260E36A1011 /* CanvasClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */; };
+		25E0EBCA6B9B36768A41F813 /* YUTorahSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8E8D62B339AAE8CDACF807 /* YUTorahSearchIndex.swift */; };
 		26B56FA6D70AEFB77DB4E9D4 /* TranscriptionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D65BB56BA83F5089F0629283 /* TranscriptionSettingsView.swift */; };
 		26E90B0EEA8592419A89B457 /* CapturePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0999EBAFBCFF39D7F174D28 /* CapturePipeline.swift */; };
+		29E1DD5CA82422CA54C9A6F8 /* YUTorahURLResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9867BCA00FA030004AA4F6F8 /* YUTorahURLResolver.swift */; };
+		2A385138F07C43270952BCF4 /* ShiurAutomationItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A89B0C992EA7A3BF00F120 /* ShiurAutomationItem.swift */; };
 		2D3FB854C9E2918F5BEC2FF6 /* Enums.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D6361409917C609942439F /* Enums.swift */; };
+		2E10D203EDA55E68A2CCF5D7 /* AutomationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F90877A2EFEAC1CEB530347 /* AutomationScheduler.swift */; };
 		30ABE89FD405A650026CF2C9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C6B420A4BE2849FFBF039B1F /* Assets.xcassets */; };
 		3206F5441BC4F454A71C813C /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F31D7E05008BB4C97BB3E77 /* StatusBarController.swift */; };
 		34591E3782F5F3B056774DD8 /* LiveBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB85EBEEFA4C4DD64A6BA221 /* LiveBookmark.swift */; };
+		3A311861A383C1A19E41C813 /* YUTorahSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE3C5081C885AB547B647B4 /* YUTorahSearchView.swift */; };
+		3B229318FCE4EA4E30F22A67 /* YUTorahURLResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9867BCA00FA030004AA4F6F8 /* YUTorahURLResolver.swift */; };
 		3C19C3525862F290CD24851F /* TranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE4BD4460EFC76CC20503256 /* TranscriptionEngine.swift */; };
+		3D5844BEFB098FE7713F88B8 /* LaunchAtLoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B67FCCE28F74E8E6AC84F215 /* LaunchAtLoginManager.swift */; };
 		40026814DD41633C8C7DDBF3 /* FlashcardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03592B808597F36DE3B7F38E /* FlashcardsView.swift */; };
 		40CEAE1E9CEA4D5E3168D188 /* DiagramRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5496C48DE5EDC0027745A0E /* DiagramRenderer.swift */; };
 		41F9B3478E69F113377A6216 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE5C3AABA6B34AD14F5DB646 /* AppUpdater.swift */; };
 		42BDE0D399DE0E774CD3DCC5 /* LectureBundleExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04630DB60DD0FFC955B6207D /* LectureBundleExportSheet.swift */; };
 		43DAF4C03E006BEDC9ED2DA3 /* Prompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4803A2E0B42C392ED5460F0F /* Prompts.swift */; };
 		45CD9772D6C4F694F70ECC83 /* LectureExportAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A0D799F1B023C3336AB825 /* LectureExportAvailability.swift */; };
+		48C206E7348E4166EF00D67E /* YUTorahSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B431E6A4C6DD679E2D7C259 /* YUTorahSearchService.swift */; };
+		493DE2F5C28A17C34D2321D0 /* ShiurSourceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F1D30F6F9F6D6F1E7515706 /* ShiurSourceProvider.swift */; };
 		4A0B4901AD2C903ACF822BDC /* CanvasSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85118E4C36171306169DA123 /* CanvasSyncService.swift */; };
 		4BCD52D700A21B47DC5A6A35 /* AgentDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07DF18B64B18FC06E4CC2F90 /* AgentDetector.swift */; };
+		4C70DDFDC829C92E73B9E5C1 /* ReferenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6AC1B3F5C73C9B7EF6CD77 /* ReferenceAttachment.swift */; };
 		4D9AEBD52937FD19A865A46C /* GenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE4FA9BA6277A22013E953E /* GenerationService.swift */; };
+		4E6393AF5E0BF37C9D6B5B2A /* ShiurAutomationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264D4BFEED3B376DCCA86F0F /* ShiurAutomationService.swift */; };
 		506B4E0C2FEE82EABA756F91 /* CardSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01528EDB75F8B898B2746A6 /* CardSyncService.swift */; };
 		534F2F824A5B4CE43A3C1995 /* TranscriptionProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87CA75D98C0B0A79B24C31A6 /* TranscriptionProviders.swift */; };
 		54CC63CA6BCF1FC7456E54AF /* TranscriptSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6293D7F84B3E2FE505739AF8 /* TranscriptSegment.swift */; };
 		56C68A34848B5F232E26859D /* Enums.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D6361409917C609942439F /* Enums.swift */; };
+		5889A28E7A42B9735C1D84EF /* YUTorahFuzzyMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12F61E67B7A6A360B9393A9D /* YUTorahFuzzyMatcher.swift */; };
 		59CF92FA7A12C257DE19A5CC /* NotesMarkdownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */; };
 		5BA88FED8AAA4DF17E087287 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE5C3AABA6B34AD14F5DB646 /* AppUpdater.swift */; };
 		5BC92167A2C70F9FD1E0AC0D /* TranscriptionProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87CA75D98C0B0A79B24C31A6 /* TranscriptionProviders.swift */; };
 		5CC2CA3F302C627237B9794E /* CompletionNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165645A8C3854D55C5824601 /* CompletionNotifier.swift */; };
 		5D0E6B5F3A3CEC54B91B9C44 /* NotesMarkdownConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD3E8ECFA5DBAF53FDF24214 /* NotesMarkdownConverter.swift */; };
+		5D4CA351DF51CD0C2C7A4A92 /* Course.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB56BD82F43139025F591D2F /* Course.swift */; };
 		5F08F096764B873351ED1A90 /* QuizReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E407430088644634374A45C /* QuizReviewView.swift */; };
 		5F48CA518FE926E6F2B01953 /* CompletionNotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */; };
+		60DEBBDDA8C0AAD05944FE97 /* ShiurSubscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43BAFC671A118892D77577AD /* ShiurSubscription.swift */; };
 		6432103455669EF48B23FC76 /* Lecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6158A28C0BB3D26FAEAE192F /* Lecture.swift */; };
 		64D1BB7B2C4864F6221429AE /* CanvasHTMLTextCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */; };
+		64DD4C5F7F480DCF741D86E4 /* ShiurSubscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43BAFC671A118892D77577AD /* ShiurSubscription.swift */; };
 		66FEF621C726AB98517FB265 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F761716AB6F39B0F119719 /* OnboardingView.swift */; };
 		67C2B516005F92253AA7165C /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7D0F6D80C445E9723332BE /* MainWindowView.swift */; };
 		681C224C5CB19823E357C693 /* ReferenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6AC1B3F5C73C9B7EF6CD77 /* ReferenceAttachment.swift */; };
 		69E7640296F076134CDA88B9 /* ReferenceMaterialPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A8D31EBDA459CA5FB32589 /* ReferenceMaterialPicker.swift */; };
 		6A84AD8F988068C3C6298016 /* LecternApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B528438D307A5B4FB6EAF1B /* LecternApp.swift */; };
+		6CEA910FD49F1BE8BB05BCCF /* ShiurImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C5B6AFA684E43B8FEA1573E /* ShiurImportSheet.swift */; };
 		6E93D4DC8C530BC4C5472563 /* GoogleDocsSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A92C58BA4F8412B20A3504 /* GoogleDocsSyncService.swift */; };
 		6F51FC24AF770F80FDB1414E /* LecternBundleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A00E389C268DAA3F3B2249 /* LecternBundleService.swift */; };
+		7354896DDC4659DE0B74DC24 /* RemoteAudioDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F39B466BD1D9EADCD297E23 /* RemoteAudioDownloader.swift */; };
 		73E019E6325643CA84769460 /* UpdatePromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB3E3B37AF7F3949572FF90 /* UpdatePromptView.swift */; };
 		7461744B772DB8803A6BB84A /* LectureChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC2F44F19A8CD8C4379AC82 /* LectureChatView.swift */; };
 		769C8CF41FCE0C5A67B52A8E /* Recording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */; };
+		76DFF5C7F10FCD387528F6F2 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872C99F2068ADE2855DB440D /* ChatMessage.swift */; };
 		774E46198FF81D34D8A71C78 /* MenuBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73BEE40BCC364B58C68CEB62 /* MenuBarPopoverView.swift */; };
+		79575C2E141B111B720DE15C /* YUTorahRSSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D853730E8F00F809FFF741FD /* YUTorahRSSParser.swift */; };
+		79A6A6E0658A39BDDB91CF63 /* YUTorahFuzzyMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12F61E67B7A6A360B9393A9D /* YUTorahFuzzyMatcher.swift */; };
 		7AADBA9597A6FB92B7749D65 /* AntigravityACP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BFE16C6F2F14A491896949 /* AntigravityACP.swift */; };
+		7AC8FBC32E220BCAA9FD7A42 /* YUTorahSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B431E6A4C6DD679E2D7C259 /* YUTorahSearchService.swift */; };
+		7AE0118F869A861B74F92EEA /* YUTorahModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C72925A022B89EE971A12294 /* YUTorahModels.swift */; };
+		7C610F4D8A2312A5F9CAF0E6 /* Lecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6158A28C0BB3D26FAEAE192F /* Lecture.swift */; };
 		7EFD4FF5B0C51EF749EEAEF3 /* AgentModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C260A0B06C75ACB5BBD3905 /* AgentModelCatalog.swift */; };
 		7FA3A2E75CC1C3AE36E46AF4 /* TranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439436382A9383B21132AFA7 /* TranscriptionService.swift */; };
 		81AEF8ECD24F2CA06E7E9EA8 /* ChatMarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61B8478F30090A0838FA7BCC /* ChatMarkdownRenderer.swift */; };
@@ -67,21 +96,28 @@
 		81D17F0E685C57F8F22C00AF /* CanvasHTMLTextCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B59062BA24987B047FA43FD /* CanvasHTMLTextCache.swift */; };
 		82688AA7EC72B3D17C7DE1B1 /* NotesContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51D3E04EE9E7EAE2AA0AA37 /* NotesContentView.swift */; };
 		86CA65565DB52DB819C9C7BB /* CanvasWorkspaceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FE176891F8FD111C81F219 /* CanvasWorkspaceViews.swift */; };
+		87D749F58B1B9A6848DD93E5 /* LectureImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A11419823C0A975075BD958 /* LectureImportService.swift */; };
 		8ADBECF8CDB31C153F5376F3 /* NotesMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D8E9C05E6FE70084DD545AC /* NotesMarkdown.swift */; };
 		8B4271F2568269D617E665C4 /* AntigravityACPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */; };
 		8BE649B38DF898AC27E78800 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872C99F2068ADE2855DB440D /* ChatMessage.swift */; };
 		8CEF00F77314A75DDAE1752F /* OnboardingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED5ED7AC83F9F7234C35460 /* OnboardingState.swift */; };
+		9057CF2BC820828797889158 /* Recording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */; };
+		924578050CE064AB1D124E3D /* YUTorahSearchParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EECE7226265D02716663B45 /* YUTorahSearchParser.swift */; };
 		9265B1AAA24271D2A4BD864F /* LectureExportAvailability+Lecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C30D8A14329AC61D5345BC9 /* LectureExportAvailability+Lecture.swift */; };
 		92BA99F1D8777D835D66AFCF /* AntigravityACP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BFE16C6F2F14A491896949 /* AntigravityACP.swift */; };
+		92E03A9C0B6913F9E5AF308C /* SubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85330EAFA97A4A66B2B2E9A0 /* SubscriptionsView.swift */; };
 		93D3161AC57DF8C49442C3CB /* GoogleDocsNotesBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6883F2E69A64C8505C606EE /* GoogleDocsNotesBar.swift */; };
+		93D5D015C6492C0F863B1A43 /* YUTorahRSSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D853730E8F00F809FFF741FD /* YUTorahRSSParser.swift */; };
 		945656E2CCCE5BFD98EBA189 /* mermaid.min.js in Resources */ = {isa = PBXBuildFile; fileRef = E7DC166705C567DFF81BC6B6 /* mermaid.min.js */; };
 		94606A0CC4D7C272C6B01A50 /* GenerateSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDCDE601FE52EA2EF91E5594 /* GenerateSheet.swift */; };
+		955C2C8A4948BF5F7DAF00A5 /* YUTorahModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C72925A022B89EE971A12294 /* YUTorahModels.swift */; };
 		96768F959FE10609CFEE708A /* CaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B73D14E51C0E213359B9BDF /* CaptureController.swift */; };
 		99B9225E8B16E1A67339FE92 /* PillWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76FE69A65922487DBD5E43CA /* PillWindowController.swift */; };
 		99CAFA2488E7C92937ACA175 /* WhisperTranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34F7FB7A56BFCB60D82FC6D0 /* WhisperTranscriptionEngine.swift */; };
 		9E7A6E725960B79DBC5965C9 /* LectureDocumentRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 510EE419EF1BDEB5F0F5897D /* LectureDocumentRenderer.swift */; };
 		9FF80456F18EBE4D84A834F3 /* Artifact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F4553C1CACE105140BCDE50 /* Artifact.swift */; };
 		A2603490A7FBF8826A31E9C6 /* CanvasHTMLTextCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B59062BA24987B047FA43FD /* CanvasHTMLTextCache.swift */; };
+		A3BC7627B74D9C21AD305CB6 /* YUTorahSearchParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EECE7226265D02716663B45 /* YUTorahSearchParser.swift */; };
 		A8E36437D00550E10D9FC228 /* CanvasConnectionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09DF40420E86AFCF7499E39F /* CanvasConnectionSettings.swift */; };
 		AA06B27A94F72E080521F647 /* ReferenceMaterialService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B1F78BFD01E4667FE613F2 /* ReferenceMaterialService.swift */; };
 		AAF12042D3F7E714EF8264E3 /* NotesMarkdownConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD3E8ECFA5DBAF53FDF24214 /* NotesMarkdownConverter.swift */; };
@@ -96,12 +132,16 @@
 		BCE33AA022B41C846D00FF1D /* RetentionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29CA61043373B5435D7F00F2 /* RetentionService.swift */; };
 		BE4E032BE015BAB8A5848D13 /* GlobalRecordHotkey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B21977294E61876D5A79076 /* GlobalRecordHotkey.swift */; };
 		C0297E49ED7057F01B1A9D5F /* LectureAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F195A8A3ED220D64F9F54D6 /* LectureAudioPlayer.swift */; };
+		C07E616910691BA0DEA41D51 /* YUTorahSourceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4992B00709F638881F00A8B3 /* YUTorahSourceProvider.swift */; };
 		C1DAB0243278C6B8217FAAE8 /* LectureImportPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1636BFF993825C1A1D7F801 /* LectureImportPicker.swift */; };
 		C2044C6A831C4420526C5F27 /* ExternalTranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 576A2CBC9D67B86F6B125E6E /* ExternalTranscriptionEngine.swift */; };
 		C2375EE9DD5ECE6C318BA535 /* NotesMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D8E9C05E6FE70084DD545AC /* NotesMarkdown.swift */; };
 		C246DC1EB1FC9BCCA7C5C84A /* ACPConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF3D392A858A8A5FF43BE12F /* ACPConnection.swift */; };
+		C755955D46BFA91077FBA354 /* YUTorahSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8E8D62B339AAE8CDACF807 /* YUTorahSearchIndex.swift */; };
 		C8BD1E39D756D4404C06735D /* LecternBundleOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */; };
+		C90B7860B0E62A59D4F48341 /* SubscriptionEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8910AF0204135B690C41D851 /* SubscriptionEditorView.swift */; };
 		CB51F1710B7BFE7BFED515EE /* SurfacePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363051532AA63A00332E82D7 /* SurfacePreferences.swift */; };
+		CB7D01FE2F70E7CFBD226E87 /* YUTorahMediaResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE0F3353EF151BC046D963A4 /* YUTorahMediaResolver.swift */; };
 		CBE08C8D503A31D46BFC2FA9 /* AntigravityACPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */; };
 		CC81062C168BF06111E4201E /* LecternBundleOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */; };
 		D850E1E9B74B2D1B0CBF2E16 /* CanvasClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */; };
@@ -113,12 +153,17 @@
 		DEA2627708C2C4172F0A4B08 /* AppAuth in Frameworks */ = {isa = PBXBuildFile; productRef = F13AF31704ECBCAC1405015C /* AppAuth */; };
 		DF356657AAF2E959F04C90CE /* RecordingFileLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DEC6C81E9D90FFBE3C748F /* RecordingFileLedger.swift */; };
 		E18F44EF0D299FB70D15D910 /* AgentProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13E515E0B5FEBA11763B7DA /* AgentProfile.swift */; };
+		E1C18D234B3A145B2B4F7D16 /* QuizItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D104A86250C8C04AD3DD384 /* QuizItem.swift */; };
 		E2247E43FA042CD00F6D8F62 /* SuperAppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75D3EFB87C0ED82B6A0F9E8F /* SuperAppShellView.swift */; };
 		E428600840C3171691894E28 /* CanvasSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A763F772641D5D2F5F79CDB9 /* CanvasSettingsView.swift */; };
 		E5F1009B3531ED6CA5C9FA57 /* AppUpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84584CA17279DC67909F94C /* AppUpdaterTests.swift */; };
 		E8F6650540B184E92DED4BBF /* LectureDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DFFBA8697AE3C7AB28D15DE /* LectureDetailView.swift */; };
+		E9B92244F39EB6A999CF8D7E /* ShiurAutomationItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A89B0C992EA7A3BF00F120 /* ShiurAutomationItem.swift */; };
 		EAAF82191FD0F66658CB5D6A /* CanvasModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C125CBCA32F7C013115044A9 /* CanvasModels.swift */; };
+		EBC4E12AA8D9064BD96F9A94 /* YUTorahMediaResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE0F3353EF151BC046D963A4 /* YUTorahMediaResolver.swift */; };
+		EC4B65F5362499EFD336E511 /* Flashcard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC884E8F1288033F883B48CF /* Flashcard.swift */; };
 		EC58924FF09B859FC286942E /* AgentDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07DF18B64B18FC06E4CC2F90 /* AgentDetector.swift */; };
+		EDBE348219FB004D97CA1195 /* RemoteAudioDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F39B466BD1D9EADCD297E23 /* RemoteAudioDownloader.swift */; };
 		FC87DA91A3A31762AD9A9EC4 /* LectureChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 405F827FE93E4C441645FA2B /* LectureChatService.swift */; };
 		FD91D9A3281EA0A3E2804653 /* AnkiConnectClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3217A5B8A37DD8207DD0478 /* AnkiConnectClient.swift */; };
 		FF280A4C00480574B4F84C30 /* QuizItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D104A86250C8C04AD3DD384 /* QuizItem.swift */; };
@@ -128,33 +173,47 @@
 		03592B808597F36DE3B7F38E /* FlashcardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashcardsView.swift; sourceTree = "<group>"; };
 		04630DB60DD0FFC955B6207D /* LectureBundleExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureBundleExportSheet.swift; sourceTree = "<group>"; };
 		061C2A9944E44D8A633CC026 /* LectureDocumentExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureDocumentExportService.swift; sourceTree = "<group>"; };
+		07A89B0C992EA7A3BF00F120 /* ShiurAutomationItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiurAutomationItem.swift; sourceTree = "<group>"; };
 		07D6361409917C609942439F /* Enums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Enums.swift; sourceTree = "<group>"; };
 		07DF18B64B18FC06E4CC2F90 /* AgentDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDetector.swift; sourceTree = "<group>"; };
 		09DF40420E86AFCF7499E39F /* CanvasConnectionSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasConnectionSettings.swift; sourceTree = "<group>"; };
 		0B59062BA24987B047FA43FD /* CanvasHTMLTextCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasHTMLTextCache.swift; sourceTree = "<group>"; };
 		0B7D0F6D80C445E9723332BE /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
 		0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasHTMLTextCacheTests.swift; sourceTree = "<group>"; };
+		12F61E67B7A6A360B9393A9D /* YUTorahFuzzyMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahFuzzyMatcher.swift; sourceTree = "<group>"; };
 		165645A8C3854D55C5824601 /* CompletionNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionNotifier.swift; sourceTree = "<group>"; };
 		16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasClient.swift; sourceTree = "<group>"; };
 		173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recording.swift; sourceTree = "<group>"; };
 		17BFE16C6F2F14A491896949 /* AntigravityACP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACP.swift; sourceTree = "<group>"; };
 		19629351EB498E76FFBC6AF2 /* lectern-transcription */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "lectern-transcription"; path = ".agents/skills/lectern-transcription"; sourceTree = SOURCE_ROOT; };
+		1A11419823C0A975075BD958 /* LectureImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureImportService.swift; sourceTree = "<group>"; };
+		1A8E8D62B339AAE8CDACF807 /* YUTorahSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSearchIndex.swift; sourceTree = "<group>"; };
+		1B431E6A4C6DD679E2D7C259 /* YUTorahSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSearchService.swift; sourceTree = "<group>"; };
+		1DE3C5081C885AB547B647B4 /* YUTorahSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSearchView.swift; sourceTree = "<group>"; };
 		1ED5ED7AC83F9F7234C35460 /* OnboardingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingState.swift; sourceTree = "<group>"; };
+		1F1D30F6F9F6D6F1E7515706 /* ShiurSourceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiurSourceProvider.swift; sourceTree = "<group>"; };
 		1F4553C1CACE105140BCDE50 /* Artifact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artifact.swift; sourceTree = "<group>"; };
 		2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LecternBundleOptions.swift; sourceTree = "<group>"; };
+		264D4BFEED3B376DCCA86F0F /* ShiurAutomationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiurAutomationService.swift; sourceTree = "<group>"; };
 		29CA61043373B5435D7F00F2 /* RetentionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetentionService.swift; sourceTree = "<group>"; };
 		2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionNotificationTests.swift; sourceTree = "<group>"; };
 		2B528438D307A5B4FB6EAF1B /* LecternApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LecternApp.swift; sourceTree = "<group>"; };
 		2F195A8A3ED220D64F9F54D6 /* LectureAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureAudioPlayer.swift; sourceTree = "<group>"; };
+		2F90877A2EFEAC1CEB530347 /* AutomationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationScheduler.swift; sourceTree = "<group>"; };
 		31FE176891F8FD111C81F219 /* CanvasWorkspaceViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasWorkspaceViews.swift; sourceTree = "<group>"; };
 		34F7FB7A56BFCB60D82FC6D0 /* WhisperTranscriptionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperTranscriptionEngine.swift; sourceTree = "<group>"; };
 		35A92C58BA4F8412B20A3504 /* GoogleDocsSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsSyncService.swift; sourceTree = "<group>"; };
 		363051532AA63A00332E82D7 /* SurfacePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfacePreferences.swift; sourceTree = "<group>"; };
 		3DFFBA8697AE3C7AB28D15DE /* LectureDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureDetailView.swift; sourceTree = "<group>"; };
+		3EECE7226265D02716663B45 /* YUTorahSearchParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSearchParser.swift; sourceTree = "<group>"; };
+		3F39B466BD1D9EADCD297E23 /* RemoteAudioDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteAudioDownloader.swift; sourceTree = "<group>"; };
 		405F827FE93E4C441645FA2B /* LectureChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureChatService.swift; sourceTree = "<group>"; };
 		439436382A9383B21132AFA7 /* TranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionService.swift; sourceTree = "<group>"; };
+		43BAFC671A118892D77577AD /* ShiurSubscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiurSubscription.swift; sourceTree = "<group>"; };
 		4803A2E0B42C392ED5460F0F /* Prompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Prompts.swift; sourceTree = "<group>"; };
+		4992B00709F638881F00A8B3 /* YUTorahSourceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSourceProvider.swift; sourceTree = "<group>"; };
 		4C30D8A14329AC61D5345BC9 /* LectureExportAvailability+Lecture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LectureExportAvailability+Lecture.swift"; sourceTree = "<group>"; };
+		4C5B6AFA684E43B8FEA1573E /* ShiurImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiurImportSheet.swift; sourceTree = "<group>"; };
 		4D642A5FC231E577576031CA /* ParakeetTDT */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ParakeetTDT; path = Vendor/ParakeetTDT; sourceTree = SOURCE_ROOT; };
 		510EE419EF1BDEB5F0F5897D /* LectureDocumentRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureDocumentRenderer.swift; sourceTree = "<group>"; };
 		518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionProviderTests.swift; sourceTree = "<group>"; };
@@ -175,11 +234,14 @@
 		7F48400CBE26D86C8AA210BB /* GlassStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyle.swift; sourceTree = "<group>"; };
 		832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasClientTests.swift; sourceTree = "<group>"; };
 		85118E4C36171306169DA123 /* CanvasSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasSyncService.swift; sourceTree = "<group>"; };
+		85330EAFA97A4A66B2B2E9A0 /* SubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionsView.swift; sourceTree = "<group>"; };
 		872C99F2068ADE2855DB440D /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
 		87CA75D98C0B0A79B24C31A6 /* TranscriptionProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionProviders.swift; sourceTree = "<group>"; };
+		8910AF0204135B690C41D851 /* SubscriptionEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionEditorView.swift; sourceTree = "<group>"; };
 		89A8D31EBDA459CA5FB32589 /* ReferenceMaterialPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceMaterialPicker.swift; sourceTree = "<group>"; };
 		8E407430088644634374A45C /* QuizReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizReviewView.swift; sourceTree = "<group>"; };
 		97F761716AB6F39B0F119719 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		9867BCA00FA030004AA4F6F8 /* YUTorahURLResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahURLResolver.swift; sourceTree = "<group>"; };
 		9B73D14E51C0E213359B9BDF /* CaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureController.swift; sourceTree = "<group>"; };
 		9C260A0B06C75ACB5BBD3905 /* AgentModelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentModelCatalog.swift; sourceTree = "<group>"; };
 		9C6AC1B3F5C73C9B7EF6CD77 /* ReferenceAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceAttachment.swift; sourceTree = "<group>"; };
@@ -193,26 +255,31 @@
 		B1636BFF993825C1A1D7F801 /* LectureImportPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureImportPicker.swift; sourceTree = "<group>"; };
 		B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACPTests.swift; sourceTree = "<group>"; };
 		B3217A5B8A37DD8207DD0478 /* AnkiConnectClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnkiConnectClient.swift; sourceTree = "<group>"; };
+		B67FCCE28F74E8E6AC84F215 /* LaunchAtLoginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginManager.swift; sourceTree = "<group>"; };
 		BB85EBEEFA4C4DD64A6BA221 /* LiveBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveBookmark.swift; sourceTree = "<group>"; };
 		BBF49011BFA6F50BCA8A7598 /* GoogleDocsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsClient.swift; sourceTree = "<group>"; };
 		BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACPClient.swift; sourceTree = "<group>"; };
 		BD87EB0581FBD62DD9CC2F0B /* CourseSynthesisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseSynthesisView.swift; sourceTree = "<group>"; };
+		BE0F3353EF151BC046D963A4 /* YUTorahMediaResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahMediaResolver.swift; sourceTree = "<group>"; };
 		BE5C3AABA6B34AD14F5DB646 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		C01528EDB75F8B898B2746A6 /* CardSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSyncService.swift; sourceTree = "<group>"; };
 		C125CBCA32F7C013115044A9 /* CanvasModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasModels.swift; sourceTree = "<group>"; };
 		C6B420A4BE2849FFBF039B1F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C72925A022B89EE971A12294 /* YUTorahModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahModels.swift; sourceTree = "<group>"; };
 		CD3E8ECFA5DBAF53FDF24214 /* NotesMarkdownConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesMarkdownConverter.swift; sourceTree = "<group>"; };
 		D0DEC6C81E9D90FFBE3C748F /* RecordingFileLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFileLedger.swift; sourceTree = "<group>"; };
 		D3A0D799F1B023C3336AB825 /* LectureExportAvailability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureExportAvailability.swift; sourceTree = "<group>"; };
 		D51D3E04EE9E7EAE2AA0AA37 /* NotesContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesContentView.swift; sourceTree = "<group>"; };
 		D65BB56BA83F5089F0629283 /* TranscriptionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionSettingsView.swift; sourceTree = "<group>"; };
 		D6883F2E69A64C8505C606EE /* GoogleDocsNotesBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsNotesBar.swift; sourceTree = "<group>"; };
+		D853730E8F00F809FFF741FD /* YUTorahRSSParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahRSSParser.swift; sourceTree = "<group>"; };
 		DC884E8F1288033F883B48CF /* Flashcard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Flashcard.swift; sourceTree = "<group>"; };
 		DF820DB24255443A5561D031 /* GoogleDocsError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsError.swift; sourceTree = "<group>"; };
 		E4A00E389C268DAA3F3B2249 /* LecternBundleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LecternBundleService.swift; sourceTree = "<group>"; };
 		E5496C48DE5EDC0027745A0E /* DiagramRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagramRenderer.swift; sourceTree = "<group>"; };
 		E7DC166705C567DFF81BC6B6 /* mermaid.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = mermaid.min.js; sourceTree = "<group>"; };
 		E84584CA17279DC67909F94C /* AppUpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdaterTests.swift; sourceTree = "<group>"; };
+		EC7DCD05473F0313914D4564 /* YUTorahSubscriptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSubscriptionTests.swift; sourceTree = "<group>"; };
 		EDCDE601FE52EA2EF91E5594 /* GenerateSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerateSheet.swift; sourceTree = "<group>"; };
 		EE4BD4460EFC76CC20503256 /* TranscriptionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionEngine.swift; sourceTree = "<group>"; };
 		EF3D392A858A8A5FF43BE12F /* ACPConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACPConnection.swift; sourceTree = "<group>"; };
@@ -267,6 +334,18 @@
 			path = .agents;
 			sourceTree = "<group>";
 		};
+		0C951052512B820FB87A6902 /* Automation */ = {
+			isa = PBXGroup;
+			children = (
+				2F90877A2EFEAC1CEB530347 /* AutomationScheduler.swift */,
+				B67FCCE28F74E8E6AC84F215 /* LaunchAtLoginManager.swift */,
+				07A89B0C992EA7A3BF00F120 /* ShiurAutomationItem.swift */,
+				264D4BFEED3B376DCCA86F0F /* ShiurAutomationService.swift */,
+				43BAFC671A118892D77577AD /* ShiurSubscription.swift */,
+			);
+			path = Automation;
+			sourceTree = "<group>";
+		};
 		17E725FBF82619F1FDA7507B /* Domain */ = {
 			isa = PBXGroup;
 			children = (
@@ -309,8 +388,12 @@
 				D51D3E04EE9E7EAE2AA0AA37 /* NotesContentView.swift */,
 				8E407430088644634374A45C /* QuizReviewView.swift */,
 				A80840764862370BCD46CACE /* SettingsView.swift */,
+				4C5B6AFA684E43B8FEA1573E /* ShiurImportSheet.swift */,
+				8910AF0204135B690C41D851 /* SubscriptionEditorView.swift */,
+				85330EAFA97A4A66B2B2E9A0 /* SubscriptionsView.swift */,
 				75D3EFB87C0ED82B6A0F9E8F /* SuperAppShellView.swift */,
 				D65BB56BA83F5089F0629283 /* TranscriptionSettingsView.swift */,
+				1DE3C5081C885AB547B647B4 /* YUTorahSearchView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -370,6 +453,15 @@
 			path = Sources;
 			sourceTree = "<group>";
 		};
+		47E62AF6D84ADFFB56F07C78 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				1F1D30F6F9F6D6F1E7515706 /* ShiurSourceProvider.swift */,
+				7C44D0E0C09B1B1D9DE888DE /* YUTorah */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
 		57C666E0599B31DACFA50FC1 /* LecternTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -381,6 +473,7 @@
 				F2ECE882547DAE6ABCD5EC51 /* ExportAvailabilityTests.swift */,
 				60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */,
 				518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */,
+				EC7DCD05473F0313914D4564 /* YUTorahSubscriptionTests.swift */,
 			);
 			path = LecternTests;
 			sourceTree = "<group>";
@@ -417,6 +510,22 @@
 			path = Playback;
 			sourceTree = "<group>";
 		};
+		7C44D0E0C09B1B1D9DE888DE /* YUTorah */ = {
+			isa = PBXGroup;
+			children = (
+				12F61E67B7A6A360B9393A9D /* YUTorahFuzzyMatcher.swift */,
+				BE0F3353EF151BC046D963A4 /* YUTorahMediaResolver.swift */,
+				C72925A022B89EE971A12294 /* YUTorahModels.swift */,
+				D853730E8F00F809FFF741FD /* YUTorahRSSParser.swift */,
+				1A8E8D62B339AAE8CDACF807 /* YUTorahSearchIndex.swift */,
+				3EECE7226265D02716663B45 /* YUTorahSearchParser.swift */,
+				1B431E6A4C6DD679E2D7C259 /* YUTorahSearchService.swift */,
+				4992B00709F638881F00A8B3 /* YUTorahSourceProvider.swift */,
+				9867BCA00FA030004AA4F6F8 /* YUTorahURLResolver.swift */,
+			);
+			path = YUTorah;
+			sourceTree = "<group>";
+		};
 		7F97AE537BCDFB5531BB1B13 /* Anki */ = {
 			isa = PBXGroup;
 			children = (
@@ -424,6 +533,15 @@
 				C01528EDB75F8B898B2746A6 /* CardSyncService.swift */,
 			);
 			path = Anki;
+			sourceTree = "<group>";
+		};
+		9684FFC3347E304E6D562848 /* Import */ = {
+			isa = PBXGroup;
+			children = (
+				1A11419823C0A975075BD958 /* LectureImportService.swift */,
+				3F39B466BD1D9EADCD297E23 /* RemoteAudioDownloader.swift */,
+			);
+			path = Import;
 			sourceTree = "<group>";
 		};
 		9E7EB93F69A5755C8FE019FE = {
@@ -516,15 +634,18 @@
 				C6B420A4BE2849FFBF039B1F /* Assets.xcassets */,
 				2B528438D307A5B4FB6EAF1B /* LecternApp.swift */,
 				7F97AE537BCDFB5531BB1B13 /* Anki */,
+				0C951052512B820FB87A6902 /* Automation */,
 				05EB20DE5704A20289CC221B /* Canvas */,
 				E426C66DE1F37069936FFF25 /* Capture */,
 				17E725FBF82619F1FDA7507B /* Domain */,
 				CF5378D30CDC4AF8DE7A02E3 /* Generation */,
 				AE124860DA98C83563657479 /* GoogleDocs */,
+				9684FFC3347E304E6D562848 /* Import */,
 				59E191A58B9B69D04022273F /* ImportExport */,
 				32B2723A56AB6D65DEFBC786 /* Onboarding */,
 				79DF3FC9D9044DFF8596F9CB /* Playback */,
 				EB5FA05316086CBB9824A308 /* Polish */,
+				47E62AF6D84ADFFB56F07C78 /* Sources */,
 				2489DBF6B64B0D74CD8BEA6F /* System */,
 				BF45E89D7A9ABE2958901FAB /* Theme */,
 				42751661E03031911341C0C3 /* Transcription */,
@@ -637,24 +758,48 @@
 				097B599C3CD156F1FE5B4DD1 /* AntigravityACPTests.swift in Sources */,
 				41F9B3478E69F113377A6216 /* AppUpdater.swift in Sources */,
 				E5F1009B3531ED6CA5C9FA57 /* AppUpdaterTests.swift in Sources */,
+				1EEF683B4D263A45FE4E6E94 /* Artifact.swift in Sources */,
 				D850E1E9B74B2D1B0CBF2E16 /* CanvasClient.swift in Sources */,
 				0932FFD48E3317DAB25BAB3C /* CanvasClientTests.swift in Sources */,
 				B1C8626312E7CF92B5F96D1A /* CanvasConnectionSettings.swift in Sources */,
 				A2603490A7FBF8826A31E9C6 /* CanvasHTMLTextCache.swift in Sources */,
 				64D1BB7B2C4864F6221429AE /* CanvasHTMLTextCacheTests.swift in Sources */,
+				76DFF5C7F10FCD387528F6F2 /* ChatMessage.swift in Sources */,
 				5F48CA518FE926E6F2B01953 /* CompletionNotificationTests.swift in Sources */,
 				B0183D74ECA0C677FCFD815A /* CompletionNotifier.swift in Sources */,
+				5D4CA351DF51CD0C2C7A4A92 /* Course.swift in Sources */,
 				2D3FB854C9E2918F5BEC2FF6 /* Enums.swift in Sources */,
 				B5E2B6A82B90454D78C45EA4 /* ExportAvailabilityTests.swift in Sources */,
 				C2044C6A831C4420526C5F27 /* ExternalTranscriptionEngine.swift in Sources */,
+				EC4B65F5362499EFD336E511 /* Flashcard.swift in Sources */,
+				1E2C8FDA18A3C566CC1F9976 /* LaunchAtLoginManager.swift in Sources */,
 				C8BD1E39D756D4404C06735D /* LecternBundleOptions.swift in Sources */,
+				7C610F4D8A2312A5F9CAF0E6 /* Lecture.swift in Sources */,
 				45CD9772D6C4F694F70ECC83 /* LectureExportAvailability.swift in Sources */,
+				0BE6A96BF3F7762C36D2F872 /* LiveBookmark.swift in Sources */,
 				8ADBECF8CDB31C153F5376F3 /* NotesMarkdown.swift in Sources */,
 				AAF12042D3F7E714EF8264E3 /* NotesMarkdownConverter.swift in Sources */,
 				59CF92FA7A12C257DE19A5CC /* NotesMarkdownTests.swift in Sources */,
 				43DAF4C03E006BEDC9ED2DA3 /* Prompts.swift in Sources */,
+				E1C18D234B3A145B2B4F7D16 /* QuizItem.swift in Sources */,
+				9057CF2BC820828797889158 /* Recording.swift in Sources */,
+				4C70DDFDC829C92E73B9E5C1 /* ReferenceAttachment.swift in Sources */,
+				EDBE348219FB004D97CA1195 /* RemoteAudioDownloader.swift in Sources */,
+				2A385138F07C43270952BCF4 /* ShiurAutomationItem.swift in Sources */,
+				1FD0871A05C063F20BD535DB /* ShiurSourceProvider.swift in Sources */,
+				64DD4C5F7F480DCF741D86E4 /* ShiurSubscription.swift in Sources */,
 				13DA820854CD0648709719F9 /* TranscriptionProviderTests.swift in Sources */,
 				534F2F824A5B4CE43A3C1995 /* TranscriptionProviders.swift in Sources */,
+				79A6A6E0658A39BDDB91CF63 /* YUTorahFuzzyMatcher.swift in Sources */,
+				EBC4E12AA8D9064BD96F9A94 /* YUTorahMediaResolver.swift in Sources */,
+				955C2C8A4948BF5F7DAF00A5 /* YUTorahModels.swift in Sources */,
+				79575C2E141B111B720DE15C /* YUTorahRSSParser.swift in Sources */,
+				25E0EBCA6B9B36768A41F813 /* YUTorahSearchIndex.swift in Sources */,
+				924578050CE064AB1D124E3D /* YUTorahSearchParser.swift in Sources */,
+				48C206E7348E4166EF00D67E /* YUTorahSearchService.swift in Sources */,
+				C07E616910691BA0DEA41D51 /* YUTorahSourceProvider.swift in Sources */,
+				21DE24DB5F083149A51666C0 /* YUTorahSubscriptionTests.swift in Sources */,
+				29E1DD5CA82422CA54C9A6F8 /* YUTorahURLResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -671,6 +816,7 @@
 				8B4271F2568269D617E665C4 /* AntigravityACPClient.swift in Sources */,
 				5BA88FED8AAA4DF17E087287 /* AppUpdater.swift in Sources */,
 				9FF80456F18EBE4D84A834F3 /* Artifact.swift in Sources */,
+				2E10D203EDA55E68A2CCF5D7 /* AutomationScheduler.swift in Sources */,
 				246D6AABE4A01260E36A1011 /* CanvasClient.swift in Sources */,
 				A8E36437D00550E10D9FC228 /* CanvasConnectionSettings.swift in Sources */,
 				81D17F0E685C57F8F22C00AF /* CanvasHTMLTextCache.swift in Sources */,
@@ -702,6 +848,7 @@
 				AD86591E3E90890763F6171D /* GoogleDocsError.swift in Sources */,
 				93D3161AC57DF8C49442C3CB /* GoogleDocsNotesBar.swift in Sources */,
 				6E93D4DC8C530BC4C5472563 /* GoogleDocsSyncService.swift in Sources */,
+				3D5844BEFB098FE7713F88B8 /* LaunchAtLoginManager.swift in Sources */,
 				6A84AD8F988068C3C6298016 /* LecternApp.swift in Sources */,
 				CC81062C168BF06111E4201E /* LecternBundleOptions.swift in Sources */,
 				6F51FC24AF770F80FDB1414E /* LecternBundleService.swift in Sources */,
@@ -716,6 +863,7 @@
 				9265B1AAA24271D2A4BD864F /* LectureExportAvailability+Lecture.swift in Sources */,
 				14A64BE39ED16C6072DBDFAE /* LectureExportAvailability.swift in Sources */,
 				C1DAB0243278C6B8217FAAE8 /* LectureImportPicker.swift in Sources */,
+				87D749F58B1B9A6848DD93E5 /* LectureImportService.swift in Sources */,
 				34591E3782F5F3B056774DD8 /* LiveBookmark.swift in Sources */,
 				67C2B516005F92253AA7165C /* MainWindowView.swift in Sources */,
 				774E46198FF81D34D8A71C78 /* MenuBarPopoverView.swift in Sources */,
@@ -733,9 +881,17 @@
 				681C224C5CB19823E357C693 /* ReferenceAttachment.swift in Sources */,
 				69E7640296F076134CDA88B9 /* ReferenceMaterialPicker.swift in Sources */,
 				AA06B27A94F72E080521F647 /* ReferenceMaterialService.swift in Sources */,
+				7354896DDC4659DE0B74DC24 /* RemoteAudioDownloader.swift in Sources */,
 				BCE33AA022B41C846D00FF1D /* RetentionService.swift in Sources */,
 				DC7FA22084818FFCEA370343 /* SettingsView.swift in Sources */,
+				E9B92244F39EB6A999CF8D7E /* ShiurAutomationItem.swift in Sources */,
+				4E6393AF5E0BF37C9D6B5B2A /* ShiurAutomationService.swift in Sources */,
+				6CEA910FD49F1BE8BB05BCCF /* ShiurImportSheet.swift in Sources */,
+				493DE2F5C28A17C34D2321D0 /* ShiurSourceProvider.swift in Sources */,
+				60DEBBDDA8C0AAD05944FE97 /* ShiurSubscription.swift in Sources */,
 				3206F5441BC4F454A71C813C /* StatusBarController.swift in Sources */,
+				C90B7860B0E62A59D4F48341 /* SubscriptionEditorView.swift in Sources */,
+				92E03A9C0B6913F9E5AF308C /* SubscriptionsView.swift in Sources */,
 				E2247E43FA042CD00F6D8F62 /* SuperAppShellView.swift in Sources */,
 				CB51F1710B7BFE7BFED515EE /* SurfacePreferences.swift in Sources */,
 				54CC63CA6BCF1FC7456E54AF /* TranscriptSegment.swift in Sources */,
@@ -745,6 +901,16 @@
 				26B56FA6D70AEFB77DB4E9D4 /* TranscriptionSettingsView.swift in Sources */,
 				73E019E6325643CA84769460 /* UpdatePromptView.swift in Sources */,
 				99CAFA2488E7C92937ACA175 /* WhisperTranscriptionEngine.swift in Sources */,
+				5889A28E7A42B9735C1D84EF /* YUTorahFuzzyMatcher.swift in Sources */,
+				CB7D01FE2F70E7CFBD226E87 /* YUTorahMediaResolver.swift in Sources */,
+				7AE0118F869A861B74F92EEA /* YUTorahModels.swift in Sources */,
+				93D5D015C6492C0F863B1A43 /* YUTorahRSSParser.swift in Sources */,
+				C755955D46BFA91077FBA354 /* YUTorahSearchIndex.swift in Sources */,
+				A3BC7627B74D9C21AD305CB6 /* YUTorahSearchParser.swift in Sources */,
+				7AC8FBC32E220BCAA9FD7A42 /* YUTorahSearchService.swift in Sources */,
+				3A311861A383C1A19E41C813 /* YUTorahSearchView.swift in Sources */,
+				132314727F2516A98C2FD7BD /* YUTorahSourceProvider.swift in Sources */,
+				3B229318FCE4EA4E30F22A67 /* YUTorahURLResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -771,6 +937,7 @@
 				CURRENT_PROJECT_VERSION = 9;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.3.3;
+				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
 			};
@@ -782,6 +949,7 @@
 				CURRENT_PROJECT_VERSION = 9;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.3.3;
+				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
 			};

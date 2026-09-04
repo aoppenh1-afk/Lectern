@@ -36,6 +36,9 @@ final class Course {
     @Relationship(deleteRule: .cascade, inverse: \ReferenceAttachment.course)
     var attachments: [ReferenceAttachment] = []
 
+    @Relationship(deleteRule: .nullify, inverse: \ShiurSubscription.course)
+    var subscriptions: [ShiurSubscription] = []
+
     init(name: String, colorHex: String, language: LectureLanguage = .english) {
         self.name = name
         self.colorHex = colorHex

@@ -64,46 +64,21 @@ final class CaptureController {
     /// Imports an existing audio file as a lecture. Transcription starts only
     /// when the user requests it from the lecture.
     func importAudio(at sourceURL: URL, into course: Course?, language: LectureLanguage? = nil) throws {
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: sourceURL.path) else {
-            throw CaptureError.importFailed("The file couldn't be found.")
-        }
-
-        let stamp = Self.fileStampFormatter.string(from: Date())
-        let destinationURL = recordingsDirectory
-            .appendingPathComponent("Imported \(stamp).\(sourceURL.pathExtension)")
-
-        do {
-            try fileManager.copyItem(at: sourceURL, to: destinationURL)
-        } catch {
-            throw CaptureError.importFailed("Couldn't copy the audio file: \(error.localizedDescription)")
-        }
-
-        let audioFile = try? AVAudioFile(forReading: destinationURL)
-        guard let audioFile else {
-            try? fileManager.removeItem(at: destinationURL)
-            throw CaptureError.importFailed("This file isn't readable audio.")
-        }
-
-        let duration = Double(audioFile.length) / audioFile.processingFormat.sampleRate
-        let attributes = try? destinationURL.resourceValues(forKeys: [.fileSizeKey])
-        let sizeBytes = Int64(attributes?.fileSize ?? 0)
-        let capturedAt = (try? sourceURL.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? Date()
-        let title = sourceURL.deletingPathExtension().lastPathComponent
-
-        persistLecture(startedAt: capturedAt,
-                       duration: duration,
-                       fileURL: destinationURL,
-                       sizeBytes: sizeBytes,
-                       course: course,
-                       language: language ?? course?.language ?? .english,
-                       title: title)
+        try importService.importAudio(
+            from: sourceURL,
+            metadata: .init(
+                course: course,
+                language: language
+            ),
+            moveSource: false
+        )
     }
 
     private let modelContainer: ModelContainer
     private let engine = AVAudioEngine()
     private let recordingsDirectory: URL
     private let recordingLedger: RecordingFileLedger
+    private let importService: LectureImportService
 
     private var pipeline: CapturePipeline?
     private var activeCourse: Course?
@@ -115,6 +90,7 @@ final class CaptureController {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         recordingsDirectory = support.appendingPathComponent("Lectern/Recordings", isDirectory: true)
         recordingLedger = RecordingFileLedger(recordingsDirectory: recordingsDirectory)
+        importService = LectureImportService(modelContainer: modelContainer, recordingsDirectory: recordingsDirectory)
 
         try? FileManager.default.createDirectory(at: recordingsDirectory,
                                                 withIntermediateDirectories: true)
