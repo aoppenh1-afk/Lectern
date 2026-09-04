@@ -124,7 +124,7 @@ struct NotesListScanner {
     private var indentWidths: [Int] = []
     private var ordinals: [Int] = []
 
-    private static let headingPattern = try! NSRegularExpression(pattern: #"^#{1,6}\s+"#)
+    private static let headingPattern = try! NSRegularExpression(pattern: #"^#{1,6}\s*"#)
 
     init() {}
 

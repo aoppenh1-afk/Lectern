@@ -27,8 +27,17 @@ final class NotesMarkdownTests: XCTestCase {
         XCTAssertEqual(scanner.scan("    - b")?.depth, 1)
         XCTAssertNil(scanner.scan("## Next topic"))
         XCTAssertEqual(scanner.scan("    - c")?.depth, 0, "A heading resets nesting.")
+        XCTAssertNil(scanner.scan("#UPDATES"), "A heading without space also ends the list.")
+        XCTAssertEqual(scanner.scan("    - c2")?.depth, 0, "A heading resets nesting.")
         XCTAssertNil(scanner.scan("Plain paragraph"))
         XCTAssertEqual(scanner.scan("        - d")?.depth, 0, "A flush-left paragraph resets nesting.")
+    }
+
+    func testHeadingWithoutSpaceMatchesHeading() {
+        let plan = NotesMarkdownConverter.plan(markdown: "#UPDATES\n- item 1\n##FIXES\n- item 2")
+        XCTAssertEqual(plan.headingRanges.count, 2)
+        XCTAssertEqual(plan.headingRanges[0].level, 1)
+        XCTAssertEqual(plan.headingRanges[1].level, 2)
     }
 
     func testOrderedItemsGetDecimalAlphaRomanLabelsByDepth() {

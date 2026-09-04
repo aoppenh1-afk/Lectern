@@ -222,11 +222,11 @@ enum NotesMarkdownConverter {
     }
 
     private static func headingMatch(_ line: String) -> (level: Int, text: String)? {
-        guard let regex = try? NSRegularExpression(pattern: #"^(#{1,6})\s+(.*)$"#),
+        guard let regex = try? NSRegularExpression(pattern: #"^(#{1,6})\s*(.*)$"#),
               let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
               let marks = Range(match.range(at: 1), in: line),
               let text = Range(match.range(at: 2), in: line) else { return nil }
-        return (line[marks].count, String(line[text]))
+        return (line[marks].count, String(line[text]).trimmingCharacters(in: .whitespaces))
     }
 
     private static func stripQuote(_ line: String) -> String {

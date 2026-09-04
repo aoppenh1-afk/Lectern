@@ -25,10 +25,7 @@ struct UpdatePromptView: View {
 
             if !release.notes.isEmpty {
                 ScrollView {
-                    Text(release.notes)
-                        .font(.system(size: 12))
-                        .foregroundStyle(LecternTheme.ink)
-                        .textSelection(.enabled)
+                    NotesContentView(markdown: release.notes, isCompact: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
                 }

@@ -16,7 +16,7 @@ enum NoteBlockParser {
         case image(URL)
     }
 
-    private static let headingPattern = try! NSRegularExpression(pattern: #"^(#{1,6})\s+(.+)$"#)
+    private static let headingPattern = try! NSRegularExpression(pattern: #"^(#{1,6})\s*(.+)$"#)
     private static let quotePattern = try! NSRegularExpression(pattern: #"^>\s?(.*)$"#)
     private static let dividerPattern = try! NSRegularExpression(pattern: #"^(-{3,}|\*{3,}|_{3,})$"#)
 
@@ -105,7 +105,7 @@ enum NoteBlockParser {
                       let content = Range(match.range(at: 2), in: line) {
                 flushParagraph()
                 lists.reset()
-                blocks.append(.heading(level: line[hashes].count, content: String(line[content])))
+                blocks.append(.heading(level: line[hashes].count, content: String(line[content]).trimmingCharacters(in: .whitespaces)))
             } else if let item = lists.scan(rawLine) {
                 flushParagraph()
                 switch item.marker {
@@ -130,9 +130,10 @@ enum NoteBlockParser {
 /// Renders parsed note blocks; diagrams go through the offline renderer.
 struct NotesContentView: View {
     let markdown: String
+    var isCompact: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: isCompact ? 4 : 6) {
             ForEach(Array(NoteBlockParser.parse(markdown: markdown).enumerated()), id: \.offset) { _, block in
                 blockView(block)
             }
@@ -144,24 +145,24 @@ struct NotesContentView: View {
         switch block {
         case .text(let content):
             inlineMarkdown(content)
-                .font(.system(size: 13))
-                .lineSpacing(4)
+                .font(.system(size: isCompact ? 12 : 13))
+                .lineSpacing(isCompact ? 2 : 4)
                 .textSelection(.enabled)
 
         case .heading(let level, let content):
             inlineMarkdown(content)
                 .font(.system(size: headingSize(level), weight: .bold, design: .serif))
-                .padding(.top, level <= 2 ? 10 : 6)
+                .padding(.top, headingTopPadding(level))
                 .textSelection(.enabled)
 
         case .bullet(let depth, let content):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(bulletGlyph(depth))
-                    .font(.system(size: 13))
+                    .font(.system(size: isCompact ? 12 : 13))
                     .foregroundStyle(.secondary)
                 inlineMarkdown(content)
-                    .font(.system(size: 13))
-                    .lineSpacing(4)
+                    .font(.system(size: isCompact ? 12 : 13))
+                    .lineSpacing(isCompact ? 2 : 4)
                     .textSelection(.enabled)
             }
             .padding(.leading, listIndent(depth))
@@ -169,12 +170,12 @@ struct NotesContentView: View {
         case .numbered(let depth, let label, let content):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(label)
-                    .font(.system(size: 13, weight: .medium).monospacedDigit())
+                    .font(.system(size: isCompact ? 12 : 13, weight: .medium).monospacedDigit())
                     .foregroundStyle(.secondary)
                     .frame(minWidth: 18, alignment: .trailing)
                 inlineMarkdown(content)
-                    .font(.system(size: 13))
-                    .lineSpacing(4)
+                    .font(.system(size: isCompact ? 12 : 13))
+                    .lineSpacing(isCompact ? 2 : 4)
                     .textSelection(.enabled)
             }
             .padding(.leading, listIndent(depth))
@@ -185,9 +186,9 @@ struct NotesContentView: View {
                     .fill(LecternTheme.accent.opacity(0.5))
                     .frame(width: 2)
                 inlineMarkdown(content)
-                    .font(.system(size: 13).italic())
+                    .font(.system(size: isCompact ? 12 : 13).italic())
                     .foregroundStyle(.secondary)
-                    .lineSpacing(4)
+                    .lineSpacing(isCompact ? 2 : 4)
                     .textSelection(.enabled)
             }
             .padding(.vertical, 2)
@@ -196,7 +197,7 @@ struct NotesContentView: View {
             Rectangle()
                 .fill(LecternTheme.hairline)
                 .frame(height: 1)
-                .padding(.vertical, 8)
+                .padding(.vertical, isCompact ? 4 : 8)
 
         case .diagram(let code):
             DiagramBlockView(code: code)
@@ -206,7 +207,7 @@ struct NotesContentView: View {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: 520)
+                    .frame(maxWidth: isCompact ? 380 : 520)
                     .clipShape(RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous)
@@ -222,7 +223,7 @@ struct NotesContentView: View {
     }
 
     private func listIndent(_ depth: Int) -> CGFloat {
-        CGFloat(min(depth, 7)) * 20
+        CGFloat(min(depth, 7)) * (isCompact ? 14 : 20)
     }
 
     private func bulletGlyph(_ depth: Int) -> String {
@@ -234,11 +235,27 @@ struct NotesContentView: View {
     }
 
     private func headingSize(_ level: Int) -> CGFloat {
-        switch level {
-        case 1: return 20
-        case 2: return 17
-        case 3: return 15
-        default: return 14
+        if isCompact {
+            switch level {
+            case 1: return 14
+            case 2: return 13
+            default: return 12
+            }
+        } else {
+            switch level {
+            case 1: return 20
+            case 2: return 17
+            case 3: return 15
+            default: return 14
+            }
+        }
+    }
+
+    private func headingTopPadding(_ level: Int) -> CGFloat {
+        if isCompact {
+            return level <= 2 ? 6 : 3
+        } else {
+            return level <= 2 ? 10 : 6
         }
     }
 
