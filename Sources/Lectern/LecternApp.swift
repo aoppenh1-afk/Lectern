@@ -187,6 +187,7 @@ struct LecternApp: App {
     var body: some Scene {
         WindowGroup(id: "main") {
             SuperAppShellView()
+                .ignoresSafeArea()
                 .environment(captureController)
                 .environment(transcriptionPreferences)
                 .environment(transcriptionService)
@@ -211,7 +212,7 @@ struct LecternApp: App {
                 }
         }
         .modelContainer(container)
-        .windowToolbarStyle(.unified)
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {

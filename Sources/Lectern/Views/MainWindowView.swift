@@ -54,8 +54,7 @@ struct MainWindowView: View {
                 detailPane
             }
         }
-        .background(LecternTheme.paper)
-        .navigationTitle("Lectern")
+        .background(LecternTheme.panelFill)
         .task {
             if selection == nil {
                 selection = visibleCourses.first.map { SidebarSelection.course($0) } ?? .unfiled
@@ -291,7 +290,7 @@ struct MainWindowView: View {
             Spacer()
         }
         .frame(width: 244)
-        .background(LecternTheme.paperDeep)
+        .background(LecternTheme.panelFill)
     }
 
     private var searchField: some View {
@@ -317,7 +316,11 @@ struct MainWindowView: View {
         .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(0.05))
+                .fill(LecternTheme.canvasCard)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(LecternTheme.hairline, lineWidth: 1)
         )
     }
 
@@ -337,7 +340,7 @@ struct MainWindowView: View {
                     )
                 Text("Unfiled")
                     .font(.system(size: 12.5, weight: selection == .unfiled ? .semibold : .regular))
-                    .foregroundStyle(LecternTheme.ink)
+                    .foregroundStyle(selection == .unfiled ? LecternTheme.sidebarSelectedText : LecternTheme.ink)
                 Spacer()
                 Text("\(lectures.filter(\.isUnfiled).count)")
                     .font(.system(size: 11).monospacedDigit())
@@ -347,7 +350,7 @@ struct MainWindowView: View {
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(selection == .unfiled ? LecternTheme.accent.opacity(0.10) : Color.clear)
+                    .fill(selection == .unfiled ? LecternTheme.sidebarSelectedFill : Color.clear)
             )
             .padding(.horizontal, 8)
             .contentShape(Rectangle())
@@ -372,7 +375,7 @@ struct MainWindowView: View {
                     )
                 Text(course.name)
                     .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(LecternTheme.ink)
+                    .foregroundStyle(isSelected ? LecternTheme.sidebarSelectedText : LecternTheme.ink)
                     .lineLimit(1)
                 Spacer()
                 Text("\(course.lectures.count)")
@@ -383,7 +386,7 @@ struct MainWindowView: View {
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isSelected ? LecternTheme.accent.opacity(0.10) : Color.clear)
+                    .fill(isSelected ? LecternTheme.sidebarSelectedFill : Color.clear)
             )
             .padding(.horizontal, 8)
             .contentShape(Rectangle())
@@ -608,7 +611,7 @@ struct MainWindowView: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isSelected ? LecternTheme.accent.opacity(0.10) : Color.clear)
+                    .fill(isSelected ? LecternTheme.sidebarSelectedFill : Color.clear)
             )
             .contentShape(Rectangle())
         }
@@ -746,7 +749,11 @@ struct MainWindowView: View {
                     .id(selectedLecture.persistentModelID)
             }
         } else if showingCourseSynthesis, let selectedCourse {
-            CourseSynthesisView(course: selectedCourse) {
+            CourseSynthesisView(
+                course: selectedCourse,
+                availableCourses: [],
+                selectedCourseID: .constant(nil)
+            ) {
                 courseSynthesis.cancel()
                 withAnimation(LecternTheme.standardAnimation) {
                     showingCourseSynthesis = false

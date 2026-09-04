@@ -17,14 +17,27 @@ struct CourseSynthesisView: View {
     @Query private var canvasAnnouncements: [CanvasAnnouncement]
     @Query(sort: \Lecture.capturedAt, order: .reverse) private var allLectures: [Lecture]
     @Bindable var course: Course
+    let availableCourses: [Course]
+    @Binding var selectedCourseID: PersistentIdentifier?
     let onClose: () -> Void
+
+    init(
+        course: Course,
+        availableCourses: [Course] = [],
+        selectedCourseID: Binding<PersistentIdentifier?>,
+        onClose: @escaping () -> Void
+    ) {
+        self.course = course
+        self.availableCourses = availableCourses
+        self._selectedCourseID = selectedCourseID
+        self.onClose = onClose
+    }
 
     @State private var selectedLectureIDs: Set<PersistentIdentifier> = []
     @State private var selectedCanvasSourceLabels: Set<String> = []
     @State private var selectedAttachmentIDs: Set<PersistentIdentifier> = []
     @State private var selectedResourceKeys: Set<String> = []
     @State private var sourcesCollapsed = false
-    @State private var sourcesManaging = false
     @State private var lecturesExpanded = true
     @State private var canvasExpanded = true
     @State private var attachmentsExpanded = true
@@ -152,106 +165,15 @@ struct CourseSynthesisView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            VStack(spacing: 0) {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        if synthesis.turns.isEmpty && !synthesis.isResponding && synthesis.pendingQuestion == nil {
-                            ContentUnavailableView(
-                                "Ask across the course",
-                                systemImage: "books.vertical",
-                                description: Text("Compare lectures or build a study guide from the selected material.")
-                            ).padding(.top, 60)
-                        } else {
-                            VStack(alignment: .leading, spacing: 16) {
-                                ForEach(synthesis.turns) { turn in
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        HStack { Spacer(minLength: 80); Text(turn.question).font(.system(size: 12.5, weight: .medium)).padding(.horizontal, 14).padding(.vertical, 10).background(LecternTheme.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 16)) }
-                                        HStack(alignment: .top, spacing: 12) {
-                                            assistantBadge
-                                            VStack(alignment: .leading, spacing: 8) {
-                                                NotesContentView(markdown: turn.answer).padding(15).background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(LecternTheme.hairline))
-                                                sourceChips
-                                            }
-                                        }
-                                    }
-                                    .id(turn.id)
-                                }
-                                if let pending = synthesis.pendingQuestion {
-                                    HStack { Spacer(minLength: 80); Text(pending).font(.system(size: 12.5, weight: .medium)).padding(.horizontal, 14).padding(.vertical, 10).background(LecternTheme.accent.opacity(0.11), in: RoundedRectangle(cornerRadius: 16)) }
-                                        .id("pending-question")
-                                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                                }
-                                if synthesis.isResponding {
-                                    HStack(alignment: .top, spacing: 12) {
-                                        assistantBadge
-                                        if synthesis.response.isEmpty {
-                                            TypingIndicatorView()
-                                                .padding(15)
-                                                .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 16))
-                                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(LecternTheme.hairline))
-                                        } else {
-                                            VStack(alignment: .leading, spacing: 10) {
-                                                NotesContentView(markdown: synthesis.response)
-                                                    .padding(15)
-                                                    .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 16))
-                                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(LecternTheme.hairline))
-                                                TypingIndicatorView(dotDiameter: 6)
-                                                    .padding(.leading, 8)
-                                            }
-                                        }
-                                    }
-                                    .id("course-typing")
-                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                                }
-                            }
-                            .padding(18)
-                        }
-                    }
-                    .onChange(of: synthesis.turns.count) { _, _ in
-                        withAnimation(LecternTheme.standardAnimation) {
-                            if let last = synthesis.turns.last {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                    .onChange(of: synthesis.pendingQuestion) { _, _ in
-                        withAnimation(LecternTheme.standardAnimation) {
-                            if synthesis.pendingQuestion != nil {
-                                proxy.scrollTo("pending-question", anchor: .bottom)
-                            } else {
-                                proxy.scrollTo("course-typing", anchor: .bottom)
-                            }
-                        }
-                    }
-                    .onChange(of: synthesis.response) { _, _ in
-                        proxy.scrollTo("course-typing", anchor: .bottom)
-                    }
-                }
-                if let error = synthesis.lastError {
-                    Text(error).font(.system(size: 11)).foregroundStyle(.red).padding(.horizontal, 14)
-                }
-                Divider()
-                CourseSynthesisComposer(
-                    profiles: profiles,
-                    selectedProfile: selectedProfile,
-                    modelCatalogs: modelCatalogs,
-                    modelCatalogsLoading: modelCatalogsLoading,
-                    modelLabel: modelLabel,
-                    thinkingLevels: thinkingLevels,
-                    defaultThinkingLevel: selectedModel?.defaultThinkingLevel,
-                    profileID: $profileID,
-                    modelOverride: $modelOverride,
-                    thinkingLevelRaw: $thinkingLevelRaw,
-                    modelPickerOpen: $modelPickerOpen,
-                    thinkingPickerOpen: $thinkingPickerOpen,
-                    onSend: send
-                )
-                .padding(12)
-            }
+        VStack(spacing: 0) {
+            chatHeader
 
-            Divider()
-            sourcesPanel
+            HStack(spacing: 20) {
+                conversationColumn
+                sourcesPanel
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 14)
         }
         .onAppear {
             selectedLectureIDs = Set(course.lectures.map(\.persistentModelID))
@@ -283,6 +205,108 @@ struct CourseSynthesisView: View {
         )) { Button("OK", role: .cancel) {} } message: { Text(importError ?? "") }
     }
 
+    private var conversationColumn: some View {
+        VStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        if synthesis.turns.isEmpty && !synthesis.isResponding && synthesis.pendingQuestion == nil {
+                            greetingCard
+                                .padding(.top, 24)
+                        } else {
+                            VStack(alignment: .leading, spacing: 16) {
+                                ForEach(synthesis.turns) { turn in
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        HStack { Spacer(minLength: 80); Text(turn.question).font(.system(size: 12.5, weight: .medium)).padding(.horizontal, 14).padding(.vertical, 10).background(LecternTheme.chatUserBubble, in: RoundedRectangle(cornerRadius: 16)) }
+                                        HStack(alignment: .top, spacing: 12) {
+                                            assistantBadge
+                                            VStack(alignment: .leading, spacing: 8) {
+                                                NotesContentView(markdown: turn.answer).padding(15).elevatedCard()
+                                                sourceChips
+                                            }
+                                        }
+                                    }
+                                    .id(turn.id)
+                                }
+                                if let pending = synthesis.pendingQuestion {
+                                    HStack { Spacer(minLength: 80); Text(pending).font(.system(size: 12.5, weight: .medium)).padding(.horizontal, 14).padding(.vertical, 10).background(LecternTheme.chatUserBubble, in: RoundedRectangle(cornerRadius: 16)) }
+                                        .id("pending-question")
+                                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                }
+                                if synthesis.isResponding {
+                                    HStack(alignment: .top, spacing: 12) {
+                                        assistantBadge
+                                        if synthesis.response.isEmpty {
+                                            TypingIndicatorView()
+                                                .padding(15)
+                                                .elevatedCard()
+                                        } else {
+                                            VStack(alignment: .leading, spacing: 10) {
+                                                NotesContentView(markdown: synthesis.response)
+                                                    .padding(15)
+                                                    .elevatedCard()
+                                                TypingIndicatorView(dotDiameter: 6)
+                                                    .padding(.leading, 8)
+                                            }
+                                        }
+                                    }
+                                    .id("course-typing")
+                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                }
+                            }
+                            .padding(.vertical, 18)
+                        }
+                    }
+                    .frame(maxWidth: 760)
+                    .frame(maxWidth: .infinity)
+                }
+                .onChange(of: synthesis.turns.count) { _, _ in
+                    withAnimation(LecternTheme.standardAnimation) {
+                        if let last = synthesis.turns.last {
+                            proxy.scrollTo(last.id, anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: synthesis.pendingQuestion) { _, _ in
+                    withAnimation(LecternTheme.standardAnimation) {
+                        if synthesis.pendingQuestion != nil {
+                            proxy.scrollTo("pending-question", anchor: .bottom)
+                        } else {
+                            proxy.scrollTo("course-typing", anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: synthesis.response) { _, _ in
+                    proxy.scrollTo("course-typing", anchor: .bottom)
+                }
+            }
+
+            if let error = synthesis.lastError {
+                Text(error).font(.system(size: 11)).foregroundStyle(.red).padding(.horizontal, 14)
+            }
+
+            CourseSynthesisComposer(
+                profiles: profiles,
+                selectedProfile: selectedProfile,
+                modelCatalogs: modelCatalogs,
+                modelCatalogsLoading: modelCatalogsLoading,
+                modelLabel: modelLabel,
+                thinkingLevels: thinkingLevels,
+                defaultThinkingLevel: selectedModel?.defaultThinkingLevel,
+                profileID: $profileID,
+                modelOverride: $modelOverride,
+                thinkingLevelRaw: $thinkingLevelRaw,
+                modelPickerOpen: $modelPickerOpen,
+                thinkingPickerOpen: $thinkingPickerOpen,
+                onSend: send
+            )
+            .frame(maxWidth: 820)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     @ViewBuilder
     private var sourcesPanel: some View {
         if sourcesCollapsed {
@@ -310,23 +334,31 @@ struct CourseSynthesisView: View {
         } else {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    Text(sourcesManaging ? "Manage sources" : "Sources")
-                        .font(.system(size: 13, weight: .semibold))
+                    Text("Sources")
+                        .font(.system(size: 15, weight: .semibold))
                     Spacer()
-                    if sourcesManaging {
-                        Button("None") { setAllSources(false) }
-                            .buttonStyle(.plain).font(.system(size: 10.5)).foregroundStyle(.secondary)
-                        Button("All") { setAllSources(true) }
-                            .buttonStyle(.plain).font(.system(size: 10.5, weight: .medium))
-                    } else {
-                        Text("\(selectedSourceCount) selected")
-                            .font(.system(size: 9.5)).foregroundStyle(.secondary)
+                    Menu {
+                        Button("Select all sources") { setAllSources(true) }
+                        Button("Clear selection") { setAllSources(false) }
+                    } label: {
+                        Image(systemName: "square.grid.2x2")
+                            .font(.system(size: 12, weight: .medium))
+                            .frame(width: 28, height: 28)
+                            .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(LecternTheme.hairline))
                     }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+
+                    Text("\(selectedSourceCount) selected")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) { sourcesCollapsed = true }
                     } label: {
-                        Image(systemName: "sidebar.right")
-                            .font(.system(size: 12, weight: .medium))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
                             .frame(width: 24, height: 24)
                     }
                     .buttonStyle(.plain)
@@ -337,122 +369,51 @@ struct CourseSynthesisView: View {
 
                 Divider()
 
-                if sourcesManaging {
-                    sourceManager
-                } else {
-                    selectedSourcesSummary
-                }
+                sourceManager
 
-                Divider()
-
-                if sourcesManaging {
-                    HStack(spacing: 8) {
-                        Button {
-                            showingImporter = true
-                        } label: {
-                            Label("Add notes or slides", systemImage: "plus")
-                                .frame(maxWidth: .infinity)
-                        }
-                        Button("Done") {
-                            withAnimation(.easeInOut(duration: 0.18)) { sourcesManaging = false }
-                        }
-                        .keyboardShortcut(.defaultAction)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    .padding(14)
-                } else {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.18)) { sourcesManaging = true }
-                    } label: {
-                        Text("Manage sources")
-                            .font(.system(size: 11.5, weight: .medium))
-                            .foregroundStyle(LecternTheme.accent)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 34)
-                    }
-                    .buttonStyle(.plain)
-                    .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(LecternTheme.hairline))
-                    .padding(14)
+                Button {
+                    showingImporter = true
+                } label: {
+                    Label("Add notes or slides", systemImage: "plus")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(LecternTheme.ink)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 34)
                 }
+                .buttonStyle(.plain)
+                .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(LecternTheme.hairline))
+                .shadow(color: Color.black.opacity(0.05), radius: 8, y: 2)
+                .padding(14)
             }
-            .frame(width: 340)
+            .panelCard(cornerRadius: 16)
+            .frame(width: 360)
         }
     }
 
-    private var selectedSourcesSummary: some View {
+    private var sourceManager: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                if selectedSourceCount == 0 {
+                if hasNoSources {
                     VStack(spacing: 8) {
                         Image(systemName: "books.vertical")
                             .font(.system(size: 24, weight: .light))
                             .foregroundStyle(.tertiary)
-                        Text("No sources selected")
+                        Text("No sources yet")
                             .font(.system(size: 11.5, weight: .medium))
-                        Text("Choose the lectures, files, and Canvas material this chat should use.")
+                        Text("Add notes or slides below, or sync Canvas material to give this chat something to use.")
                             .font(.system(size: 10.5))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 24)
-                    .padding(.top, 40)
+                    .padding(.vertical, 40)
                 }
 
-                if !selectedLectures.isEmpty {
-                    sourceSummarySection(title: "Lectures", count: selectedLectures.count, isExpanded: $lecturesExpanded) {
-                        ForEach(selectedLectures.sorted(by: { $0.capturedAt < $1.capturedAt })) { lecture in
-                            sourceSummaryRow(
-                                icon: "waveform",
-                                title: lecture.title,
-                                subtitle: "Recovered · \(lecture.capturedAt.formatted(date: .abbreviated, time: .shortened))"
-                            )
-                        }
-                    }
-                }
-
-                if !selectedCanvasSummarySources.isEmpty {
-                    sourceSummarySection(title: "Canvas resources", count: selectedCanvasSummarySources.count, isExpanded: $canvasExpanded) {
-                        ForEach(selectedCanvasSummarySources, id: \.label) { source in
-                            sourceSummaryRow(icon: "checkmark", title: source.label, subtitle: "Included")
-                        }
-                    }
-                }
-
-                if !selectedAttachments.isEmpty {
-                    sourceSummarySection(title: "Course files", count: selectedAttachments.count, isExpanded: $attachmentsExpanded) {
-                        ForEach(selectedAttachments) { attachment in
-                            sourceSummaryRow(
-                                icon: attachment.kind == .pdf ? "doc.richtext" : "doc.text",
-                                title: attachment.name,
-                                subtitle: "Included course file"
-                            )
-                        }
-                    }
-                }
-
-                if !selectedResourceReferences.isEmpty {
-                    sourceSummarySection(title: "Course resources", count: selectedResourceReferences.count, isExpanded: $resourcesExpanded) {
-                        ForEach(courseCanvasResources.filter { selectedResourceKeys.contains($0.syncKey) }) { resource in
-                            sourceSummaryRow(icon: "doc", title: resource.title, subtitle: resource.moduleName)
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 4)
-        }
-    }
-
-    private var sourceManager: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
                 if !candidateLectures.isEmpty {
                     sourceSection(
                         title: "Lectures",
-                        icon: "waveform",
                         selectedCount: selectedLectures.count,
                         totalCount: candidateLectures.count,
                         isExpanded: $lecturesExpanded
@@ -465,9 +426,16 @@ struct CourseSynthesisView: View {
                                     else { selectedLectureIDs.remove(lecture.persistentModelID) }
                                 }
                             )) {
-                                Text(lecture.title).font(.system(size: 10.5)).lineLimit(2)
+                                HStack(spacing: 9) {
+                                    SourceRowIcon(icon: "doc.text", tint: .blue)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(lecture.title).font(.system(size: 11.5, weight: .medium)).lineLimit(1)
+                                        Text("Recovered · \(lecture.capturedAt.formatted(date: .abbreviated, time: .shortened))")
+                                            .font(.system(size: 9.5)).foregroundStyle(.secondary).lineLimit(1)
+                                    }
+                                }
                             }
-                            .toggleStyle(.checkbox)
+                            .toggleStyle(CircleCheckToggleStyle())
                         }
                     }
                 }
@@ -475,7 +443,6 @@ struct CourseSynthesisView: View {
                 if !canvasSources.isEmpty {
                     sourceSection(
                         title: "Canvas data",
-                        icon: "building.columns",
                         selectedCount: selectedCanvasSummarySources.count,
                         totalCount: canvasSources.count,
                         isExpanded: $canvasExpanded
@@ -488,9 +455,16 @@ struct CourseSynthesisView: View {
                                     else { selectedCanvasSourceLabels.remove(source.label) }
                                 }
                             )) {
-                                Text(source.label).font(.system(size: 10.5)).lineLimit(2)
+                                HStack(spacing: 9) {
+                                    SourceRowIcon(icon: "building.columns", tint: .blue)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(source.label).font(.system(size: 11.5, weight: .medium)).lineLimit(1)
+                                        Text(selectedCanvasSourceLabels.contains(source.label) ? "Included" : "Not included")
+                                            .font(.system(size: 9.5)).foregroundStyle(.secondary).lineLimit(1)
+                                    }
+                                }
                             }
-                            .toggleStyle(.checkbox)
+                            .toggleStyle(CircleCheckToggleStyle())
                         }
                     }
                 }
@@ -498,7 +472,6 @@ struct CourseSynthesisView: View {
                 if !course.attachments.isEmpty {
                     sourceSection(
                         title: "Course files",
-                        icon: "paperclip",
                         selectedCount: selectedAttachments.count,
                         totalCount: course.attachments.count,
                         isExpanded: $attachmentsExpanded
@@ -511,10 +484,16 @@ struct CourseSynthesisView: View {
                                     else { selectedAttachmentIDs.remove(attachment.persistentModelID) }
                                 }
                             )) {
-                                Label(attachment.name, systemImage: attachment.kind == .pdf ? "doc.richtext" : "doc.text")
-                                    .font(.system(size: 10.5)).lineLimit(2)
+                                HStack(spacing: 9) {
+                                    SourceRowIcon(
+                                        icon: attachmentRowIcon(for: attachment.kind),
+                                        tint: attachmentRowTint(for: attachment.kind)
+                                    )
+                                    Text(attachment.name)
+                                        .font(.system(size: 11.5)).lineLimit(2)
+                                }
                             }
-                            .toggleStyle(.checkbox)
+                            .toggleStyle(CircleCheckToggleStyle())
                         }
                     }
                 }
@@ -522,7 +501,6 @@ struct CourseSynthesisView: View {
                 if !courseCanvasResources.isEmpty {
                     sourceSection(
                         title: "Course resources",
-                        icon: "folder",
                         selectedCount: selectedResourceKeys.count,
                         totalCount: courseCanvasResources.count,
                         isExpanded: $resourcesExpanded
@@ -540,80 +518,56 @@ struct CourseSynthesisView: View {
                     }
                 }
             }
-            .padding(12)
         }
     }
 
-    private func sourceSummarySection<Content: View>(title: String,
-                                                      count: Int,
-                                                      isExpanded: Binding<Bool>,
-                                                      @ViewBuilder content: @escaping () -> Content) -> some View {
-        DisclosureGroup(isExpanded: isExpanded) {
-            VStack(alignment: .leading, spacing: 0) { content() }
-                .padding(.bottom, 12)
-        } label: {
-            HStack(spacing: 7) {
-                Text(title).font(.system(size: 11.5, weight: .semibold))
-                Text("\(count)")
-                    .font(.system(size: 9).monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            .padding(.vertical, 12)
-        }
-        .overlay(alignment: .bottom) { Divider() }
-    }
-
-    private func sourceSummaryRow(icon: String, title: String, subtitle: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Circle()
-                .fill(LecternTheme.accent.opacity(0.10))
-                .frame(width: 26, height: 26)
-                .overlay(
-                    Image(systemName: icon)
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(LecternTheme.accent)
-                )
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 10.75, weight: .medium))
-                    .lineLimit(2)
-                Text(subtitle)
-                    .font(.system(size: 9.5))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, 7)
+    private var hasNoSources: Bool {
+        candidateLectures.isEmpty
+            && canvasSources.isEmpty
+            && course.attachments.isEmpty
+            && courseCanvasResources.isEmpty
     }
 
     private func sourceSection<Content: View>(title: String,
-                                              icon: String,
                                               selectedCount: Int,
                                               totalCount: Int,
                                               isExpanded: Binding<Bool>,
                                               @ViewBuilder content: @escaping () -> Content) -> some View {
-        DisclosureGroup(isExpanded: isExpanded) {
-            VStack(alignment: .leading, spacing: 8) { content() }
-                .padding(.top, 8)
-                .padding(.leading, 5)
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(LecternTheme.accent)
-                    .frame(width: 18)
-                Text(title).font(.system(size: 11.5, weight: .semibold))
-                Spacer()
-                Text("\(selectedCount)/\(totalCount)")
-                    .font(.system(size: 9.5).monospacedDigit())
-                    .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            DisclosureGroup(isExpanded: isExpanded) {
+                VStack(alignment: .leading, spacing: 10) { content() }
+                    .padding(.top, 10)
+            } label: {
+                HStack(spacing: 7) {
+                    Text(title).font(.system(size: 12.5, weight: .semibold))
+                    Spacer()
+                    Text("\(selectedCount)/\(totalCount)")
+                        .font(.system(size: 10).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.12), in: Capsule())
+                }
             }
+            .tint(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            Divider()
         }
-        .padding(10)
-        .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 9))
-        .overlay(RoundedRectangle(cornerRadius: 9).stroke(LecternTheme.hairline))
+    }
+
+    private func attachmentRowIcon(for kind: ReferenceAttachmentKind) -> String {
+        switch kind {
+        case .pdf, .word: return "doc.richtext"
+        case .markdown, .text: return "doc.text"
+        }
+    }
+
+    private func attachmentRowTint(for kind: ReferenceAttachmentKind) -> Color {
+        switch kind {
+        case .pdf: return .red
+        case .word, .markdown, .text: return .blue
+        }
     }
 
     private func resourceModuleSection(_ group: ResourceModuleGroup) -> some View {
@@ -633,12 +587,18 @@ struct CourseSynthesisView: View {
                             else { selectedResourceKeys.remove(resource.syncKey) }
                         }
                     )) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(resource.title).font(.system(size: 10.5)).lineLimit(2)
-                            Text(resource.kind).font(.system(size: 9)).foregroundStyle(.secondary)
+                        HStack(spacing: 9) {
+                            SourceRowIcon(
+                                icon: resource.kind.lowercased().contains("pdf") ? "doc.richtext" : "doc.text",
+                                tint: resource.kind.lowercased().contains("pdf") ? .red : .blue
+                            )
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(resource.title).font(.system(size: 11.5)).lineLimit(2)
+                                Text(resource.kind).font(.system(size: 9.5)).foregroundStyle(.secondary)
+                            }
                         }
                     }
-                    .toggleStyle(.checkbox)
+                    .toggleStyle(CircleCheckToggleStyle())
                 }
             }
             .padding(.top, 7)
@@ -685,9 +645,79 @@ struct CourseSynthesisView: View {
         }
     }
 
+    private var chatHeader: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(LecternTheme.canvasCard)
+                .frame(width: 34, height: 34)
+                .overlay(Circle().strokeBorder(LecternTheme.hairline, lineWidth: 1))
+                .overlay(
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(LecternTheme.accent)
+                )
+                .shadow(color: Color.black.opacity(0.05), radius: 5, y: 1)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("AI Assistant")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(LecternTheme.accent)
+                Text("Ask across lectures and course files.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if !courseOptions.isEmpty {
+                StudioDropdown(
+                    title: "Course",
+                    selection: Binding(
+                        get: { selectedCourseID ?? course.persistentModelID },
+                        set: { selectedCourseID = $0 }
+                    ),
+                    options: courseOptions,
+                    width: 300,
+                    icon: "book.closed"
+                )
+            }
+        }
+        .padding(.horizontal, 32)
+        .padding(.vertical, 22)
+    }
+
+    private var courseOptions: [StudioDropdownOption<PersistentIdentifier?>] {
+        availableCourses.map { course in
+            StudioDropdownOption(value: Optional(course.persistentModelID), title: course.name, subtitle: course.courseCode)
+        }
+    }
+
     private var assistantBadge: some View {
-        Circle().fill(LecternTheme.accent.opacity(0.12)).frame(width: 30, height: 30)
+        Circle()
+            .fill(LecternTheme.canvasCard)
+            .frame(width: 30, height: 30)
+            .overlay(Circle().strokeBorder(LecternTheme.hairline, lineWidth: 1))
             .overlay(Image(systemName: "sparkles").font(.system(size: 12, weight: .semibold)).foregroundStyle(LecternTheme.accent))
+            .shadow(color: Color.black.opacity(0.05), radius: 5, y: 1)
+    }
+
+    private var greetingCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            assistantBadge
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 10) {
+                (Text("Hello! I am your study assistant for ") + Text(course.name).bold() + Text(". How can I help you today?"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(LecternTheme.ink)
+                Text("Ask me anything about your lectures, notes, or Canvas material.")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(.secondary)
+                if selectedSourceCount > 0 {
+                    sourceChips
+                }
+            }
+            .lineSpacing(4)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .elevatedCard()
+        }
     }
 
     private var sourceChips: some View {
@@ -853,6 +883,6 @@ private struct CourseSynthesisComposer: View {
 private extension View {
     func sourceChip() -> some View {
         font(.system(size: 9.5)).foregroundStyle(.secondary).padding(.horizontal, 8).padding(.vertical, 4)
-            .background(Color.primary.opacity(0.035), in: Capsule()).overlay(Capsule().stroke(LecternTheme.hairline))
+            .background(LecternTheme.canvasCard, in: Capsule()).overlay(Capsule().stroke(LecternTheme.hairline))
     }
 }

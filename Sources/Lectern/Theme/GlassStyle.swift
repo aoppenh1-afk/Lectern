@@ -23,9 +23,9 @@ enum LecternTheme {
         case "graphite":
             return adaptive(light: NSColor(srgbRed: 0.290, green: 0.300, blue: 0.320, alpha: 1),   // #4A4D52
                             dark: NSColor(srgbRed: 0.780, green: 0.790, blue: 0.810, alpha: 1))    // #C7C9CF
-        default: // moss
-            return adaptive(light: NSColor(srgbRed: 0.290, green: 0.459, blue: 0.329, alpha: 1),   // #4A7554
-                            dark: NSColor(srgbRed: 0.545, green: 0.722, blue: 0.576, alpha: 1))    // #8BB893
+        default: // moss / forest green matching design mockup
+            return adaptive(light: NSColor(srgbRed: 0.102, green: 0.325, blue: 0.212, alpha: 1),   // #1A5336
+                            dark: NSColor(srgbRed: 0.408, green: 0.729, blue: 0.565, alpha: 1))    // #68BA90
         }
     }
 
@@ -38,14 +38,59 @@ enum LecternTheme {
 
     // MARK: Paper surfaces (adaptive light/dark)
 
+    /// Warm canvas the whole app floats on.
     static var paper: Color {
-        adaptive(light: NSColor(srgbRed: 0.988, green: 0.984, blue: 0.973, alpha: 1),   // #FCFBF8
-                 dark: NSColor(srgbRed: 0.110, green: 0.110, blue: 0.115, alpha: 1))
+        adaptive(light: NSColor(srgbRed: 0.980, green: 0.978, blue: 0.972, alpha: 1),   // #FAF9F7
+                  dark: NSColor(srgbRed: 0.110, green: 0.110, blue: 0.115, alpha: 1))
     }
 
     static var paperDeep: Color {
-        adaptive(light: NSColor(srgbRed: 0.965, green: 0.957, blue: 0.937, alpha: 1),   // #F6F4EF
-                 dark: NSColor(srgbRed: 0.085, green: 0.085, blue: 0.090, alpha: 1))
+        adaptive(light: NSColor(srgbRed: 0.965, green: 0.965, blue: 0.960, alpha: 1),   // #F6F6F5
+                  dark: NSColor(srgbRed: 0.085, green: 0.085, blue: 0.090, alpha: 1))
+    }
+
+    /// Solid elevated card: pure white in light mode, raised gray in dark.
+    /// Use for floating content cards (chat answers, source sections) that
+    /// must read as white sheets above the warm canvas.
+    static var canvasCard: Color {
+        Color(nsColor: .controlBackgroundColor)
+    }
+
+    /// Sage user chat bubble (pale green in light mode).
+    static var chatUserBubble: Color {
+        adaptive(light: NSColor(srgbRed: 0.882, green: 0.925, blue: 0.878, alpha: 1),   // #E1ECE0
+                  dark: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.14))
+    }
+
+    /// Delicate pale sage fill for active sidebar navigation pill.
+    static var sidebarSelectedFill: Color {
+        adaptive(light: NSColor(srgbRed: 0.882, green: 0.925, blue: 0.878, alpha: 1),   // #E1ECE0
+                  dark: NSColor(srgbRed: 0.160, green: 0.280, blue: 0.200, alpha: 0.55))
+    }
+
+    /// Deep botanical green for active sidebar navigation text & icon.
+    static var sidebarSelectedText: Color {
+        accent
+    }
+
+    /// Near-white fill for large floating panels (chat column, sources).
+    /// Message cards stay pure `canvasCard` so they lift off the panel.
+    static var panelFill: Color {
+        adaptive(light: NSColor(srgbRed: 0.984, green: 0.980, blue: 0.972, alpha: 1),   // #FBFAF7
+                  dark: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.06))
+    }
+
+    /// Milky tint laid over frosted glass so the opacity reads strongly
+    /// against the warm canvas.
+    static var glassTint: Color {
+        adaptive(light: NSColor(white: 1.0, alpha: 0.78),
+                  dark: NSColor(white: 1.0, alpha: 0.05))
+    }
+
+    /// Top-light sheen washed over the canvas for depth.
+    static var canvasSheen: Color {
+        adaptive(light: NSColor(white: 1.0, alpha: 0.35),
+                  dark: NSColor(white: 1.0, alpha: 0.04))
     }
 
     static var cardFill: Color {
@@ -67,8 +112,8 @@ enum LecternTheme {
     static let processingTint = adaptive(light: NSColor(srgbRed: 0.486, green: 0.361, blue: 0.749, alpha: 1), // #7C5CBF
                                           dark: NSColor(srgbRed: 0.655, green: 0.545, blue: 0.878, alpha: 1))   // #A78BE0
 
-    static let successTint = adaptive(light: NSColor(srgbRed: 0.180, green: 0.490, blue: 0.310, alpha: 1),  // #2E7D4F
-                                      dark: NSColor(srgbRed: 0.400, green: 0.753, blue: 0.541, alpha: 1))   // #66C08A
+    static let successTint = adaptive(light: NSColor(srgbRed: 0.102, green: 0.325, blue: 0.212, alpha: 1),  // #1A5336
+                                      dark: NSColor(srgbRed: 0.408, green: 0.729, blue: 0.565, alpha: 1))   // #68BA90
 
     static let warningTint = adaptive(light: NSColor(srgbRed: 0.718, green: 0.475, blue: 0.122, alpha: 1),  // #B7791F
                                       dark: NSColor(srgbRed: 0.878, green: 0.706, blue: 0.361, alpha: 1))   // #E0B45C
@@ -478,6 +523,181 @@ func ComposerShortModelLabel(_ label: String) -> String {
     return prefix.isEmpty ? label : String(prefix)
 }
 
+// MARK: - Floating canvas components
+
+/// Full-height sidebar styling modifier (transparent overlay allowing the unified app canvas to show through).
+struct GlassSidebar: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+    }
+}
+
+/// The single inset application workspace used to the right of the sidebar.
+struct WorkspaceCard: ViewModifier {
+    var cornerRadius: CGFloat = 18
+
+    func body(content: Content) -> some View {
+        content
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(LecternTheme.panelFill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(LecternTheme.hairline, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.045), radius: 14, x: -1, y: 3)
+    }
+}
+
+/// Large floating panel (chat column, sources card): near-white sheet
+/// with a soft, wide drop shadow.
+struct PanelCard: ViewModifier {
+    var cornerRadius: CGFloat = 22
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(LecternTheme.panelFill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(LecternTheme.hairline, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.07), radius: 24, y: 6)
+    }
+}
+
+extension View {
+    func panelCard(cornerRadius: CGFloat = 20) -> some View {
+        modifier(PanelCard(cornerRadius: cornerRadius))
+    }
+
+    func appCanvas() -> some View {
+        modifier(AppCanvasModifier())
+    }
+
+    func workspaceCard() -> some View {
+        modifier(WorkspaceCard())
+    }
+}
+
+/// Unified window canvas: soft porcelain background with delicate botanical watercolor
+/// foliage anchored in the lower left, softly washed with a subtle white sheen so the entire
+/// window background matches edge-to-edge behind the sidebar and main workspace card.
+struct AppCanvasModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                ZStack(alignment: .bottomLeading) {
+                    LecternTheme.panelFill
+
+                    Image("SidebarBotanical")
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 340)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                        .opacity(colorScheme == .dark ? 0.85 : 0.70)
+                        .allowsHitTesting(false)
+
+                    if colorScheme == .dark {
+                        Color.black.opacity(0.35)
+                            .allowsHitTesting(false)
+                    } else {
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.40),
+                                Color.white.opacity(0.18)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .allowsHitTesting(false)
+                    }
+                }
+                .clipped()
+            }
+    }
+}
+
+/// Floating white content card (chat answers, source sections).
+struct ElevatedCard: ViewModifier {
+    var cornerRadius: CGFloat = 14
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(LecternTheme.canvasCard)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(LecternTheme.hairline, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.05), radius: 10, y: 2)
+    }
+}
+
+extension View {
+    func glassSidebar() -> some View {
+        modifier(GlassSidebar())
+    }
+
+    func elevatedCard(cornerRadius: CGFloat = 14) -> some View {
+        modifier(ElevatedCard(cornerRadius: cornerRadius))
+    }
+}
+
+/// Plain outline glyph for source rows (lectures, files, resources).
+struct SourceRowIcon: View {
+    let icon: String
+    let tint: Color
+    var size: CGFloat = 15
+
+    var body: some View {
+        Image(systemName: icon)
+            .font(.system(size: size, weight: .regular))
+            .foregroundStyle(tint)
+            .frame(width: 22, alignment: .center)
+    }
+}
+
+/// Circular check toggle matching the sources panel design: quiet ring
+/// when off, filled dot with a check when on.
+struct CircleCheckToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            HStack(spacing: 9) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(
+                            configuration.isOn ? Color.clear : Color.secondary.opacity(0.45),
+                            lineWidth: 1.5
+                        )
+                        .background(
+                            Circle().fill(configuration.isOn ? LecternTheme.successTint : Color.clear)
+                        )
+                        .frame(width: 17, height: 17)
+                    if configuration.isOn {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                configuration.label
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Floating-chrome plumbing (pill, popover only)
 
 struct GlassPanelModifier: ViewModifier {
@@ -495,5 +715,32 @@ extension View {
     /// Prominent filled button using the Liquid Glass button style when available.
     func prominentAction() -> some View {
         buttonStyle(.glassProminent)
+    }
+}
+
+/// Configures the hosting window for edge-to-edge rendering without an opaque titlebar.
+struct WindowConfigurationView: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let window = view.window {
+                window.titlebarAppearsTransparent = true
+                window.titleVisibility = .hidden
+                window.styleMask.insert(.fullSizeContentView)
+                window.isOpaque = false
+                window.backgroundColor = .clear
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let window = nsView.window {
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.styleMask.insert(.fullSizeContentView)
+            window.isOpaque = false
+            window.backgroundColor = .clear
+        }
     }
 }

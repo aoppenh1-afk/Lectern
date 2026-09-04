@@ -30,7 +30,7 @@ struct StudioDropdown<Value: Hashable>: View {
                         .foregroundStyle(LecternTheme.accent)
                 }
                 Text(selectedTitle)
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                 Spacer(minLength: 10)
                 Image(systemName: "chevron.down")
@@ -39,9 +39,10 @@ struct StudioDropdown<Value: Hashable>: View {
             }
             .foregroundStyle(LecternTheme.ink)
             .padding(.horizontal, 11)
-            .frame(width: width, height: 34)
-            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(LecternTheme.hairline))
+            .frame(width: width, height: 38)
+            .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
+            .shadow(color: Color.black.opacity(0.04), radius: 5, y: 1)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -694,24 +695,14 @@ struct CommandStudioAIView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) { Text("AI Chat").font(.system(size: 28, weight: .bold, design: .serif)); Text("Ask across lectures and course files. Canvas deadlines and resources stay visible beside your study material.").font(.system(size: 12)).foregroundStyle(.secondary) }
-                Spacer()
-                if !courseOptions.isEmpty {
-                    StudioDropdown(
-                        title: "Course",
-                        selection: Binding(get: { selectedCourse?.persistentModelID }, set: { selectedCourseID = $0 }),
-                        options: courseOptions,
-                        width: 260,
-                        icon: "book.closed"
-                    )
-                }
-            }
-            .padding(.horizontal, 28).padding(.vertical, 20)
-            Divider()
             if let course = selectedCourse {
-                CourseSynthesisView(course: course, onClose: {})
-                    .id(course.persistentModelID)
+                CourseSynthesisView(
+                    course: course,
+                    availableCourses: courses,
+                    selectedCourseID: $selectedCourseID,
+                    onClose: {}
+                )
+                .id(course.persistentModelID)
             } else {
                 ContentUnavailableView("Create or sync a course first", systemImage: "sparkles")
             }
@@ -732,7 +723,7 @@ struct StudioPage<Content: View>: View {
             VStack(alignment: .leading, spacing: 4) { Text(title).font(.system(size: 28, weight: .bold, design: .serif)).foregroundStyle(LecternTheme.ink); Text(subtitle).font(.system(size: 12)).foregroundStyle(.secondary) }
             content
         }
-        .padding(28).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(LecternTheme.paper)
+        .padding(28).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(LecternTheme.panelFill)
     }
 }
 

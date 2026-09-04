@@ -223,7 +223,7 @@ struct LectureChatView: View {
                         .padding(.vertical, 11)
                         .background(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(LecternTheme.accent.opacity(0.10))
+                                .fill(LecternTheme.chatUserBubble)
                         )
                     if !message.attachmentNames.isEmpty {
                         HStack(spacing: 5) {
@@ -295,14 +295,7 @@ struct LectureChatView: View {
                 .lineSpacing(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(15)
-                .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(LecternTheme.cardFill)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(LecternTheme.hairline, lineWidth: 1)
-                )
+                .elevatedCard()
 
                 if !content.isEmpty {
                     HStack(spacing: 7) {
@@ -574,13 +567,15 @@ struct LectureChatView: View {
 
     private func assistantBadge(size: CGFloat) -> some View {
         Circle()
-            .fill(LecternTheme.accent.opacity(0.12))
+            .fill(LecternTheme.canvasCard)
             .frame(width: size, height: size)
+            .overlay(Circle().strokeBorder(LecternTheme.hairline, lineWidth: 1))
             .overlay(
                 Image(systemName: "sparkles")
                     .font(.system(size: size * 0.42, weight: .semibold))
                     .foregroundStyle(LecternTheme.accent)
             )
+            .shadow(color: Color.black.opacity(0.05), radius: 5, y: 1)
     }
 
     private func markdownText(_ content: String) -> Text {

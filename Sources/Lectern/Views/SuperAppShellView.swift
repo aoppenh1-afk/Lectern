@@ -75,10 +75,16 @@ struct SuperAppShellView: View {
     var body: some View {
         HStack(spacing: 0) {
             commandSidebar
-            Divider()
             destination
+                .workspaceCard()
+                .padding(.top, 12)
+                .padding(.bottom, 12)
+                .padding(.trailing, 12)
+                .padding(.leading, 8)
         }
-        .background(LecternTheme.paper)
+        .appCanvas()
+        .ignoresSafeArea()
+        .background(WindowConfigurationView())
         .frame(minWidth: 1180, minHeight: 760)
         .task(priority: .utility) {
             // Let SwiftUI commit the cached dashboard before maintenance touches SwiftData.
@@ -145,8 +151,8 @@ struct SuperAppShellView: View {
             }
             .foregroundStyle(LecternTheme.ink)
             .padding(.horizontal, 20)
-            .padding(.top, 26)
-            .padding(.bottom, 24)
+            .padding(.top, 52)
+            .padding(.bottom, 32)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("ACADEMIC TERM")
@@ -156,13 +162,13 @@ struct SuperAppShellView: View {
                     title: "Academic term",
                     selection: $selectedTerm,
                     options: termOptions,
-                    width: 196
+                    width: 220
                 )
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 14)
+            .padding(.bottom, 34)
 
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 ForEach(CommandStudioSection.allCases) { section in
                     sidebarButton(section)
                 }
@@ -170,55 +176,30 @@ struct SuperAppShellView: View {
             .padding(.horizontal, 12)
 
             Spacer()
-            Divider().padding(.horizontal, 20)
-
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(canvasConnection.isConnected ? LecternTheme.successTint : Color.secondary.opacity(0.25))
-                    .frame(width: 7, height: 7)
-                Text(canvasConnection.isConnected ? "Canvas connected" : "Canvas not connected")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if canvasSync.isSyncing { ProgressView().controlSize(.mini) }
+            SettingsLink {
+                Label("Settings", systemImage: "gearshape")
+                    .font(.system(size: 13))
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-
-            HStack {
-                SettingsLink {
-                    Label("Settings", systemImage: "gearshape")
-                        .font(.system(size: 13))
-                }
-                .buttonStyle(.plain)
-                Spacer()
-                Button {
-                    Task { await canvasSync.syncNow() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(.plain)
-                .disabled(!canvasConnection.isConnected || canvasSync.isSyncing)
-                .help("Sync Canvas now")
-            }
+            .buttonStyle(.plain)
             .foregroundStyle(LecternTheme.ink)
             .padding(.horizontal, 20)
-            .padding(.bottom, 20)
+            .padding(.bottom, 26)
         }
-        .frame(width: 236)
-        .background(LecternTheme.paperDeep)
+        .frame(width: 260)
+        .glassSidebar()
     }
 
     private func sidebarButton(_ section: CommandStudioSection) -> some View {
-        Button {
+        let selected = selection == section
+        return Button {
             selection = section
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: section.icon)
-                    .font(.system(size: 15))
+                    .font(.system(size: 15, weight: selected ? .medium : .regular))
                     .frame(width: 20)
                 Text(section.title)
-                    .font(.system(size: 13.5, weight: selection == section ? .medium : .regular))
+                    .font(.system(size: 13.5, weight: selected ? .medium : .regular))
                 Spacer()
                 if section == .assignments {
                     if upcomingCount > 0 { sidebarCount(upcomingCount) }
@@ -226,12 +207,16 @@ struct SuperAppShellView: View {
                     sidebarCount(announcementCount)
                 }
             }
-            .foregroundStyle(selection == section ? LecternTheme.accent : LecternTheme.ink)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .foregroundStyle(selected ? LecternTheme.sidebarSelectedText : LecternTheme.ink)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(selection == section ? LecternTheme.accent.opacity(0.10) : .clear)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(selected ? LecternTheme.sidebarSelectedFill : .clear)
+            )
+            .shadow(
+                color: selected ? Color.black.opacity(0.04) : .clear,
+                radius: 6, y: 2
             )
             .contentShape(Rectangle())
         }
