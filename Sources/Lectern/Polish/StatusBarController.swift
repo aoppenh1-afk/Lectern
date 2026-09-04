@@ -37,6 +37,7 @@ final class StatusBarController {
             object: nil
         )
         rebuild()
+        assertVisibleSoon()
     }
 
     @objc private func preferencesChanged() {
@@ -61,6 +62,10 @@ final class StatusBarController {
             item.button?.action = #selector(togglePopover(_:))
             item.button?.target = self
 
+            // Settings is the source of truth for visibility. AppKit can restore
+            // a persisted hidden state for this autosave name, so assert
+            // visible on every rebuild, not just once per install.
+            item.isVisible = true
             statusItem = item
         } else {
             popover?.performClose(nil)
@@ -69,6 +74,31 @@ final class StatusBarController {
                 NSStatusBar.system.removeStatusItem(item)
             }
             statusItem = nil
+            surfacePreferences.menuBarBlocked = false
+        }
+    }
+
+    /// Re-asserts visibility shortly after install. The persisted hidden state
+    /// for the autosave name can be restored asynchronously after the item is
+    /// created, re-hiding it after the synchronous assert in rebuild().
+    /// Also detects when macOS Control Center refuses to host the item at all
+    /// (per-bundle blocklist in Tahoe's menu-bar ledger): the button's window
+    /// then has no screen. Surfaces as SurfacePreferences.menuBarBlocked so
+    /// Settings can tell the user how to re-allow Lectern.
+    private func assertVisibleSoon() {
+        guard let item = statusItem,
+              surfacePreferences.popoverEnabled else { return }
+        for delay in [2.0, 8.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak item] in
+                guard let self, let item,
+                      self.statusItem === item,
+                      self.surfacePreferences.popoverEnabled else { return }
+                item.isVisible = true
+                // A hosted item's button window belongs to a screen. When
+                // Control Center blocks the bundle, the window is never
+                // hosted (screen stays nil) even though isVisible is true.
+                self.surfacePreferences.menuBarBlocked = item.button?.window?.screen == nil
+            }
         }
     }
 

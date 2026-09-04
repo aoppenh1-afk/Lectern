@@ -526,6 +526,17 @@ private struct RecordingPane: View {
                     .labelsHidden()
             }
 
+            if surfacePreferences.menuBarBlocked, popoverEnabled {
+                SettingsRow(
+                    title: "Menu bar icon hidden by macOS",
+                    caption: "macOS is blocking Lectern's menu bar icon. Allow Lectern in System Settings › Menu Bar, or choose Reset Control Center there.",
+                    showsDivider: false
+                ) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(LecternTheme.warningTint)
+                }
+            }
+
             SettingsRow(
                 title: "Notch pill during recording",
                 caption: "Floating pill at the top of the screen while capturing."

@@ -10,6 +10,10 @@ import SwiftUI
 final class SurfacePreferences {
     private(set) var popoverEnabled: Bool
     private(set) var pillEnabled: Bool
+    /// True when macOS Control Center refuses to host the menu-bar item
+    /// (Tahoe per-bundle blocklist). Set by StatusBarController; Settings
+    /// shows re-allow instructions while true.
+    var menuBarBlocked = false
     private(set) var appearanceMode: String
     private(set) var accentID: String
     private(set) var hotKeyCode: Int

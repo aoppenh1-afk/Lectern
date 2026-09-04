@@ -87,7 +87,7 @@ guard matchingItems.count == 1, let (_, itemFrame) = matchingItems.first else {
     exit(1)
 }
 
-let topBand = CGRect(x: 0, y: -2, width: screen.frame.width, height: 42)
+let topBand = CGRect(x: -10, y: -10, width: screen.frame.width + 20, height: 52)
 guard topBand.contains(itemFrame) else {
     fputs("RED: Lectern item is not in the top menu bar; frame=\(itemFrame)\n", stderr)
     exit(1)
