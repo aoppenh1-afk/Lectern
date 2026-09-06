@@ -574,14 +574,22 @@ struct YUTorahSubscriptionTests {
             targetType: .teacher,
             targetNumericID: 80056,
             resolvedFeedURLString: "https://www.yutorah.org/rss/RecentAudioShiurim?teacher=80056",
-            displayName: "Rabbi Schachter"
+            displayName: "Rabbi Schachter",
+            baselineFutureOnly: true
         )
 
-        // Baseline: mark existing items in feed as seen
+        #expect(sub.isBaselineFutureOnly == true)
+        #expect(sub.seenItemIDs.isEmpty)
+
+        // Baseline: mark all existing items in feed as seen
         let existingFeedShiurIDs = ["101", "102", "103", "104"]
         sub.markSeen(itemIDs: existingFeedShiurIDs)
 
-        // Future check: only new shiur 105 is not seen
+        // First check with existing items -> 0 new items to import
+        let currentCheck = existingFeedShiurIDs.filter { !sub.hasSeen(itemID: $0) }
+        #expect(currentCheck.isEmpty)
+
+        // Future check: newly uploaded shiur 105 appears in feed
         let incomingFeedShiurIDs = ["105", "104", "103", "102"]
         let newItems = incomingFeedShiurIDs.filter { !sub.hasSeen(itemID: $0) }
 
@@ -593,10 +601,11 @@ struct YUTorahSubscriptionTests {
             targetType: .teacher,
             targetNumericID: 80056,
             resolvedFeedURLString: "https://www.yutorah.org/rss/RecentAudioShiurim?teacher=80056",
-            displayName: "Rabbi Schachter"
+            displayName: "Rabbi Schachter",
+            baselineFutureOnly: false
         )
 
-        // Opting into backlog: seenItemIDs remains empty on creation
+        #expect(sub.isBaselineFutureOnly == false)
         #expect(sub.seenItemIDs.isEmpty)
 
         let incomingFeedShiurIDs = ["101", "102", "103"]

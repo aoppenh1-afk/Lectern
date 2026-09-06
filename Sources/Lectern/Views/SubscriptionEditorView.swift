@@ -449,15 +449,15 @@ struct SubscriptionEditorView: View {
                 language: selectedLanguage,
                 autoTranscribe: autoTranscribe,
                 autoGenerateNotes: autoGenerateNotes,
-                seenItemIDs: importBaselineFutureOnly ? Set(previewItems.map(\.shiurID)) : []
+                baselineFutureOnly: importBaselineFutureOnly,
+                seenItemIDs: []
             )
             modelContext.insert(sub)
 
-            // If user explicitly chose to import currently visible recent shiurim
-            if !importBaselineFutureOnly {
-                Task {
-                    await automationService.checkSubscription(sub, ignoreDue: true)
-                }
+            // Immediately run checkSubscription in the background to establish the baseline
+            // (or import visible recent shiurim if opted in)
+            Task {
+                await automationService.checkSubscription(sub, ignoreDue: true)
             }
         }
 

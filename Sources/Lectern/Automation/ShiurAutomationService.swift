@@ -99,6 +99,8 @@ final class ShiurAutomationService {
             try? modelContainer.mainContext.save()
 
         case .newItems(let items, let channelTitle, let eTag, let lastModified):
+            let isFirstCheck = subscription.lastSuccessfulCheckAt == nil || subscription.seenItemIDs.isEmpty
+
             subscription.lastSuccessfulCheckAt = Date()
             subscription.eTag = eTag
             subscription.lastModified = lastModified
@@ -109,15 +111,57 @@ final class ShiurAutomationService {
                 subscription.displayName = channelTitle
             }
 
-            // Baseline check: if subscription has never seen any items yet, establish baseline
-            if subscription.seenItemIDs.isEmpty {
+            // Baseline check: if this subscription has not established a baseline yet
+            if isFirstCheck {
                 let allIDs = items.map(\.shiurID)
                 subscription.markSeen(itemIDs: allIDs)
                 try? modelContainer.mainContext.save()
-                return
+
+                if subscription.isBaselineFutureOnly {
+                    // "Start with new shiurim from now on":
+                    // All current items in the feed are marked as seen; import ZERO old shiurim.
+                    return
+                } else {
+                    // "Import currently visible recent shiurim":
+                    // Import only the top few (up to 5) visible recent items from the feed
+                    let recentLimit = 5
+                    let itemsToImport = Array(items.prefix(recentLimit)).sorted(by: { $0.date < $1.date })
+
+                    for remoteItem in itemsToImport {
+                        if findExistingLecture(shiurID: remoteItem.shiurID) != nil {
+                            subscription.lastImportedAt = Date()
+                            subscription.lastImportedTitle = remoteItem.title
+                            subscription.importedCount += 1
+                            try? modelContainer.mainContext.save()
+                            continue
+                        }
+
+                        let automationItem = ShiurAutomationItem(
+                            sourceKey: remoteItem.sourceKey,
+                            shiurID: remoteItem.shiurID,
+                            subscriptionID: subscription.id,
+                            title: remoteItem.title,
+                            teacherName: remoteItem.teacherName,
+                            seriesName: remoteItem.seriesName,
+                            publicationDate: remoteItem.date,
+                            pageURLString: remoteItem.pageURL?.absoluteString,
+                            mediaURLString: remoteItem.enclosureURL?.absoluteString,
+                            duration: remoteItem.duration,
+                            state: .discovered,
+                            language: subscription.language,
+                            autoTranscribe: subscription.autoTranscribe,
+                            autoGenerateNotes: subscription.autoGenerateNotes
+                        )
+                        modelContainer.mainContext.insert(automationItem)
+                        try? modelContainer.mainContext.save()
+
+                        await processItem(automationItem, targetCourse: subscription.course)
+                    }
+                    return
+                }
             }
 
-            // Filter new items not seen by this subscription
+            // Normal subsequent check: filter new items not seen by this subscription
             let newItems = items
                 .filter { !subscription.hasSeen(itemID: $0.shiurID) }
                 .sorted(by: { $0.date < $1.date }) // Process oldest to newest

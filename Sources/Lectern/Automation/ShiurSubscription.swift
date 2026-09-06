@@ -60,6 +60,7 @@ final class ShiurSubscription {
     private var languageRaw: String
     var autoTranscribe: Bool
     var autoGenerateNotes: Bool
+    var baselineFutureOnly: Bool?
     var createdAt: Date
     var lastCheckedAt: Date?
     var lastSuccessfulCheckAt: Date?
@@ -85,6 +86,7 @@ final class ShiurSubscription {
         language: LectureLanguage = .hebrewEnglish,
         autoTranscribe: Bool = true,
         autoGenerateNotes: Bool = true,
+        baselineFutureOnly: Bool = true,
         createdAt: Date = Date(),
         lastCheckedAt: Date? = nil,
         lastSuccessfulCheckAt: Date? = nil,
@@ -109,6 +111,7 @@ final class ShiurSubscription {
         self.languageRaw = language.rawValue
         self.autoTranscribe = autoTranscribe
         self.autoGenerateNotes = autoGenerateNotes
+        self.baselineFutureOnly = baselineFutureOnly
         self.createdAt = createdAt
         self.lastCheckedAt = lastCheckedAt
         self.lastSuccessfulCheckAt = lastSuccessfulCheckAt
@@ -119,6 +122,11 @@ final class ShiurSubscription {
         self.lastModified = lastModified
         self.lastError = lastError
         self.seenItemIDsData = (try? JSONEncoder().encode(Array(seenItemIDs))) ?? Data()
+    }
+
+    var isBaselineFutureOnly: Bool {
+        get { baselineFutureOnly ?? true }
+        set { baselineFutureOnly = newValue }
     }
 
     var targetType: ShiurSubscriptionTargetType {
