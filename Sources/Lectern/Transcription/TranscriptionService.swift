@@ -259,13 +259,36 @@ final class TranscriptionService {
                             : preferences.builtInModelID
                     )
                 )
-                let result = try await transcribeExternally(
-                    recordingPath: recordingPath,
-                    lecture: lecture,
-                    selectedConnection: connection,
-                    recoverCompletedResult: artifact.content.isEmpty
-                )
-                apply(result, to: artifact, lecture: lecture, selectedConnection: connection)
+                do {
+                    let result = try await transcribeExternally(
+                        recordingPath: recordingPath,
+                        lecture: lecture,
+                        selectedConnection: connection,
+                        recoverCompletedResult: artifact.content.isEmpty
+                    )
+                    apply(result, to: artifact, lecture: lecture, selectedConnection: connection)
+                } catch {
+                    try Task.checkCancellation()
+                    if (error as? ExternalTranscriptionError)?.code == .cancelled {
+                        throw error
+                    }
+                    guard preferences.allowLocalFallbackAfterExternalFailure,
+                          let fallback = try await runLocalFallbacks(
+                              recordingPath: recordingPath,
+                              lecture: lecture,
+                              excluding: model,
+                              progress: persistProgress
+                          ) else {
+                        throw error
+                    }
+                    applyLocalFallback(
+                        fallback,
+                        to: artifact,
+                        lecture: lecture,
+                        primaryName: "Antigravity ACP",
+                        primaryError: error.localizedDescription
+                    )
+                }
             case .local(let model):
                 do {
                     let segments = try await transcribeLocally(
@@ -282,19 +305,38 @@ final class TranscriptionService {
                     lecture.transcriptCompletedAt = Date()
                     lecture.transcriptFallbackSummary = nil
                 } catch {
-                    guard preferences.allowFallbackProviders,
-                          preferences.allowCloudFallbackAfterLocalFailure,
-                          let connection = preferences.defaultConnection else {
+                    try Task.checkCancellation()
+                    if (error as? ExternalTranscriptionError)?.code == .cancelled {
                         throw error
                     }
-                    let result = try await transcribeExternally(
+                    if let fallback = try await runLocalFallbacks(
                         recordingPath: recordingPath,
                         lecture: lecture,
-                        selectedConnection: connection,
-                        initialFailure: error.localizedDescription,
-                        recoverCompletedResult: artifact.content.isEmpty
-                    )
-                    apply(result, to: artifact, lecture: lecture, selectedConnection: connection)
+                        excluding: model,
+                        progress: persistProgress
+                    ) {
+                        applyLocalFallback(
+                            fallback,
+                            to: artifact,
+                            lecture: lecture,
+                            primaryName: "on-device \(model.title)",
+                            primaryError: error.localizedDescription
+                        )
+                    } else {
+                        guard preferences.allowFallbackProviders,
+                              preferences.allowCloudFallbackAfterLocalFailure,
+                              let connection = preferences.defaultConnection else {
+                            throw error
+                        }
+                        let result = try await transcribeExternally(
+                            recordingPath: recordingPath,
+                            lecture: lecture,
+                            selectedConnection: connection,
+                            initialFailure: error.localizedDescription,
+                            recoverCompletedResult: artifact.content.isEmpty
+                        )
+                        apply(result, to: artifact, lecture: lecture, selectedConnection: connection)
+                    }
                 }
             case .external:
                 guard let connection = preferences.connection(id: lecture.requestedTranscriptionConnectionID)
@@ -306,13 +348,36 @@ final class TranscriptionService {
                         userMessage: "Add an API connection in Settings before using external transcription."
                     )
                 }
-                let result = try await transcribeExternally(
-                    recordingPath: recordingPath,
-                    lecture: lecture,
-                    selectedConnection: connection,
-                    recoverCompletedResult: artifact.content.isEmpty
-                )
-                apply(result, to: artifact, lecture: lecture, selectedConnection: connection)
+                do {
+                    let result = try await transcribeExternally(
+                        recordingPath: recordingPath,
+                        lecture: lecture,
+                        selectedConnection: connection,
+                        recoverCompletedResult: artifact.content.isEmpty
+                    )
+                    apply(result, to: artifact, lecture: lecture, selectedConnection: connection)
+                } catch {
+                    try Task.checkCancellation()
+                    if (error as? ExternalTranscriptionError)?.code == .cancelled {
+                        throw error
+                    }
+                    guard preferences.allowLocalFallbackAfterExternalFailure,
+                          let fallback = try await runLocalFallbacks(
+                              recordingPath: recordingPath,
+                              lecture: lecture,
+                              excluding: nil,
+                              progress: persistProgress
+                          ) else {
+                        throw error
+                    }
+                    applyLocalFallback(
+                        fallback,
+                        to: artifact,
+                        lecture: lecture,
+                        primaryName: connection.runningDisplayName,
+                        primaryError: error.localizedDescription
+                    )
+                }
             }
 
             artifact.generatedAt = Date()
@@ -331,6 +396,69 @@ final class TranscriptionService {
             lecture.statusMessage = error.localizedDescription
             lastError = "Transcription failed: \(error.localizedDescription)"
             try? context.save()
+        }
+    }
+
+    /// Tries the enabled on-device fallback models in the user's order.
+    /// Only models that are already downloaded (and, for Whisper, have a
+    /// whisper-cli) are attempted — a fallback never triggers a surprise
+    /// multi-hundred-megabyte download. Returns nil when the master fallback
+    /// switch is off or nothing usable succeeded.
+    private func runLocalFallbacks(
+        recordingPath: String,
+        lecture: Lecture,
+        excluding failed: BuiltInTranscriptionModel?,
+        progress: @escaping @MainActor @Sendable ([TranscriptSegment], Double) -> Void
+    ) async throws -> (model: BuiltInTranscriptionModel, segments: [TranscriptSegment], failures: [String])? {
+        guard preferences.allowFallbackProviders else { return nil }
+        let candidates = preferences.localFallbackModels(excluding: failed).filter(isLocalModelReady)
+        guard !candidates.isEmpty else { return nil }
+        var failures: [String] = []
+        for model in candidates {
+            lecture.statusMessage = "Trying on-device \(model.title)…"
+            try? modelContainer.mainContext.save()
+            do {
+                let segments = try await transcribeLocally(
+                    recordingPath: recordingPath,
+                    lecture: lecture,
+                    model: model,
+                    progress: progress
+                )
+                return (model, segments, failures)
+            } catch {
+                try Task.checkCancellation()
+                failures.append("\(model.title): \(error.localizedDescription)")
+            }
+        }
+        return nil
+    }
+
+    private func applyLocalFallback(
+        _ fallback: (model: BuiltInTranscriptionModel, segments: [TranscriptSegment], failures: [String]),
+        to artifact: Artifact,
+        lecture: Lecture,
+        primaryName: String,
+        primaryError: String
+    ) {
+        artifact.content = Self.markdown(from: fallback.segments)
+        artifact.modelInfo = fallback.model.modelInfo
+        lecture.transcriptProviderRaw = TranscriptionProviderID.local.rawValue
+        lecture.transcriptConnectionName = "On this Mac"
+        lecture.transcriptModelID = fallback.model.modelInfo
+        lecture.transcriptCompletedAt = Date()
+        var attempts = ["\(primaryName) failed (\(primaryError))"]
+        attempts.append(contentsOf: fallback.failures)
+        lecture.transcriptFallbackSummary = "Fell back to on-device \(fallback.model.title) after \(attempts.joined(separator: "; "))."
+    }
+
+    private func isLocalModelReady(_ model: BuiltInTranscriptionModel) -> Bool {
+        switch model {
+        case .parakeet:
+            return engine.isModelCached
+        case .whisper:
+            return whisperEngine.isModelCached && WhisperTranscriptionEngine.isCLIInstalled
+        case .antigravity:
+            return false
         }
     }
 
@@ -449,9 +577,9 @@ final class TranscriptionService {
             }
             await jobStore.upsert(job)
             lecture.transcriptProviderRaw = connection.provider.rawValue
-            lecture.transcriptConnectionName = connection.displayName
+            lecture.transcriptConnectionName = connection.runningDisplayName
             lecture.transcriptModelID = connection.modelID
-            lecture.statusMessage = "Transcribing with \(connection.displayName)"
+            lecture.statusMessage = "Transcribing with \(connection.runningDisplayName)"
             try? modelContainer.mainContext.save()
 
             let resumeID = job.attempts[index].providerJobID
@@ -519,8 +647,8 @@ final class TranscriptionService {
         artifact.content = Self.markdown(from: result)
         artifact.modelInfo = "\(result.providerInfo.provider.rawValue) / \(result.providerInfo.resolvedModelID ?? result.providerInfo.requestedModelID)"
         lecture.transcriptProviderRaw = result.providerInfo.provider.rawValue
-        lecture.transcriptConnectionName = preferences.connection(id: result.providerInfo.connectionID)?.displayName
-            ?? selectedConnection.displayName
+        lecture.transcriptConnectionName = preferences.connection(id: result.providerInfo.connectionID)?.runningDisplayName
+            ?? selectedConnection.runningDisplayName
         lecture.transcriptModelID = result.providerInfo.resolvedModelID ?? result.providerInfo.requestedModelID
         lecture.transcriptCompletedAt = result.providerInfo.completedAt
     }

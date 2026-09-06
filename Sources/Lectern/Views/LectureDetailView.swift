@@ -19,6 +19,7 @@ struct LectureDetailView: View {
     @State private var transcriptionPickerOpen = false
     @State private var transcriptionModelSearch = ""
     @State private var hoveredTranscriberID: String?
+    @State private var localAvailability = LocalModelAvailability()
 
     enum Tab: Hashable {
         case rawTranscript, cleanedTranscript, notes, flashcards, quiz, bookmarks, attachments
@@ -40,6 +41,7 @@ struct LectureDetailView: View {
         }
         .task {
             _ = transcription.recoverCompletedLocalCheckpointIfPossible(lecture)
+            localAvailability.refresh()
             if let profile = AgentProfiles.profile(id: AgentProfiles.antigravityID) {
                 antigravityCatalog = await AgentModelCatalogLoader.load(for: profile)
             }
@@ -283,6 +285,7 @@ struct LectureDetailView: View {
 
     private func transcriptionChoiceMenu(label: String) -> some View {
         Button {
+            localAvailability.refresh()
             transcriptionPickerOpen.toggle()
         } label: {
             HStack(spacing: 8) {
@@ -353,14 +356,18 @@ struct LectureDetailView: View {
                     if !filteredBuiltInModels.isEmpty {
                         transcriptionPickerSection("On this Mac")
                         ForEach(filteredBuiltInModels) { model in
+                            let downloaded = localAvailability.isDownloaded(model)
                             transcriptionPickerRow(
                                 id: model.id,
                                 title: model.title,
-                                subtitle: "Private, on-device transcription"
+                                subtitle: downloaded
+                                    ? "Private, on-device transcription"
+                                    : "Not downloaded — get it in Settings › Transcription",
+                                enabled: downloaded
                             ) {
-                                Image(systemName: "macbook")
+                                Image(systemName: downloaded ? "macbook" : "arrow.down.circle")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(LecternTheme.accent)
+                                    .foregroundStyle(downloaded ? LecternTheme.accent : .secondary)
                             } action: {
                                 chooseLocalTranscriber(model.id)
                             }
@@ -435,6 +442,7 @@ struct LectureDetailView: View {
         id: String,
         title: String,
         subtitle: String,
+        enabled: Bool = true,
         @ViewBuilder icon: () -> Icon,
         action: @escaping () -> Void
     ) -> some View {
@@ -446,14 +454,14 @@ struct LectureDetailView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(LecternTheme.ink)
+                        .foregroundStyle(enabled ? LecternTheme.ink : .secondary)
                     Text(subtitle)
                         .font(.system(size: 10.5))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 Spacer()
-                Image(systemName: "arrow.right")
+                Image(systemName: enabled ? "arrow.right" : "arrow.down.circle")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.tertiary)
             }
@@ -461,11 +469,13 @@ struct LectureDetailView: View {
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(hoveredTranscriberID == id ? Color.primary.opacity(0.055) : .clear)
+                    .fill(hoveredTranscriberID == id && enabled ? Color.primary.opacity(0.055) : .clear)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.55)
         .padding(.horizontal, 5)
         .onHover { hovering in
             hoveredTranscriberID = hovering ? id : nil
@@ -501,6 +511,13 @@ struct LectureDetailView: View {
     }
 
     private func chooseLocalTranscriber(_ modelID: String) {
+        // Defensive: the picker disables missing models, but the stored
+        // default can still point at one that was deleted from disk.
+        if let model = BuiltInTranscriptionModel(rawValue: modelID),
+           !model.usesAntigravity,
+           !localAvailability.isDownloaded(model) {
+            return
+        }
         transcriptionPickerOpen = false
         transcription.retranscribe(
             lecture,

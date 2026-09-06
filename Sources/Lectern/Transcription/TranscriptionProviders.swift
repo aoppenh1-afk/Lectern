@@ -528,6 +528,16 @@ struct TranscriptionConnection: Identifiable, Codable, Hashable, Sendable {
         TranscriptionProviderCatalog.capabilities(provider: provider, modelID: modelID)
     }
 
+    /// Name shown while a job runs. Stored connection labels can predate the
+    /// current model (e.g. a "Gemini 3.7" name from before the 3.8 bump), so
+    /// Antigravity connections always report the model that actually runs.
+    var runningDisplayName: String {
+        if provider == .antigravityCLI {
+            return AntigravityACPClient.transcriptionDisplayName
+        }
+        return displayName
+    }
+
     static func builtInAntigravity(modelID: String? = nil) -> TranscriptionConnection {
         .init(
             id: builtInAntigravityID,
@@ -552,6 +562,66 @@ struct TranscriptionPreferencesSnapshot: Codable, Sendable {
     var neverFallbackFromFreeToPaid = true
     var askBeforePaidFallback = true
     var allowCloudFallbackAfterLocalFailure = false
+    /// Ordered on-device models (Parakeet / Whisper ids) to try when the
+    /// primary transcriber fails. Empty preserves the old API-only behavior.
+    var fallbackLocalModelIDs: [String] = []
+    var allowLocalFallbackAfterExternalFailure = false
+
+    enum CodingKeys: String, CodingKey {
+        case source
+        case builtInModelID
+        case defaultConnectionID
+        case fallbackConnectionIDs
+        case allowFallbackProviders
+        case freeConnectionsOnly
+        case neverFallbackFromFreeToPaid
+        case askBeforePaidFallback
+        case allowCloudFallbackAfterLocalFailure
+        case fallbackLocalModelIDs
+        case allowLocalFallbackAfterExternalFailure
+    }
+
+    init(
+        source: TranscriptionSource = .local,
+        builtInModelID: String? = nil,
+        defaultConnectionID: UUID? = nil,
+        fallbackConnectionIDs: [UUID] = [],
+        allowFallbackProviders: Bool = false,
+        freeConnectionsOnly: Bool = false,
+        neverFallbackFromFreeToPaid: Bool = true,
+        askBeforePaidFallback: Bool = true,
+        allowCloudFallbackAfterLocalFailure: Bool = false,
+        fallbackLocalModelIDs: [String] = [],
+        allowLocalFallbackAfterExternalFailure: Bool = false
+    ) {
+        self.source = source
+        self.builtInModelID = builtInModelID
+        self.defaultConnectionID = defaultConnectionID
+        self.fallbackConnectionIDs = fallbackConnectionIDs
+        self.allowFallbackProviders = allowFallbackProviders
+        self.freeConnectionsOnly = freeConnectionsOnly
+        self.neverFallbackFromFreeToPaid = neverFallbackFromFreeToPaid
+        self.askBeforePaidFallback = askBeforePaidFallback
+        self.allowCloudFallbackAfterLocalFailure = allowCloudFallbackAfterLocalFailure
+        self.fallbackLocalModelIDs = fallbackLocalModelIDs
+        self.allowLocalFallbackAfterExternalFailure = allowLocalFallbackAfterExternalFailure
+    }
+
+    /// Tolerates payloads written before the on-device fallback keys existed.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        source = try container.decodeIfPresent(TranscriptionSource.self, forKey: .source) ?? .local
+        builtInModelID = try container.decodeIfPresent(String.self, forKey: .builtInModelID)
+        defaultConnectionID = try container.decodeIfPresent(UUID.self, forKey: .defaultConnectionID)
+        fallbackConnectionIDs = try container.decodeIfPresent([UUID].self, forKey: .fallbackConnectionIDs) ?? []
+        allowFallbackProviders = try container.decodeIfPresent(Bool.self, forKey: .allowFallbackProviders) ?? false
+        freeConnectionsOnly = try container.decodeIfPresent(Bool.self, forKey: .freeConnectionsOnly) ?? false
+        neverFallbackFromFreeToPaid = try container.decodeIfPresent(Bool.self, forKey: .neverFallbackFromFreeToPaid) ?? true
+        askBeforePaidFallback = try container.decodeIfPresent(Bool.self, forKey: .askBeforePaidFallback) ?? true
+        allowCloudFallbackAfterLocalFailure = try container.decodeIfPresent(Bool.self, forKey: .allowCloudFallbackAfterLocalFailure) ?? false
+        fallbackLocalModelIDs = try container.decodeIfPresent([String].self, forKey: .fallbackLocalModelIDs) ?? []
+        allowLocalFallbackAfterExternalFailure = try container.decodeIfPresent(Bool.self, forKey: .allowLocalFallbackAfterExternalFailure) ?? false
+    }
 }
 
 @MainActor
@@ -570,6 +640,8 @@ final class TranscriptionPreferences {
     var neverFallbackFromFreeToPaid = true { didSet { persistPolicy() } }
     var askBeforePaidFallback = true { didSet { persistPolicy() } }
     var allowCloudFallbackAfterLocalFailure = false { didSet { persistPolicy() } }
+    var fallbackLocalModelIDs: [String] = [] { didSet { persistPolicy() } }
+    var allowLocalFallbackAfterExternalFailure = false { didSet { persistPolicy() } }
 
     private var isLoading = true
     private let defaults: UserDefaults
@@ -591,6 +663,8 @@ final class TranscriptionPreferences {
             neverFallbackFromFreeToPaid = policy.neverFallbackFromFreeToPaid
             askBeforePaidFallback = policy.askBeforePaidFallback
             allowCloudFallbackAfterLocalFailure = policy.allowCloudFallbackAfterLocalFailure
+            fallbackLocalModelIDs = policy.fallbackLocalModelIDs
+            allowLocalFallbackAfterExternalFailure = policy.allowLocalFallbackAfterExternalFailure
         }
         isLoading = false
         sanitize()
@@ -664,6 +738,43 @@ final class TranscriptionPreferences {
         return ordered
     }
 
+    /// On-device models that may appear in the fallback chain. Antigravity is
+    /// cloud transcription and is never an on-device fallback.
+    static let onDeviceFallbackCandidates: [BuiltInTranscriptionModel] = [.parakeet, .whisper]
+
+    /// Ordered on-device fallback models, optionally skipping the model that
+    /// just failed so a job never retries what already errored.
+    func localFallbackModels(excluding failed: BuiltInTranscriptionModel? = nil) -> [BuiltInTranscriptionModel] {
+        fallbackLocalModelIDs.compactMap { id in
+            guard let model = BuiltInTranscriptionModel(rawValue: id),
+                  !model.usesAntigravity,
+                  model != failed else {
+                return nil
+            }
+            return model
+        }
+    }
+
+    func setLocalFallback(_ model: BuiltInTranscriptionModel, enabled: Bool) {
+        guard !model.usesAntigravity else { return }
+        if enabled {
+            if !fallbackLocalModelIDs.contains(model.id) {
+                fallbackLocalModelIDs.append(model.id)
+            }
+        } else {
+            fallbackLocalModelIDs.removeAll { $0 == model.id }
+        }
+    }
+
+    func moveLocalFallback(fromOffsets: IndexSet, toOffset: Int) {
+        let moving = fromOffsets.sorted().map { fallbackLocalModelIDs[$0] }
+        for index in fromOffsets.sorted(by: >) {
+            fallbackLocalModelIDs.remove(at: index)
+        }
+        let removedBeforeDestination = fromOffsets.filter { $0 < toOffset }.count
+        fallbackLocalModelIDs.insert(contentsOf: moving, at: max(0, toOffset - removedBeforeDestination))
+    }
+
     func snapshot() -> TranscriptionPreferencesSnapshot {
         .init(
             source: source,
@@ -674,7 +785,9 @@ final class TranscriptionPreferences {
             freeConnectionsOnly: freeConnectionsOnly,
             neverFallbackFromFreeToPaid: neverFallbackFromFreeToPaid,
             askBeforePaidFallback: askBeforePaidFallback,
-            allowCloudFallbackAfterLocalFailure: allowCloudFallbackAfterLocalFailure
+            allowCloudFallbackAfterLocalFailure: allowCloudFallbackAfterLocalFailure,
+            fallbackLocalModelIDs: fallbackLocalModelIDs,
+            allowLocalFallbackAfterExternalFailure: allowLocalFallbackAfterExternalFailure
         )
     }
 
@@ -691,8 +804,34 @@ final class TranscriptionPreferences {
             builtInModelID = Self.sanitizeBuiltInModelID(id)
             persistPolicy()
         }
+        // Stored Antigravity connections can predate the 3.7 → 3.8 model bump
+        // and carry the old version in their modelID or display name. Rewrite
+        // those so every label reflects the model that actually runs.
+        var migrated = connections
+        for index in migrated.indices where migrated[index].provider == .antigravityCLI {
+            if migrated[index].modelID.contains("3.7") {
+                migrated[index].modelID = migrated[index].modelID.replacingOccurrences(of: "3.7", with: "3.8")
+            }
+            if migrated[index].displayName.contains("3.7") {
+                migrated[index].displayName = migrated[index].displayName.replacingOccurrences(of: "3.7", with: "3.8")
+            }
+        }
+        if migrated != connections {
+            connections = migrated
+        }
         let valid = Set(connections.map(\.id))
         fallbackConnectionIDs = fallbackConnectionIDs.filter(valid.contains)
+        // Drop anything that is not an on-device model id (e.g. a legacy
+        // Antigravity id) and remove duplicates while preserving order.
+        var seenLocalIDs = Set<String>()
+        fallbackLocalModelIDs = fallbackLocalModelIDs.filter { id in
+            guard let model = BuiltInTranscriptionModel(rawValue: id),
+                  !model.usesAntigravity,
+                  seenLocalIDs.insert(id).inserted else {
+                return false
+            }
+            return true
+        }
         if let defaultConnectionID, !valid.contains(defaultConnectionID) {
             self.defaultConnectionID = connections.first(where: \.enabled)?.id
         }

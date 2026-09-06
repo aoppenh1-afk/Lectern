@@ -164,6 +164,26 @@ final class TranscriptionProviderTests: XCTestCase {
         )
     }
 
+    func testAntigravityRunningDisplayNameReflectsCurrentModel() {
+        let stale = TranscriptionConnection(
+            displayName: "Gemini 3.7 Flash",
+            provider: .antigravityCLI,
+            modelID: "gemini-3.7-flash-high"
+        )
+        XCTAssertEqual(stale.runningDisplayName, AntigravityACPClient.transcriptionDisplayName)
+        XCTAssertEqual(
+            TranscriptionConnection.builtInAntigravity().runningDisplayName,
+            AntigravityACPClient.transcriptionDisplayName
+        )
+
+        let custom = TranscriptionConnection(
+            displayName: "Groq free",
+            provider: .groq,
+            modelID: "whisper-large-v3-turbo"
+        )
+        XCTAssertEqual(custom.runningDisplayName, "Groq free")
+    }
+
     func testHebrewAudioImportUsesExplicitGeminiSettingInsteadOfWhisper() {
         let plan = TranscriptionJobPlan.resolve(
             preferenceSource: .local,
@@ -268,6 +288,25 @@ final class TranscriptionProviderTests: XCTestCase {
     }
 
     @MainActor
+    func testStaleAntigravityConnectionMigratesToCurrentModel() throws {
+        let suiteName = "LecternTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let stale = TranscriptionConnection(
+            displayName: "Gemini 3.7 Flash",
+            provider: .antigravityCLI,
+            modelID: "gemini-3.7-flash-high"
+        )
+        defaults.set(try JSONEncoder().encode([stale]), forKey: TranscriptionPreferences.settingsKey)
+
+        let restored = TranscriptionPreferences(defaults: defaults)
+        let migrated = try XCTUnwrap(restored.connections.first)
+        XCTAssertFalse(migrated.modelID.contains("3.7"))
+        XCTAssertFalse(migrated.displayName.contains("3.7"))
+        XCTAssertEqual(migrated.runningDisplayName, AntigravityACPClient.transcriptionDisplayName)
+    }
+
+    @MainActor
     func testFreeConnectionCannotFallThroughToPaidConnection() throws {
         let suiteName = "LecternTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -317,6 +356,77 @@ final class TranscriptionProviderTests: XCTestCase {
 
         XCTAssertEqual(preferences.defaultConnection?.id, free.id)
         XCTAssertTrue(preferences.fallbackPlan(startingWith: paid).isEmpty)
+    }
+
+    @MainActor
+    func testSnapshotWithoutLocalFallbackKeysDecodesWithDefaults() throws {
+        let legacy = #"{"source":"local","allowFallbackProviders":true}"#
+        let snapshot = try JSONDecoder().decode(
+            TranscriptionPreferencesSnapshot.self,
+            from: Data(legacy.utf8)
+        )
+        XCTAssertEqual(snapshot.source, .local)
+        XCTAssertTrue(snapshot.allowFallbackProviders)
+        XCTAssertEqual(snapshot.fallbackLocalModelIDs, [])
+        XCTAssertFalse(snapshot.allowLocalFallbackAfterExternalFailure)
+    }
+
+    @MainActor
+    func testLocalFallbackModelsRespectOrderAndExclusion() throws {
+        let suiteName = "LecternTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = TranscriptionPreferences(defaults: defaults)
+        preferences.fallbackLocalModelIDs = [
+            BuiltInTranscriptionModel.whisper.id,
+            BuiltInTranscriptionModel.parakeet.id,
+            BuiltInTranscriptionModel.antigravity.id,
+        ]
+
+        XCTAssertEqual(
+            preferences.localFallbackModels().map(\.id),
+            [BuiltInTranscriptionModel.whisper.id, BuiltInTranscriptionModel.parakeet.id]
+        )
+        XCTAssertEqual(
+            preferences.localFallbackModels(excluding: .whisper).map(\.id),
+            [BuiltInTranscriptionModel.parakeet.id]
+        )
+    }
+
+    @MainActor
+    func testSetLocalFallbackTogglesMembershipWithoutDuplicates() throws {
+        let suiteName = "LecternTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = TranscriptionPreferences(defaults: defaults)
+
+        preferences.setLocalFallback(.whisper, enabled: true)
+        preferences.setLocalFallback(.whisper, enabled: true)
+        preferences.setLocalFallback(.parakeet, enabled: true)
+        preferences.setLocalFallback(.antigravity, enabled: true)
+        XCTAssertEqual(
+            preferences.fallbackLocalModelIDs,
+            [BuiltInTranscriptionModel.whisper.id, BuiltInTranscriptionModel.parakeet.id]
+        )
+
+        preferences.setLocalFallback(.whisper, enabled: false)
+        XCTAssertEqual(preferences.fallbackLocalModelIDs, [BuiltInTranscriptionModel.parakeet.id])
+    }
+
+    @MainActor
+    func testLocalFallbackPreferencesPersist() throws {
+        let suiteName = "LecternTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = TranscriptionPreferences(defaults: defaults)
+        preferences.allowFallbackProviders = true
+        preferences.allowLocalFallbackAfterExternalFailure = true
+        preferences.fallbackLocalModelIDs = [BuiltInTranscriptionModel.whisper.id]
+
+        let restored = TranscriptionPreferences(defaults: defaults)
+        XCTAssertTrue(restored.allowLocalFallbackAfterExternalFailure)
+        XCTAssertEqual(restored.fallbackLocalModelIDs, [BuiltInTranscriptionModel.whisper.id])
+        XCTAssertEqual(restored.localFallbackModels().map(\.id), [BuiltInTranscriptionModel.whisper.id])
     }
 
     func testPersistentJobStoreRestoresSubmittedJobAndProviderID() async throws {

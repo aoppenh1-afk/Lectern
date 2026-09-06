@@ -79,6 +79,7 @@
 		506B4E0C2FEE82EABA756F91 /* CardSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01528EDB75F8B898B2746A6 /* CardSyncService.swift */; };
 		534F2F824A5B4CE43A3C1995 /* TranscriptionProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87CA75D98C0B0A79B24C31A6 /* TranscriptionProviders.swift */; };
 		54CC63CA6BCF1FC7456E54AF /* TranscriptSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6293D7F84B3E2FE505739AF8 /* TranscriptSegment.swift */; };
+		54EDF39C4881E27E83B1287F /* LocalModelAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7484EB4DB7F42BE66D0D748 /* LocalModelAvailability.swift */; };
 		552E85AB543002814CDABBB6 /* LectureDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DFFBA8697AE3C7AB28D15DE /* LectureDetailView.swift */; };
 		5615682F2B763412045BBC99 /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7D0F6D80C445E9723332BE /* MainWindowView.swift */; };
 		56C68A34848B5F232E26859D /* Enums.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D6361409917C609942439F /* Enums.swift */; };
@@ -104,6 +105,7 @@
 		681C224C5CB19823E357C693 /* ReferenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6AC1B3F5C73C9B7EF6CD77 /* ReferenceAttachment.swift */; };
 		69E7640296F076134CDA88B9 /* ReferenceMaterialPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A8D31EBDA459CA5FB32589 /* ReferenceMaterialPicker.swift */; };
 		6A84AD8F988068C3C6298016 /* LecternApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B528438D307A5B4FB6EAF1B /* LecternApp.swift */; };
+		6A99822377127DED59924502 /* LocalModelAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7484EB4DB7F42BE66D0D748 /* LocalModelAvailability.swift */; };
 		6AC221B5CC644CE1D388095D /* SurfacePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363051532AA63A00332E82D7 /* SurfacePreferences.swift */; };
 		6C8B2B6804CFA43DFC1D5537 /* AnkiConnectClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3217A5B8A37DD8207DD0478 /* AnkiConnectClient.swift */; };
 		6CEA910FD49F1BE8BB05BCCF /* ShiurImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C5B6AFA684E43B8FEA1573E /* ShiurImportSheet.swift */; };
@@ -334,6 +336,7 @@
 		C125CBCA32F7C013115044A9 /* CanvasModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasModels.swift; sourceTree = "<group>"; };
 		C6B420A4BE2849FFBF039B1F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C72925A022B89EE971A12294 /* YUTorahModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahModels.swift; sourceTree = "<group>"; };
+		C7484EB4DB7F42BE66D0D748 /* LocalModelAvailability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelAvailability.swift; sourceTree = "<group>"; };
 		CD3E8ECFA5DBAF53FDF24214 /* NotesMarkdownConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesMarkdownConverter.swift; sourceTree = "<group>"; };
 		D0DEC6C81E9D90FFBE3C748F /* RecordingFileLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFileLedger.swift; sourceTree = "<group>"; };
 		D3A0D799F1B023C3336AB825 /* LectureExportAvailability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureExportAvailability.swift; sourceTree = "<group>"; };
@@ -514,6 +517,7 @@
 			isa = PBXGroup;
 			children = (
 				576A2CBC9D67B86F6B125E6E /* ExternalTranscriptionEngine.swift */,
+				C7484EB4DB7F42BE66D0D748 /* LocalModelAvailability.swift */,
 				EE4BD4460EFC76CC20503256 /* TranscriptionEngine.swift */,
 				87CA75D98C0B0A79B24C31A6 /* TranscriptionProviders.swift */,
 				439436382A9383B21132AFA7 /* TranscriptionService.swift */,
@@ -899,6 +903,7 @@
 				809986650E99301152093682 /* LectureImportPicker.swift in Sources */,
 				AB2FECAA6D4132BAFE9B08BA /* LectureImportService.swift in Sources */,
 				0BE6A96BF3F7762C36D2F872 /* LiveBookmark.swift in Sources */,
+				54EDF39C4881E27E83B1287F /* LocalModelAvailability.swift in Sources */,
 				5615682F2B763412045BBC99 /* MainWindowView.swift in Sources */,
 				2ADEDBC002DEC1E15D1A1CC5 /* MenuBarPopoverView.swift in Sources */,
 				3C90514FAC181668F41A9CC3 /* NotesContentView.swift in Sources */,
@@ -1013,6 +1018,7 @@
 				C1DAB0243278C6B8217FAAE8 /* LectureImportPicker.swift in Sources */,
 				87D749F58B1B9A6848DD93E5 /* LectureImportService.swift in Sources */,
 				34591E3782F5F3B056774DD8 /* LiveBookmark.swift in Sources */,
+				6A99822377127DED59924502 /* LocalModelAvailability.swift in Sources */,
 				67C2B516005F92253AA7165C /* MainWindowView.swift in Sources */,
 				774E46198FF81D34D8A71C78 /* MenuBarPopoverView.swift in Sources */,
 				82688AA7EC72B3D17C7DE1B1 /* NotesContentView.swift in Sources */,

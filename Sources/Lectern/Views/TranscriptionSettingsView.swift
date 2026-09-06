@@ -1,3 +1,4 @@
+import ParakeetTDT
 import SwiftUI
 
 struct TranscriptionSettingsPane: View {
@@ -9,12 +10,14 @@ struct TranscriptionSettingsPane: View {
     @State private var testMessages: [UUID: String] = [:]
     @State private var antigravityCatalog = AgentModelCatalog.empty
     @State private var antigravityCatalogLoading = false
+    @State private var localAvailability = LocalModelAvailability()
 
     var body: some View {
         @Bindable var preferences = preferences
 
         VStack(alignment: .leading, spacing: 16) {
             transcriptionSourceCard(preferences: preferences)
+            localModelsCard
             connectionsCard
             fallbackCard(preferences: preferences)
         }
@@ -27,6 +30,7 @@ struct TranscriptionSettingsPane: View {
                 .environment(preferences)
         }
         .task {
+            localAvailability.refresh()
             await loadAntigravityCatalog()
         }
     }
@@ -144,6 +148,25 @@ struct TranscriptionSettingsPane: View {
                     .frame(width: 250)
                 }
             }
+        }
+        .padding(16)
+        .transcriptionSettingsCard()
+    }
+
+    private var localModelsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsSectionHeader(
+                eyebrow: "ON THIS MAC",
+                title: "On-device models",
+                detail: "Parakeet is fastest for English lectures. Whisper covers English and Hebrew shiurim. Both stay on this Mac."
+            )
+
+            LocalModelRow(model: .parakeet, availability: localAvailability)
+            LocalModelRow(model: .whisper, availability: localAvailability)
+
+            Button("Check again") { localAvailability.refresh() }
+                .font(.system(size: 11))
+                .buttonStyle(.link)
         }
         .padding(16)
         .transcriptionSettingsCard()
@@ -380,6 +403,53 @@ struct TranscriptionSettingsPane: View {
                 Toggle("Never fall back from free to paid", isOn: $preferences.neverFallbackFromFreeToPaid)
                 Toggle("Ask before a paid fallback", isOn: $preferences.askBeforePaidFallback)
                 Toggle("Allow cloud fallback after local failure", isOn: $preferences.allowCloudFallbackAfterLocalFailure)
+
+                Divider()
+                Toggle("Allow on-device fallback after cloud failure", isOn: $preferences.allowLocalFallbackAfterExternalFailure)
+                    .font(.system(size: 12, weight: .medium))
+                Text("When Antigravity or an API connection fails, fall back to a downloaded on-device model. Models that are not downloaded are skipped.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                if preferences.allowLocalFallbackAfterExternalFailure {
+                    VStack(spacing: 6) {
+                        ForEach(TranscriptionPreferences.onDeviceFallbackCandidates) { model in
+                            let order = preferences.fallbackLocalModelIDs.firstIndex(of: model.id)
+                            HStack(spacing: 10) {
+                                Text(order.map { "\($0 + 1)" } ?? "–")
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 20, height: 20)
+                                    .background(Color.primary.opacity(0.06), in: Circle())
+                                Image(systemName: "macbook")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(LecternTheme.accent)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(model.title)
+                                        .font(.system(size: 12, weight: .medium))
+                                    Text(localAvailability.isDownloaded(model) ? "Downloaded" : "Not downloaded — skipped until downloaded")
+                                        .font(.system(size: 10.5))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if order != nil {
+                                    Button { moveLocalFallback(model, by: -1) } label: { Image(systemName: "chevron.up") }
+                                        .buttonStyle(.plain).disabled(order == 0)
+                                    Button { moveLocalFallback(model, by: 1) } label: { Image(systemName: "chevron.down") }
+                                        .buttonStyle(.plain).disabled(order == preferences.fallbackLocalModelIDs.count - 1)
+                                }
+                                Toggle("", isOn: Binding(
+                                    get: { order != nil },
+                                    set: { preferences.setLocalFallback(model, enabled: $0) }
+                                ))
+                                .labelsHidden()
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
             }
         }
         .font(.system(size: 12))
@@ -391,6 +461,13 @@ struct TranscriptionSettingsPane: View {
         let destination = index + delta
         guard preferences.fallbackConnectionIDs.indices.contains(destination) else { return }
         preferences.fallbackConnectionIDs.swapAt(index, destination)
+    }
+
+    private func moveLocalFallback(_ model: BuiltInTranscriptionModel, by delta: Int) {
+        guard let index = preferences.fallbackLocalModelIDs.firstIndex(of: model.id) else { return }
+        let destination = index + delta
+        guard preferences.fallbackLocalModelIDs.indices.contains(destination) else { return }
+        preferences.fallbackLocalModelIDs.swapAt(index, destination)
     }
 
     private func test(_ connection: TranscriptionConnection) {
@@ -450,6 +527,128 @@ private struct SettingsSectionHeader: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// One on-device model (Parakeet or Whisper) with auto-detected download
+/// state and a download button when it is missing. Status refreshes through
+/// the shared `LocalModelAvailability` after a download finishes.
+private struct LocalModelRow: View {
+    let model: BuiltInTranscriptionModel
+    var availability: LocalModelAvailability
+
+    @State private var isDownloading = false
+    @State private var fraction = 0.0
+    @State private var errorMessage: String?
+    @State private var downloadTask: Task<Void, Never>?
+
+    private var downloaded: Bool { availability.isDownloaded(model) }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(LecternTheme.accent.opacity(downloaded ? 0.10 : 0.05))
+                Image(systemName: downloaded ? "macbook" : "arrow.down.circle")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(downloaded ? LecternTheme.accent : .secondary)
+            }
+            .frame(width: 42, height: 42)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(model.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(LecternTheme.ink)
+                    if isDownloading {
+                        Text(model == .whisper
+                            ? "Downloading \(Int((fraction * 100).rounded()))%"
+                            : "Downloading…")
+                            .providerBadge(tint: LecternTheme.processingTint)
+                    } else if downloaded {
+                        Text("Downloaded")
+                            .providerBadge(tint: LecternTheme.successTint)
+                    } else {
+                        Text("Not downloaded")
+                            .providerBadge(tint: .secondary)
+                    }
+                }
+                Text(model.subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                if isDownloading {
+                    // Parakeet reports per-file progress off the main actor,
+                    // so it shows an indeterminate bar; Whisper drives the
+                    // determinate fraction below.
+                    if model == .whisper {
+                        ProgressView(value: fraction)
+                            .controlSize(.small)
+                            .frame(maxWidth: 220)
+                    } else {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(LecternTheme.warningTint)
+                } else if model == .whisper, downloaded, !availability.whisperCLIInstalled {
+                    Text("Model is here, but whisper-cli was not found. Install whisper-cpp (e.g. brew install whisper-cpp) to use it.")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(LecternTheme.warningTint)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            if downloaded {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(LecternTheme.successTint)
+            } else if isDownloading {
+                Button("Cancel") { downloadTask?.cancel() }
+                    .controlSize(.small)
+            } else {
+                Button("Download") { startDownload() }
+                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+                    .tint(LecternTheme.accent)
+            }
+        }
+        .padding(10)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+        }
+    }
+
+    private func startDownload() {
+        guard !isDownloading else { return }
+        errorMessage = nil
+        isDownloading = true
+        fraction = 0
+        downloadTask = Task {
+            do {
+                switch model {
+                case .parakeet:
+                    _ = try await ModelDownloader().download(repoId: TranscriptionEngine.repoId)
+                    fraction = 1
+                case .whisper:
+                    try await WhisperTranscriptionEngine().downloadModel { progress in
+                        fraction = progress
+                    }
+                case .antigravity:
+                    break
+                }
+                availability.refresh()
+            } catch is CancellationError {
+                errorMessage = "Download cancelled."
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isDownloading = false
         }
     }
 }
