@@ -33,23 +33,10 @@ fi
 # Preflight signing identity: Releases MUST have a persistent code signing certificate
 # to avoid invalidating user Keychain access on update.
 export REQUIRE_CODE_SIGN_IDENTITY=1
-SIGN_IDENTITY="${LECTERN_SIGN_IDENTITY:-}"
-if [[ -z "$SIGN_IDENTITY" ]]; then
-  if security find-identity -p codesigning -v | grep -q "\"Lectern Release Signing\""; then
-    SIGN_IDENTITY="Lectern Release Signing"
-  elif security find-identity -p codesigning -v | grep -q "\"Developer ID Application:"; then
-    SIGN_IDENTITY="$(security find-identity -p codesigning -v | grep "\"Developer ID Application:" | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')"
-  elif security find-identity -p codesigning -v | grep -q "\"Apple Development:"; then
-    SIGN_IDENTITY="$(security find-identity -p codesigning -v | grep "\"Apple Development:" | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')"
-  fi
-fi
-
-if [[ -z "$SIGN_IDENTITY" ]]; then
-  echo "Error: Refusing to cut release without a persistent code signing certificate." >&2
-  echo "Ad-hoc signed releases cause macOS Keychain to prompt users for credentials on every update." >&2
-  echo "Run 'scripts/setup-signing-cert.sh' to create a permanent 'Lectern Release Signing' certificate." >&2
-  exit 1
-fi
+source "$ROOT/scripts/release-signing.sh"
+# Assignment must be separate from export so a failed preflight stops the release.
+SIGN_IDENTITY="$(resolve_lectern_signing_identity)"
+export LECTERN_SIGN_IDENTITY="$SIGN_IDENTITY"
 echo "Using signing identity: $SIGN_IDENTITY"
 
 REPO="$(grep -E '^[[:space:]]*LecternUpdateRepository:' project.yml | sed -E 's/.*:[[:space:]]*//')"
@@ -66,6 +53,8 @@ sed -i '' -E "s/^([[:space:]]*CURRENT_PROJECT_VERSION:).*/\\1 \"$NEXT_BUILD\"/" 
 xcodegen generate >/dev/null
 
 "$ROOT/scripts/build-app.sh"
+
+verify_lectern_release_signature "$ROOT/dist/Lectern.app"
 
 ZIP="dist/Lectern-$VERSION.zip"
 rm -f "$ZIP" "$ZIP.sha256"

@@ -73,6 +73,8 @@ You can also download any version from the [Releases page](https://github.com/ao
 
 Antigravity ACP is the default. **Settings › Agents** manages its runtime and Google account separately, and detects other supported agents on this Mac (ChatGPT via `codex-acp`, OpenCode).
 
+All three use the bundled [Lectern notes skill](.agents/skills/lectern-notes/SKILL.md), which contains separate layouts for English lectures and English-Hebrew shiurim. No separate skill installation or access to the author's notes is needed. Google Docs sync keeps headings and lists left to right and isolates Hebrew phrases while leaving surrounding punctuation and numbers in the LTR sentence. The export format version is part of the sync hash, so the next sync can reformat existing notes without regenerating them.
+
 ## Building from source
 
 ```bash
@@ -92,19 +94,17 @@ xcodebuild -scheme Lectern -destination 'platform=macOS' test
 
 Releases require a persistent code signing certificate so macOS Keychain items (Canvas tokens, Google Docs OAuth, transcription API keys) remain accessible across updates without repeatedly prompting the user.
 
-If you have not set up the release certificate on this Mac yet, run the one-time helper:
+Builds and releases are pinned to the original `Lectern Release Signing` certificate fingerprint in `scripts/release-signing.sh`. On another Mac, import the existing `.p12` backup into your login Keychain. Creating a new certificate with the same name does not preserve Keychain access. The setup helper is only for establishing a new identity, not restoring this app's release identity.
 
-```bash
-scripts/setup-signing-cert.sh
-```
-
-This creates a 20-year self-signed `Lectern Release Signing` certificate in your login keychain and saves a backup `.p12` archive to your Desktop (`Lectern-Release-Signing-BACKUP.p12`, password: `lectern`). **Keep this `.p12` file backed up safely** so you can preserve the app's signing identity if you ever switch machines.
-
-To publish a release:
+Run a release with:
 
 ```bash
 scripts/release.sh 1.3.1 --notes "What changed"
 ```
+
+The scripts refuse a missing or different certificate and verify the finished app against the pinned signing requirement before packaging. For a disposable local build only, use `LECTERN_SIGN_IDENTITY=- scripts/build-app.sh`. Such builds may require Keychain authorization again.
+
+Credentials saved by an older ad-hoc or differently signed build may prompt once after the transition. Choose **Always Allow** in the macOS Keychain prompt to authorize the stable identity. Future releases must keep using the same certificate. This does not eliminate prompts when the login Keychain itself is locked.
 
 This verifies the signing identity, bumps `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml`, builds and signs the app bundle with the persistent certificate, zips, commits, tags `v1.3.1`, pushes, and creates the GitHub release with the zip and its `.sha256`. Installed copies pick it up on their next check.
 

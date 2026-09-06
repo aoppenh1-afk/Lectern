@@ -8,7 +8,7 @@ import Foundation
 /// tabs to choose the nesting level for `createParagraphBullets` and then
 /// strips them.
 enum NotesMarkdownConverter {
-    static let formatVersion = "v5"
+    static let formatVersion = "v7"
 
     struct WritePlan {
         let text: String
@@ -35,6 +35,27 @@ enum NotesMarkdownConverter {
                     ] as [String: Any]
                 ]
             ])
+            // The final paragraph survives deleting the old body. Docs can
+            // retain its list membership and copy it to every inserted line.
+            // Clear inherited bullets before applying this outline's list ranges.
+            let bodyRange = range(start: 1, end: text.utf16.count + 1, tabId: tabId)
+            requests.append([
+                "deleteParagraphBullets": ["range": bodyRange]
+            ])
+            // Removing bullets preserves their visual indentation. Reset that
+            // too, so headings/body text stay flush left across repeated syncs.
+            // Depth tabs remain in the text for createParagraphBullets below.
+            requests.append([
+                "updateParagraphStyle": [
+                    "paragraphStyle": [
+                        "indentStart": ["magnitude": 0, "unit": "PT"],
+                        "indentEnd": ["magnitude": 0, "unit": "PT"],
+                        "indentFirstLine": ["magnitude": 0, "unit": "PT"],
+                    ],
+                    "fields": "indentStart,indentEnd,indentFirstLine",
+                    "range": bodyRange,
+                ]
+            ])
             for heading in headingRanges {
                 let named = heading.level <= 1 ? "HEADING_1" : "HEADING_2"
                 requests.append([
@@ -54,10 +75,8 @@ enum NotesMarkdownConverter {
                     ]
                 ])
             }
-            // Hebrew headings and body paragraphs use RTL flow with physical
-            // left alignment. Hebrew-led list paragraphs are emitted as LTR
-            // so Docs keeps their bullets on the left; their text is wrapped
-            // in a Unicode RTL isolate by `plan(markdown:)`.
+            // The outline always flows left to right, including Hebrew-first
+            // headings. Only Hebrew phrases inside a paragraph use RTL isolates.
             for paragraph in directionRanges {
                 requests.append([
                     "updateParagraphStyle": [
@@ -106,7 +125,7 @@ enum NotesMarkdownConverter {
     static let numberedPreset = "NUMBERED_DECIMAL_ALPHA_ROMAN"
 
     static func plan(markdown: String) -> WritePlan {
-        let items = parse(replaceFences(markdown))
+        let items = parse(replaceFences(removingDirectionControls(markdown)))
         var headingRanges: [(Int, Int, Int)] = []
         var listParas: [(start: Int, end: Int, preset: String)] = []
         var boldRanges: [(Int, Int)] = []
@@ -115,20 +134,9 @@ enum NotesMarkdownConverter {
         var cursor = 1
 
         for item in items {
-            let naturalDirection = paragraphDirection(for: item.text)
-            let isHebrewList: Bool
-            let renderedText: String
-            let renderedBold: [(start: Int, end: Int)]
-            if case .list = item.kind, naturalDirection == "RIGHT_TO_LEFT" {
-                isHebrewList = true
-                let isolated = isolateHebrewRuns(in: item.text, splitAt: item.bold)
-                renderedText = isolated.text
-                renderedBold = isolated.bold
-            } else {
-                isHebrewList = false
-                renderedText = item.text
-                renderedBold = item.bold
-            }
+            let isolated = isolateHebrewRuns(in: item.text, boldRanges: item.bold)
+            let renderedText = isolated.text
+            let renderedBold = isolated.bold
 
             let start = cursor
             let textLen = renderedText.utf16.count
@@ -147,7 +155,7 @@ enum NotesMarkdownConverter {
             directionRanges.append((
                 start,
                 end,
-                isHebrewList ? "LEFT_TO_RIGHT" : naturalDirection
+                "LEFT_TO_RIGHT"
             ))
             renderedItems.append(renderedText)
             cursor = end
@@ -294,12 +302,17 @@ enum NotesMarkdownConverter {
         )
     }
 
-    private static func paragraphDirection(for text: String) -> String {
-        for scalar in text.unicodeScalars {
-            guard CharacterSet.letters.contains(scalar) else { continue }
-            return isHebrew(scalar) ? "RIGHT_TO_LEFT" : "LEFT_TO_RIGHT"
-        }
-        return "LEFT_TO_RIGHT"
+    private static func removingDirectionControls(_ text: String) -> String {
+        // Rebuild direction at the export boundary, before calculating Markdown
+        // and UTF-16 ranges. Pasted controls must not nest or unbalance our isolates.
+        String(text.unicodeScalars.filter {
+            switch $0.value {
+            case 0x061C, 0x200E...0x200F, 0x202A...0x202E, 0x2066...0x2069:
+                return false
+            default:
+                return true
+            }
+        })
     }
 
     private static func isHebrew(_ scalar: Unicode.Scalar) -> Bool {
@@ -313,21 +326,12 @@ enum NotesMarkdownConverter {
 
     private static func isolateHebrewRuns(
         in text: String,
-        splitAt boldRanges: [(start: Int, end: Int)]
+        boldRanges: [(start: Int, end: Int)]
     ) -> (text: String, bold: [(start: Int, end: Int)]) {
         let textLength = text.utf16.count
-        let boundaries = Set(
-            [0, textLength] + boldRanges.flatMap { [$0.start, $0.end] }
-        ).sorted()
-        var segments: [(start: Int, end: Int)] = []
-
-        for index in 0..<(boundaries.count - 1) {
-            segments += hebrewSegments(
-                in: text,
-                from: boundaries[index],
-                to: boundaries[index + 1]
-            )
-        }
+        // Bold changes presentation, not Hebrew word order. Splitting a phrase
+        // at a bold boundary would reorder its parts within the LTR paragraph.
+        let segments = hebrewSegments(in: text, from: 0, to: textLength)
 
         var output = ""
         var previousEnd = 0
@@ -362,48 +366,33 @@ enum NotesMarkdownConverter {
         var lastHebrewEnd = lowerBound
         var offset = lowerBound
 
-        func finishSegment(at boundary: Int) {
+        func finishSegment() {
             guard let start = segmentStart else { return }
-            let end = hebrewSegmentEnd(
-                in: text,
-                afterLastHebrew: lastHebrewEnd,
-                before: boundary
-            )
-            segments.append((start, end))
+            segments.append((start, lastHebrewEnd))
             segmentStart = nil
         }
 
-        for scalar in text[lowerIndex..<upperIndex].unicodeScalars {
+        let scalars = Array(text[lowerIndex..<upperIndex].unicodeScalars)
+        for (index, scalar) in scalars.enumerated() {
             let scalarEnd = offset + scalar.utf16.count
             if isHebrew(scalar) {
                 if segmentStart == nil { segmentStart = offset }
                 lastHebrewEnd = scalarEnd
-            } else if CharacterSet.letters.contains(scalar) {
-                finishSegment(at: offset)
+            } else if (scalar == "\"" || scalar == "'") && index > 0
+                && index + 1 < scalars.count
+                && isHebrew(scalars[index - 1]) && isHebrew(scalars[index + 1]) {
+                // Legacy ASCII abbreviation quotes belong inside the word.
+                lastHebrewEnd = scalarEnd
+            } else if !CharacterSet.whitespaces.contains(scalar) {
+                // Sentence punctuation, paired brackets, and numbers belong to
+                // the LTR sentence. Never swallow one side of a bracket pair,
+                // or join comma/semicolon-separated Hebrew phrases into one run.
+                finishSegment()
             }
             offset = scalarEnd
         }
-        finishSegment(at: upperBound)
+        finishSegment()
         return segments
-    }
-
-    private static func hebrewSegmentEnd(
-        in text: String,
-        afterLastHebrew lastHebrewEnd: Int,
-        before boundary: Int
-    ) -> Int {
-        let pending = utf16Substring(text, from: lastHebrewEnd, to: boundary)
-        guard let lastNonspace = pending.rangeOfCharacter(
-            from: .whitespacesAndNewlines.inverted,
-            options: .backwards
-        ) else {
-            return lastHebrewEnd
-        }
-        let meaningful = String(pending[..<lastNonspace.upperBound])
-        if meaningful.contains(where: { "([{<".contains($0) }) {
-            return lastHebrewEnd
-        }
-        return lastHebrewEnd + meaningful.utf16.count
     }
 
     private static func utf16Substring(_ text: String, from start: Int, to end: Int) -> String {

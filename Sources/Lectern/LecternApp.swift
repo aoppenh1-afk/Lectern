@@ -265,6 +265,7 @@ struct LecternApp: App {
 
         Settings {
             SettingsView()
+                .preferredColorScheme(surfacePreferences.appearance.colorScheme)
                 .environment(surfacePreferences)
                 .environment(googleDocsAuth)
                 .environment(transcriptionPreferences)

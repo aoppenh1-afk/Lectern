@@ -552,6 +552,54 @@ for raw in sys.stdin:
         XCTAssertEqual(result.providerInfo.provider, .antigravityCLI)
     }
 
+    func testNotesSendsCompleteBundledSkillThroughACPWithoutPersonalSkillInstallation() async throws {
+        let script = #"""
+import json, sys
+for raw in sys.stdin:
+    request = json.loads(raw)
+    method = request.get("method")
+    request_id = request.get("id")
+    if method == "initialize":
+        result = {"protocolVersion": 1, "agentInfo": {"name": "fixture", "version": "1"},
+                  "agentCapabilities": {}, "authMethods": [{"id": "oauth-personal", "name": "Google"}]}
+    elif method == "session/new":
+        model = "gemini-3.8-flash-high"
+        result = {"sessionId": "notes", "configOptions": [
+            {"id": "model", "category": "model", "currentValue": model,
+             "options": [{"value": model, "name": model}]}]}
+    elif method == "session/prompt":
+        text = "\n".join(b.get("text", "") for b in request["params"]["prompt"] if b.get("type") == "text")
+        update = {"sessionId": "notes", "update": {"sessionUpdate": "agent_message_chunk",
+                  "content": {"type": "text", "text": text}}}
+        print(json.dumps({"jsonrpc": "2.0", "method": "session/update", "params": update}), flush=True)
+        result = {"stopReason": "end_turn"}
+    else:
+        result = {}
+    print(json.dumps({"jsonrpc": "2.0", "id": request_id, "result": result}), flush=True)
+"""#
+        let appURL = Bundle(for: Self.self).bundleURL.deletingLastPathComponent()
+            .appendingPathComponent("Lectern.app")
+        let bundle = try XCTUnwrap(Bundle(url: appURL))
+        let skillURL = try XCTUnwrap(LecternAgentSkill.notes.bundledURL(bundle: bundle))
+        XCTAssertTrue(skillURL.path.hasPrefix(appURL.path + "/"))
+        let instructions = try String(contentsOf: skillURL, encoding: .utf8)
+        let client = AntigravityACPClient(connectionFactory: {
+            try await ACPConnection.connect(
+                executableURL: URL(fileURLWithPath: "/usr/bin/python3"),
+                arguments: ["-u", "-c", script],
+                environment: ProcessInfo.processInfo.environment
+            )
+        }, skillURLOverrides: [.notes: skillURL])
+        let request = Prompts.antigravityNotesRequest(language: .hebrewEnglish)
+        let delivered = try await client.run(
+            prompt: request,
+            inputs: [.text("The משנה introduces a question", named: "lecture-source.md")],
+            skills: [.notes]
+        )
+        XCTAssertTrue(delivered.contains("Instructions from /lectern-notes:\n" + instructions))
+        XCTAssertTrue(delivered.contains(request))
+    }
+
     private func makeToneWithSilence(
         at url: URL,
         silenceCenterSeconds: Double
