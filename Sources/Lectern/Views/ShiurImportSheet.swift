@@ -186,7 +186,7 @@ struct ShiurImportSheet: View {
             Divider()
 
             Toggle(isOn: $autoGenerateNotes) {
-                Text("Generate Notes after transcription")
+                Text("Clean up transcript and note taking")
                     .font(.system(size: 12.5, weight: .medium))
             }
             .toggleStyle(.switch)

@@ -358,10 +358,10 @@ struct SubscriptionEditorView: View {
 
             Divider()
 
-            // Auto-notes
+            // Clean up transcript & note taking
             Toggle(isOn: $autoGenerateNotes) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Generate Notes after transcription")
+                    Text("Clean up transcript and note taking")
                         .font(.system(size: 12.5, weight: .medium))
                     Text("Study agent: \(studyAgentSummary)")
                         .font(.system(size: 10.5))

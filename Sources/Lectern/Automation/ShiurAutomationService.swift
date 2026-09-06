@@ -331,7 +331,7 @@ final class ShiurAutomationService {
                 try? modelContainer.mainContext.save()
             } catch {
                 item.state = .failed
-                item.stateMessage = "Notes generation failed: \(error.localizedDescription)"
+                item.stateMessage = "Clean up & note taking failed: \(error.localizedDescription)"
                 try? modelContainer.mainContext.save()
             }
         }

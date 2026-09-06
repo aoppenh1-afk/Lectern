@@ -225,7 +225,7 @@ struct SubscriptionsView: View {
                             Label("Auto-transcribe", systemImage: "waveform")
                         }
                         if sub.autoGenerateNotes {
-                            Label("Auto-Notes", systemImage: "sparkles")
+                            Label("Clean up transcript & note taking", systemImage: "sparkles")
                         }
                         Text("Imported: \(sub.importedCount)")
                         if let lastImport = sub.lastImportedTitle {
