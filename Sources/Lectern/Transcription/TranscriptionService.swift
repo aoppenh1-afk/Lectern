@@ -48,6 +48,10 @@ final class TranscriptionService {
         drainQueue()
     }
 
+    func isQueuedOrRunning(lectureID: PersistentIdentifier) -> Bool {
+        activeID == lectureID || pendingIDs.contains(lectureID)
+    }
+
     /// Stops queued and active work. Active external commands receive task
     /// cancellation, which also tears down their complete process tree.
     func cancelAll() {
@@ -161,7 +165,7 @@ final class TranscriptionService {
             return
         }
         let existingArtifact = lecture.artifact(of: .rawTranscript)
-        if existingArtifact != nil, lecture.status == .ready {
+        if lecture.hasCompletedRawTranscript {
             return
         }
 

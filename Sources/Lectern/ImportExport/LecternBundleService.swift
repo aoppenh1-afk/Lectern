@@ -136,6 +136,16 @@ enum LecternBundleService {
                               duration: manifest.duration, status: .ready, language: manifest.language)
         lecture.course = course
         context.insert(lecture)
+        var importedFiles: [URL] = []
+        var completed = false
+        defer {
+            if !completed {
+                context.delete(lecture)
+                for file in importedFiles {
+                    try? FileManager.default.removeItem(at: file)
+                }
+            }
+        }
 
         func addArtifact(_ kind: ArtifactKind, _ content: String?) {
             guard let content, !content.isEmpty else { return }
@@ -147,7 +157,7 @@ enum LecternBundleService {
         addArtifact(.cleanedTranscript, manifest.cleanedTranscript)
 
         if let notes = manifest.notes {
-            let importedNotes = try restoreImages(in: notes, from: source, lecture: lecture)
+            let importedNotes = try restoreImages(in: notes, from: source, importedFiles: &importedFiles)
             addArtifact(.notes, importedNotes)
         }
         for cardData in manifest.flashcards {
@@ -167,8 +177,9 @@ enum LecternBundleService {
             bookmark.lecture = lecture
             lecture.bookmarks.append(bookmark)
         }
-        try restoreReferences(manifest.references, source: source, lecture: lecture, context: context)
+        try restoreReferences(manifest.references, source: source, lecture: lecture, context: context, importedFiles: &importedFiles)
         try context.save()
+        completed = true
         return lecture
     }
 
@@ -197,10 +208,11 @@ enum LecternBundleService {
     }
 
     @MainActor
-    private static func restoreImages(in markdown: String, from bundle: URL, lecture: Lecture) throws -> String {
+    private static func restoreImages(in markdown: String, from bundle: URL, importedFiles: inout [URL]) throws -> String {
         let regex = try NSRegularExpression(pattern: #"!\[([^\]]*)\]\((Assets/[^)]+)\)"#)
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let target = support.appendingPathComponent("Lectern/Attachments/Imported-\(UUID().uuidString)", isDirectory: true)
+        importedFiles.append(target)
         var output = markdown
         for match in regex.matches(in: markdown, range: NSRange(markdown.startIndex..., in: markdown)).reversed() {
             guard let range = Range(match.range(at: 2), in: markdown) else { continue }
@@ -218,7 +230,7 @@ enum LecternBundleService {
 
     @MainActor
     private static func restoreReferences(_ references: [Reference], source: URL,
-                                          lecture: Lecture, context: ModelContext) throws {
+                                          lecture: Lecture, context: ModelContext, importedFiles: inout [URL]) throws {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let target = support.appendingPathComponent("Lectern/Reference Materials", isDirectory: true)
         try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
@@ -229,6 +241,7 @@ enum LecternBundleService {
                 if FileManager.default.fileExists(atPath: bundled.path) {
                     let name = uniqueName(for: item.name, in: target)
                     let copied = target.appendingPathComponent(name)
+                    importedFiles.append(copied)
                     try FileManager.default.copyItem(at: bundled, to: copied)
                     path = copied.path
                 }

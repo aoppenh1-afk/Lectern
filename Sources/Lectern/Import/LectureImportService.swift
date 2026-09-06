@@ -75,7 +75,7 @@ final class LectureImportService {
         let stamp = Self.fileStampFormatter.string(from: Date())
         let ext = sourceURL.pathExtension.isEmpty ? "mp3" : sourceURL.pathExtension
         let destinationURL = recordingsDirectory
-            .appendingPathComponent("Imported \(stamp).\(ext)")
+            .appendingPathComponent("Imported \(stamp)-\(UUID().uuidString).\(ext)")
 
         do {
             if moveSource {

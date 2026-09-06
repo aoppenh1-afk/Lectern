@@ -19,6 +19,8 @@ final class ShiurAutomationService {
     private let generationService: GenerationService
     private let completionNotifier: any CompletionNotifying
 
+    private var activeSourceKeys: Set<String> = []
+
     private var activeSubscriptionIDs: Set<UUID> = []
 
     init(
@@ -99,86 +101,24 @@ final class ShiurAutomationService {
             try? modelContainer.mainContext.save()
 
         case .newItems(let items, let channelTitle, let eTag, let lastModified):
-            let isFirstCheck = subscription.lastSuccessfulCheckAt == nil || subscription.seenItemIDs.isEmpty
-
-            subscription.lastSuccessfulCheckAt = Date()
-            subscription.eTag = eTag
-            subscription.lastModified = lastModified
-            subscription.lastError = nil
-
-            if let channelTitle, !channelTitle.isEmpty,
-               subscription.displayName.starts(with: "YU Torah") || subscription.displayName.isEmpty {
-                subscription.displayName = channelTitle
+            let context = modelContainer.mainContext
+            let previousSuccess = subscription.lastSuccessfulCheckAt
+            let previousSeen = subscription.seenItemIDsData
+            let isFirstCheck = previousSuccess == nil
+            var seen = subscription.seenItemIDs
+            // Feeds can contain duplicate entries and need not be newest-first.
+            let orderedItems = items.sorted { $0.date > $1.date }
+            let uniqueItems = orderedItems.filter {
+                seen.insert($0.shiurID).inserted
             }
-
-            // Baseline check: if this subscription has not established a baseline yet
-            if isFirstCheck {
-                let allIDs = items.map(\.shiurID)
-                subscription.markSeen(itemIDs: allIDs)
-                try? modelContainer.mainContext.save()
-
-                if subscription.isBaselineFutureOnly {
-                    // "Start with new shiurim from now on":
-                    // All current items in the feed are marked as seen; import ZERO old shiurim.
-                    return
-                } else {
-                    // "Import currently visible recent shiurim":
-                    // Import only the top few (up to 5) visible recent items from the feed
-                    let recentLimit = 5
-                    let itemsToImport = Array(items.prefix(recentLimit)).sorted(by: { $0.date < $1.date })
-
-                    for remoteItem in itemsToImport {
-                        if findExistingLecture(shiurID: remoteItem.shiurID) != nil {
-                            subscription.lastImportedAt = Date()
-                            subscription.lastImportedTitle = remoteItem.title
-                            subscription.importedCount += 1
-                            try? modelContainer.mainContext.save()
-                            continue
-                        }
-
-                        let automationItem = ShiurAutomationItem(
-                            sourceKey: remoteItem.sourceKey,
-                            shiurID: remoteItem.shiurID,
-                            subscriptionID: subscription.id,
-                            title: remoteItem.title,
-                            teacherName: remoteItem.teacherName,
-                            seriesName: remoteItem.seriesName,
-                            publicationDate: remoteItem.date,
-                            pageURLString: remoteItem.pageURL?.absoluteString,
-                            mediaURLString: remoteItem.enclosureURL?.absoluteString,
-                            duration: remoteItem.duration,
-                            state: .discovered,
-                            language: subscription.language,
-                            autoTranscribe: subscription.autoTranscribe,
-                            autoGenerateNotes: subscription.autoGenerateNotes
-                        )
-                        modelContainer.mainContext.insert(automationItem)
-                        try? modelContainer.mainContext.save()
-
-                        await processItem(automationItem, targetCourse: subscription.course)
-                    }
-                    return
-                }
-            }
-
-            // Normal subsequent check: filter new items not seen by this subscription
-            let newItems = items
-                .filter { !subscription.hasSeen(itemID: $0.shiurID) }
-                .sorted(by: { $0.date < $1.date }) // Process oldest to newest
-
-            for remoteItem in newItems {
-                subscription.markSeen(itemIDs: [remoteItem.shiurID])
-                try? modelContainer.mainContext.save()
-
-                if findExistingLecture(shiurID: remoteItem.shiurID) != nil {
-                    subscription.lastImportedAt = Date()
-                    subscription.lastImportedTitle = remoteItem.title
-                    subscription.importedCount += 1
-                    try? modelContainer.mainContext.save()
-                    continue
-                }
-
-                let automationItem = ShiurAutomationItem(
+            let candidates = isFirstCheck
+                ? (subscription.isBaselineFutureOnly ? [] : Array(uniqueItems.prefix(5)))
+                : uniqueItems
+            var pending: [ShiurAutomationItem] = []
+            for remoteItem in candidates.reversed() {
+                guard findExistingLecture(shiurID: remoteItem.shiurID) == nil,
+                      findAutomationItem(sourceKey: remoteItem.sourceKey) == nil else { continue }
+                let item = ShiurAutomationItem(
                     sourceKey: remoteItem.sourceKey,
                     shiurID: remoteItem.shiurID,
                     subscriptionID: subscription.id,
@@ -189,15 +129,43 @@ final class ShiurAutomationService {
                     pageURLString: remoteItem.pageURL?.absoluteString,
                     mediaURLString: remoteItem.enclosureURL?.absoluteString,
                     duration: remoteItem.duration,
-                    state: .discovered,
+                    targetCourseIDData: subscription.course.flatMap {
+                        try? JSONEncoder().encode($0.persistentModelID)
+                    },
                     language: subscription.language,
                     autoTranscribe: subscription.autoTranscribe,
                     autoGenerateNotes: subscription.autoGenerateNotes
                 )
-                modelContainer.mainContext.insert(automationItem)
-                try? modelContainer.mainContext.save()
+                context.insert(item)
+                pending.append(item)
+            }
 
-                await processItem(automationItem, targetCourse: subscription.course)
+            subscription.markSeen(itemIDs: orderedItems.reversed().map(\.shiurID))
+            subscription.lastSuccessfulCheckAt = Date()
+            subscription.eTag = eTag
+            subscription.lastModified = lastModified
+            subscription.lastError = nil
+            if let channelTitle, !channelTitle.isEmpty,
+               subscription.displayName.starts(with: "YU Torah") || subscription.displayName.isEmpty {
+                subscription.displayName = channelTitle
+            }
+
+            // Persist the entire queue with its feed checkpoint before starting any
+            // download. A restart must not lose the remainder behind a cached ETag.
+            do {
+                try context.save()
+            } catch {
+                for item in pending { context.delete(item) }
+                subscription.lastSuccessfulCheckAt = previousSuccess
+                subscription.seenItemIDsData = previousSeen
+                subscription.eTag = nil
+                subscription.lastModified = nil
+                subscription.lastError = "Could not save the import queue: \(error.localizedDescription)"
+                lastCheckError = subscription.lastError
+                return
+            }
+            for item in pending {
+                await processItem(item, targetCourse: subscription.course)
             }
         }
     }
@@ -208,6 +176,25 @@ final class ShiurAutomationService {
         guard !activeItemIDs.contains(item.id) else { return }
         activeItemIDs.insert(item.id)
         defer { activeItemIDs.remove(item.id) }
+
+        while activeSourceKeys.contains(item.sourceKey) {
+            do { try await Task.sleep(for: .milliseconds(100)) }
+            catch { return }
+        }
+        guard !Task.isCancelled else { return }
+        activeSourceKeys.insert(item.sourceKey)
+        defer { activeSourceKeys.remove(item.sourceKey) }
+
+        if let targetCourse {
+            item.targetCourseIDData = try? JSONEncoder().encode(targetCourse.persistentModelID)
+        }
+        let course = targetCourse ?? resolvedCourse(for: item)
+        if item.state == .imported ||
+            ((item.state == .discovered || item.state == .downloading) && findExistingLecture(shiurID: item.shiurID) != nil) {
+            item.state = item.autoTranscribe ? .waitingForTranscription : .complete
+            item.stateMessage = nil
+            try? modelContainer.mainContext.save()
+        }
 
         if item.state == .discovered || item.state == .downloading {
             item.state = .downloading
@@ -254,7 +241,7 @@ final class ShiurAutomationService {
                     from: downloadedFile,
                     metadata: .init(
                         title: item.title,
-                        course: targetCourse,
+                        course: course,
                         language: item.language,
                         capturedAt: item.publicationDate,
                         sourceProviderRaw: "yutorah",
@@ -295,7 +282,7 @@ final class ShiurAutomationService {
                 return
             }
 
-            if lecture.artifact(of: .rawTranscript) != nil {
+            if lecture.hasCompletedRawTranscript {
                 // Transcript already exists
                 item.state = item.autoGenerateNotes ? .waitingForNotes : .complete
                 try? modelContainer.mainContext.save()
@@ -313,8 +300,9 @@ final class ShiurAutomationService {
                 transcriptionService.enqueue(lectureID: lecture.persistentModelID)
 
                 // Wait for transcription to finish
-                while lecture.status == .transcribing {
-                    try? await Task.sleep(for: .seconds(1))
+                while transcriptionService.isQueuedOrRunning(lectureID: lecture.persistentModelID) {
+                    do { try await Task.sleep(for: .milliseconds(250)) }
+                    catch { return }
                 }
 
                 if lecture.status == .failed {
@@ -324,9 +312,15 @@ final class ShiurAutomationService {
                     return
                 }
 
-                if lecture.status == .ready && lecture.artifact(of: .rawTranscript) != nil {
+                if lecture.hasCompletedRawTranscript {
                     item.state = item.autoGenerateNotes ? .waitingForNotes : .complete
+                    item.stateMessage = nil
                     try? modelContainer.mainContext.save()
+                } else {
+                    item.state = .failed
+                    item.stateMessage = lecture.statusMessage ?? "Transcription stopped before a complete transcript was saved."
+                    try? modelContainer.mainContext.save()
+                    return
                 }
             }
         }
@@ -379,6 +373,27 @@ final class ShiurAutomationService {
                 try? modelContainer.mainContext.save()
             }
         }
+    }
+
+    func retryItem(_ item: ShiurAutomationItem) async {
+        guard !activeItemIDs.contains(item.id), item.state == .failed || item.state == .paused else { return }
+        if let lecture = findExistingLecture(shiurID: item.shiurID) {
+            if lecture.hasCompletedRawTranscript {
+                item.state = item.autoGenerateNotes ? .waitingForNotes : .complete
+            } else {
+                item.state = item.autoTranscribe ? .waitingForTranscription : .complete
+            }
+        } else {
+            item.state = .discovered
+        }
+        item.stateMessage = nil
+        do { try modelContainer.mainContext.save() }
+        catch {
+            item.state = .failed
+            item.stateMessage = "Could not save retry: \(error.localizedDescription)"
+            return
+        }
+        await processItem(item)
     }
 
     // MARK: - One-Time Shiur Import
@@ -505,15 +520,29 @@ final class ShiurAutomationService {
     func findExistingLecture(shiurID: String) -> Lecture? {
         let key = "yutorah:\(shiurID)"
         let context = modelContainer.mainContext
-        let descriptor = FetchDescriptor<Lecture>()
-        let lectures = (try? context.fetch(descriptor)) ?? []
-        return lectures.first(where: { $0.sourceKey == key })
+        var descriptor = FetchDescriptor<Lecture>(predicate: #Predicate { $0.sourceKey == key })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    private func findAutomationItem(sourceKey: String) -> ShiurAutomationItem? {
+        var descriptor = FetchDescriptor<ShiurAutomationItem>(predicate: #Predicate { $0.sourceKey == sourceKey })
+        descriptor.fetchLimit = 1
+        return try? modelContainer.mainContext.fetch(descriptor).first
+    }
+
+    private func resolvedCourse(for item: ShiurAutomationItem) -> Course? {
+        if let data = item.targetCourseIDData,
+           let id = try? JSONDecoder().decode(PersistentIdentifier.self, from: data),
+           let course = modelContainer.mainContext.model(for: id) as? Course,
+           !course.isDeleted { return course }
+        return item.subscriptionID.flatMap { findSubscription(id: $0)?.course }
     }
 
     private func findSubscription(id: UUID) -> ShiurSubscription? {
         let context = modelContainer.mainContext
-        let descriptor = FetchDescriptor<ShiurSubscription>()
-        let subscriptions = (try? context.fetch(descriptor)) ?? []
-        return subscriptions.first(where: { $0.id == id })
+        var descriptor = FetchDescriptor<ShiurSubscription>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
     }
 }

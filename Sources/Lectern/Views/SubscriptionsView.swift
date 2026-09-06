@@ -8,6 +8,10 @@ struct SubscriptionsView: View {
     @Query(sort: \ShiurSubscription.createdAt, order: .reverse)
     private var subscriptions: [ShiurSubscription]
 
+    @Query(filter: #Predicate<ShiurAutomationItem> { $0.stateRaw == "failed" },
+           sort: \ShiurAutomationItem.updatedAt, order: .reverse)
+    private var failedItems: [ShiurAutomationItem]
+
     @State private var pendingTeacher: (id: Int, name: String, previews: [RemoteShiurItem])?
     @State private var pendingSeries: (id: Int, title: String, previews: [RemoteShiurItem])?
     @State private var pendingCollection: (id: Int, title: String, previews: [RemoteShiurItem])?
@@ -43,6 +47,7 @@ struct SubscriptionsView: View {
                 )
 
                 subscriptionsSection
+                failedImportsSection
             }
             .padding(.horizontal, 36)
             .padding(.vertical, 30)
@@ -95,6 +100,33 @@ struct SubscriptionsView: View {
         }
         .popover(isPresented: $pasteLinkOpen) {
             pasteLinkPopover
+        }
+    }
+
+    @ViewBuilder
+    private var failedImportsSection: some View {
+        if !failedItems.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Imports needing attention")
+                    .font(.headline)
+                ForEach(failedItems) { item in
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.title).font(.subheadline.weight(.semibold))
+                            Text(item.stateMessage ?? "Import stopped before completion.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Retry") {
+                            Task { await automationService.retryItem(item) }
+                        }
+                        .disabled(automationService.activeItemIDs.contains(item.id))
+                    }
+                }
+            }
+            .padding(14)
+            .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10))
         }
     }
 

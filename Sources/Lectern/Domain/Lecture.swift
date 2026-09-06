@@ -120,6 +120,12 @@ final class Lecture {
         recording?.sizeBytes ?? 0
     }
 
+    var hasCompletedRawTranscript: Bool {
+        guard status == .ready,
+              let transcript = artifact(of: .rawTranscript) else { return false }
+        return !transcript.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     func artifact(of kind: ArtifactKind) -> Artifact? {
         artifacts.first(where: { $0.kind == kind })
     }

@@ -56,7 +56,7 @@ final class GenerationService {
                   thinkingLevel: ThinkingLevel = .medium,
                   modelOverride: String? = nil,
                   quizFocus: String? = nil) {
-        guard generationTask == nil else { return }
+        guard activeJob == nil else { return }
         let ordered = GenerationJobKind.ordered.filter { kinds.contains($0) }
         guard !ordered.isEmpty else { return }
 

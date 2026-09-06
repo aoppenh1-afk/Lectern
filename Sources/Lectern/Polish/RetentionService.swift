@@ -37,10 +37,11 @@ final class RetentionService {
 
             // Protection rule: audio survives until its lecture transcribed.
             guard let lecture = recording.lecture,
-                  lecture.artifact(of: .rawTranscript) != nil else { continue }
+                  lecture.hasCompletedRawTranscript else { continue }
 
             if FileManager.default.fileExists(atPath: recording.filePath) {
-                try? FileManager.default.removeItem(atPath: recording.filePath)
+                do { try FileManager.default.removeItem(atPath: recording.filePath) }
+                catch { continue }
             }
             recording.prunedAt = Date()
             prunedCount += 1
