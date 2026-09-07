@@ -1,6 +1,6 @@
 # Lectern
 
-Lectern is a macOS app for students. It records lectures and shiurim, transcribes them (English and mixed English‑Hebrew), and turns them into nested outline notes, flashcards and quizzes. Optionally it syncs Canvas courses, deadlines and grades, and pushes notes to Google Docs.
+Lectern is a macOS app for students. It records lectures and shiurim — from a microphone in the room, or from Zoom and other system audio on this Mac — transcribes them (English and mixed English‑Hebrew), and turns them into nested outline notes, flashcards and quizzes. Optionally it syncs Canvas courses, deadlines and grades, and pushes notes to Google Docs.
 
 Lectern launches [Google's official Antigravity ACP agent](https://github.com/agentclientprotocol/registry/tree/main/antigravity-acp) on your Mac and uses its separate Google sign-in. Lectern has no server and collects nothing.
 
@@ -111,6 +111,7 @@ This verifies the signing identity, bumps `MARKETING_VERSION` / `CURRENT_PROJECT
 ## Privacy
 
 - Recordings, transcripts and notes stay in `~/Library/Application Support/Lectern`.
+- Zoom / system-audio capture uses ScreenCaptureKit. macOS gates that behind Screen & System Audio Recording permission; Lectern discards the dummy video frames and stores only the WAV.
 - Canvas tokens, Google Docs OAuth state, transcription API keys and any GitHub token are stored in the macOS Keychain. The official Antigravity ACP agent stores its own credential in a private Lectern profile.
 - Antigravity prompts and supported attachments are sent through ACP. Lecture audio uses ACP's native audio content block instead of a workspace path hint.
 - This repository does not contain credentials. Do not commit `.env` files or tokens.

@@ -105,11 +105,12 @@ final class StatusBarController {
     private func buildPopover() -> NSPopover {
         let pop = NSPopover()
         pop.behavior = .transient
-        pop.contentSize = NSSize(width: 240, height: 260)
+        pop.contentSize = NSSize(width: 252, height: 360)
         pop.contentViewController = NSHostingController(
             rootView: AnyView(
                 MenuBarPopoverView()
                     .environment(capture)
+                    .environment(surfacePreferences)
                     .preferredColorScheme(surfacePreferences.appearance.colorScheme)
             )
         )
@@ -136,6 +137,7 @@ final class StatusBarController {
             hosting.rootView = AnyView(
                 MenuBarPopoverView()
                     .environment(capture)
+                    .environment(surfacePreferences)
                     .preferredColorScheme(surfacePreferences.appearance.colorScheme)
             )
         }

@@ -48,6 +48,10 @@
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Lectern records your microphone during lectures so they can be transcribed and studied on this Mac.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Lectern captures the audio your Mac is playing — Zoom, Meet, or a lecture video — so it can be transcribed and studied on this Mac. No video is stored.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Lectern uses Screen Recording permission only to capture system audio from Zoom and other lecture playback. No screen video is recorded or saved.</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

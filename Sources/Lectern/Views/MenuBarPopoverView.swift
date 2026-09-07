@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MenuBarPopoverView: View {
     @Environment(CaptureController.self) private var capture
+    @Environment(SurfacePreferences.self) private var surfacePreferences
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @Query(sort: \Course.name) private var courses: [Course]
@@ -68,6 +69,24 @@ struct MenuBarPopoverView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
+                Picker("Source", selection: Binding(
+                    get: { surfacePreferences.captureSource },
+                    set: { surfacePreferences.setCaptureSource($0) }
+                )) {
+                    ForEach(CaptureSource.allCases) { source in
+                        Text(source.shortTitle).tag(source)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                Text(sourceCaption)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
                 Picker("Language", selection: $selectedLanguage) {
                     ForEach(LectureLanguage.allCases) { language in
                         Text(language.title).tag(language)
@@ -90,9 +109,15 @@ struct MenuBarPopoverView: View {
             }
 
             Button {
-                Task { await capture.start(in: selectedCourse, language: selectedLanguage) }
+                Task {
+                    await capture.start(
+                        in: selectedCourse,
+                        language: selectedLanguage,
+                        source: surfacePreferences.captureSource
+                    )
+                }
             } label: {
-                Label("Start Recording", systemImage: "record.circle")
+                Label(surfacePreferences.captureSource.recordButtonTitle, systemImage: "record.circle")
                     .font(.system(size: 13, weight: .medium))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
@@ -144,7 +169,7 @@ struct MenuBarPopoverView: View {
                         .frame(width: 7, height: 7)
                         .symbolEffect(.pulse)
 
-                    Text("Recording")
+                    Text(capture.liveStatusTitle)
                         .font(.system(size: 13, weight: .semibold))
 
                     Spacer()
@@ -205,6 +230,13 @@ struct MenuBarPopoverView: View {
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var sourceCaption: String {
+        if surfacePreferences.captureSource.includesSystemAudio, MeetingAudioTarget.isZoomRunning {
+            return "Zoom is open. Lectern will capture what this Mac is playing."
+        }
+        return surfacePreferences.captureSource.caption
     }
 
     private var elapsedString: String {

@@ -309,6 +309,7 @@ struct StudioCard<Content: View>: View {
 
 struct OverviewDashboardView: View {
     @Environment(CaptureController.self) private var capture
+    @Environment(SurfacePreferences.self) private var surfacePreferences
     @Query(sort: \Course.name) private var courses: [Course]
     @Query(sort: \CanvasAssignment.dueAt) private var assignments: [CanvasAssignment]
     @Query(sort: \CanvasEvent.startAt) private var events: [CanvasEvent]
@@ -402,9 +403,9 @@ struct OverviewDashboardView: View {
                 Text(activeSessionSubtitle)
                     .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
                 Button {
-                    capture.toggle(in: suggestedCourse)
+                    capture.toggle(in: suggestedCourse, source: surfacePreferences.captureSource)
                 } label: {
-                    Text(capture.phase.isLive ? "Stop recording" : "Start grounded recording")
+                    Text(capture.phase.isLive ? "Stop recording" : surfacePreferences.captureSource == .microphone ? "Start grounded recording" : surfacePreferences.captureSource.recordButtonTitle)
                         .frame(maxWidth: .infinity).padding(.vertical, 10)
                 }
                 .buttonStyle(.plain)
@@ -506,7 +507,15 @@ struct OverviewDashboardView: View {
 
     private func emptyLine(_ title: String) -> some View { Text(title).font(.system(size: 12)).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 76, alignment: .center) }
     private var greeting: String { Calendar.current.component(.hour, from: Date()) < 12 ? "Good morning" : Calendar.current.component(.hour, from: Date()) < 18 ? "Good afternoon" : "Good evening" }
-    private var activeSessionSubtitle: String { if capture.phase.isLive { return "Recording into \(capture.activeCourseName ?? "Unfiled")" }; if let event = todayEvents.first { return "\(event.startAt.formatted(date: .omitted, time: .shortened)) · \(event.locationName ?? "Canvas schedule")" }; return "Choose a course and Lectern will ground the recording in its class context." }
+    private var activeSessionSubtitle: String {
+        if capture.phase.isLive {
+            return "\(capture.liveStatusTitle) into \(capture.activeCourseName ?? "Unfiled")"
+        }
+        if let event = todayEvents.first {
+            return "\(event.startAt.formatted(date: .omitted, time: .shortened)) · \(event.locationName ?? "Canvas schedule")"
+        }
+        return "Choose a course and Lectern will ground the recording in its class context."
+    }
     private var nextDeadlineTitle: String { upcomingAssignments.first.map { String($0.title.prefix(16)) } ?? "All clear" }
     private var nextDeadlineLabel: String { upcomingAssignments.first.map { relativeDue($0.dueAt) } ?? "No deadline" }
     private var gpaEstimate: String { let scores = gradedCourses.compactMap(\.currentScore); guard !scores.isEmpty else { return "—" }; let points = scores.map { score in score >= 93 ? 4.0 : score >= 90 ? 3.7 : score >= 87 ? 3.3 : score >= 83 ? 3.0 : score >= 80 ? 2.7 : score >= 77 ? 2.3 : score >= 73 ? 2.0 : score >= 70 ? 1.7 : score >= 67 ? 1.3 : score >= 65 ? 1.0 : 0 }; return String(format: "%.2f", points.reduce(0, +) / Double(points.count)) }

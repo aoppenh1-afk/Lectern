@@ -250,10 +250,19 @@ struct LecternApp: App {
             }
 
             CommandMenu("Capture") {
-                Button(captureController.phase.isLive ? "Stop Recording" : "Start Recording") {
+                Button(captureController.phase.isLive ? "Stop Recording" : surfacePreferences.captureSource.recordButtonTitle) {
                     captureController.toggle()
                 }
                 .keyboardShortcut("r", modifiers: .command)
+
+                if !captureController.phase.isLive {
+                    ForEach(CaptureSource.allCases) { source in
+                        Button(source.title) {
+                            surfacePreferences.setCaptureSource(source)
+                            captureController.toggle(in: nil, source: source)
+                        }
+                    }
+                }
 
                 Button("Drop Bookmark") {
                     captureController.addBookmark()

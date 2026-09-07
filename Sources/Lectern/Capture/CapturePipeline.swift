@@ -37,9 +37,14 @@ final class WAVFileWriter {
             samples[index] = Int16(clamped * Float(32767))
         }
 
+        append(int16Samples: samples[0..<frameCount])
+    }
+
+    func append(int16Samples samples: ArraySlice<Int16>) {
+        guard !finished, !samples.isEmpty else { return }
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
         handle.write(data)
-        dataBytes += Int64(frameCount * MemoryLayout<Int16>.size)
+        dataBytes += Int64(samples.count * MemoryLayout<Int16>.size)
     }
 
     /// Rewrites RIFF chunk sizes with the final byte count and closes the file.
@@ -82,7 +87,8 @@ final class WAVFileWriter {
 /// directly from the audio render thread.
 final class CapturePipeline: @unchecked Sendable {
     private let writer: WAVFileWriter
-    private let converter: AVAudioConverter
+    private var converter: AVAudioConverter
+    private var sourceFormat: AVAudioFormat
     private let outputFormat: AVAudioFormat
     private let queue = DispatchQueue(label: "com.lectern.capture.pipeline")
 
@@ -101,11 +107,13 @@ final class CapturePipeline: @unchecked Sendable {
 
         self.writer = try WAVFileWriter(url: destinationURL, sampleRate: output.sampleRate)
         self.converter = converter
+        self.sourceFormat = sourceFormat
         self.outputFormat = output
     }
 
     func ingest(_ buffer: AVAudioPCMBuffer) {
-        queue.async { self.convertAndAppend(buffer) }
+        guard let copy = buffer.cloned() else { return }
+        queue.async { self.convertAndAppend(copy) }
     }
 
     /// Blocks until every queued chunk has been written and the header patched.
@@ -125,6 +133,12 @@ final class CapturePipeline: @unchecked Sendable {
     }
 
     private func convertAndAppend(_ input: AVAudioPCMBuffer) {
+        if !Self.sameFormat(input.format, sourceFormat),
+           let rebuilt = AVAudioConverter(from: input.format, to: outputFormat) {
+            converter = rebuilt
+            sourceFormat = input.format
+        }
+
         let ratio = outputFormat.sampleRate / input.format.sampleRate
         let capacity = AVAudioFrameCount((Double(input.frameLength) * ratio).rounded(.up)) + 64
         guard let scratch = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else { return }
@@ -168,12 +182,22 @@ final class CapturePipeline: @unchecked Sendable {
             }
         }
     }
+
+    private static func sameFormat(_ lhs: AVAudioFormat, _ rhs: AVAudioFormat) -> Bool {
+        lhs.sampleRate == rhs.sampleRate
+            && lhs.channelCount == rhs.channelCount
+            && lhs.commonFormat == rhs.commonFormat
+            && lhs.isInterleaved == rhs.isInterleaved
+    }
 }
 
 enum CaptureError: LocalizedError {
     case unsupportedOutputFormat
     case conversionUnavailable
     case noInputHardware
+    case noDisplay
+    case systemAudioDenied
+    case mixdownFailed(String)
     case importFailed(String)
 
     var errorDescription: String? {
@@ -181,6 +205,10 @@ enum CaptureError: LocalizedError {
         case .unsupportedOutputFormat: return "Could not build the 16 kHz mono output format."
         case .conversionUnavailable: return "This microphone's format cannot be converted for transcription."
         case .noInputHardware: return "No input device is available."
+        case .noDisplay: return "No display is available for system audio capture."
+        case .systemAudioDenied:
+            return "System audio access is off. Allow Lectern in System Settings › Privacy & Security › Screen & System Audio Recording, then start recording again."
+        case .mixdownFailed(let message): return message
         case .importFailed(let message): return message
         }
     }

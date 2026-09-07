@@ -513,6 +513,23 @@ private struct RecordingPane: View {
     var body: some View {
         SettingsCard {
             SettingsRow(
+                title: "Capture source",
+                caption: surfacePreferences.captureSource.caption
+            ) {
+                Picker("", selection: Binding(
+                    get: { surfacePreferences.captureSource },
+                    set: { surfacePreferences.setCaptureSource($0) }
+                )) {
+                    ForEach(CaptureSource.allCases) { source in
+                        Text(source.shortTitle).tag(source)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 160)
+                .labelsHidden()
+            }
+
+            SettingsRow(
                 title: "Record hotkey",
                 caption: "Works system-wide. Default ⌥⌘R avoids the browser ⌘R-reload collision; the in-app Capture menu keeps ⌘R."
             ) {

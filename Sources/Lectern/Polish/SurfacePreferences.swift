@@ -18,6 +18,7 @@ final class SurfacePreferences {
     private(set) var accentID: String
     private(set) var hotKeyCode: Int
     private(set) var hotKeyModifiers: Int
+    private(set) var captureSourceRaw: String
 
     enum AppearanceMode: String, CaseIterable, Identifiable {
         case system
@@ -47,6 +48,15 @@ final class SurfacePreferences {
         AppearanceMode(rawValue: appearanceMode) ?? .system
     }
 
+    var captureSource: CaptureSource {
+        CaptureSource(rawValue: captureSourceRaw) ?? .microphone
+    }
+
+    func setCaptureSource(_ source: CaptureSource) {
+        captureSourceRaw = source.rawValue
+        CaptureSource.persist(source)
+    }
+
     @ObservationIgnored private nonisolated(unsafe) var observer: NSObjectProtocol?
 
     init() {
@@ -56,6 +66,7 @@ final class SurfacePreferences {
         accentID = UserDefaults.standard.string(forKey: "appearance.accent") ?? "moss"
         hotKeyCode = UserDefaults.standard.object(forKey: "hotkey.keycode") as? Int ?? GlobalRecordHotkey.defaultKeyCode
         hotKeyModifiers = UserDefaults.standard.object(forKey: "hotkey.modifiers") as? Int ?? GlobalRecordHotkey.defaultModifiers
+        captureSourceRaw = UserDefaults.standard.string(forKey: CaptureSource.defaultsKey) ?? CaptureSource.microphone.rawValue
 
         observer = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification,
@@ -70,6 +81,7 @@ final class SurfacePreferences {
                 self.accentID = UserDefaults.standard.string(forKey: "appearance.accent") ?? "moss"
                 self.hotKeyCode = UserDefaults.standard.object(forKey: "hotkey.keycode") as? Int ?? GlobalRecordHotkey.defaultKeyCode
                 self.hotKeyModifiers = UserDefaults.standard.object(forKey: "hotkey.modifiers") as? Int ?? GlobalRecordHotkey.defaultModifiers
+                self.captureSourceRaw = UserDefaults.standard.string(forKey: CaptureSource.defaultsKey) ?? CaptureSource.microphone.rawValue
             }
         }
     }

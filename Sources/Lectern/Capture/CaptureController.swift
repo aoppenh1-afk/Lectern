@@ -1,5 +1,7 @@
 import AVFoundation
+import CoreGraphics
 import Observation
+import ScreenCaptureKit
 import SwiftData
 import SwiftUI
 
@@ -32,6 +34,7 @@ final class CaptureController {
     private(set) var phase: Phase = .idle
     private(set) var errorMessage: String?
     private(set) var liveBookmarks: [PendingBookmark] = []
+    private(set) var activeSource: CaptureSource = .microphone
 
     /// Invoked whenever the phase machine changes state (for UI surfaces
     /// like the notch pill).
@@ -50,10 +53,11 @@ final class CaptureController {
 
     /// Start/stop a capture, filing the resulting lecture into `course`.
     /// `language` overrides the course's default (nil inherits it).
-    func toggle(in course: Course?, language: LectureLanguage? = nil) {
+    /// `source` overrides the Settings default (nil inherits it).
+    func toggle(in course: Course?, language: LectureLanguage? = nil, source: CaptureSource? = nil) {
         switch phase {
         case .idle:
-            Task { await start(in: course, language: language) }
+            Task { await start(in: course, language: language, source: source) }
         case .recording:
             stop()
         case .requestingPermission, .saving:
@@ -80,7 +84,11 @@ final class CaptureController {
     private let recordingLedger: RecordingFileLedger
     private let importService: LectureImportService
 
-    private var pipeline: CapturePipeline?
+    private var micPipeline: CapturePipeline?
+    private var systemPipeline: CapturePipeline?
+    private var systemCapture: SystemAudioCapture?
+    private var microphoneTapInstalled = false
+    private var destinationURL: URL?
     private var activeCourse: Course?
     private var activeLanguage: LectureLanguage = .english
 
@@ -106,28 +114,39 @@ final class CaptureController {
 
     // MARK: - Lifecycle
 
-    func start(in course: Course?, language: LectureLanguage? = nil) async {
+    func start(in course: Course?, language: LectureLanguage? = nil, source: CaptureSource? = nil) async {
         guard case .idle = phase else { return }
+        let resolvedSource = source ?? CaptureSource.preferred
         activeLanguage = language ?? course?.language ?? .english
+        activeSource = resolvedSource
         errorMessage = nil
         phase = .requestingPermission
         notifyPhaseChange()
 
-        guard await Self.microphoneAccessGranted() else {
-            phase = .idle
-            errorMessage = "Microphone access is off. Allow it in System Settings › Privacy & Security › Microphone."
-            notifyPhaseChange()
-            return
+        if resolvedSource.includesMicrophone {
+            guard await Self.microphoneAccessGranted() else {
+                phase = .idle
+                errorMessage = "Microphone access is off. Allow it in System Settings › Privacy & Security › Microphone."
+                notifyPhaseChange()
+                return
+            }
+        }
+
+        if resolvedSource.includesSystemAudio {
+            guard await Self.systemAudioAccessGranted() else {
+                phase = .idle
+                errorMessage = CaptureError.systemAudioDenied.localizedDescription
+                notifyPhaseChange()
+                return
+            }
         }
 
         do {
-            try beginCapture(course: course)
+            try await beginCapture(course: course, source: resolvedSource)
         } catch {
-            pipeline?.abort()
-            pipeline = nil
-            engine.inputNode.removeTap(onBus: 0)
+            await abortLiveCapture()
             phase = .idle
-            errorMessage = "Couldn't start capture: \(error.localizedDescription)"
+            errorMessage = Self.startFailureMessage(error)
             notifyPhaseChange()
         }
     }
@@ -137,37 +156,34 @@ final class CaptureController {
         phase = .saving
         notifyPhaseChange()
 
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        stopMicrophone()
 
-        let finishedPipeline = pipeline
-        pipeline = nil
+        let finishedMic = micPipeline
+        let finishedSystem = systemPipeline
+        let runningSystemCapture = systemCapture
+        let mixedDestination = destinationURL
         let course = activeCourse
-        activeCourse = nil
         let language = activeLanguage
+        let source = activeSource
+        micPipeline = nil
+        systemPipeline = nil
+        systemCapture = nil
+        destinationURL = nil
+        activeCourse = nil
         activeLanguage = .english
 
-        guard let finishedPipeline else {
-            phase = .idle
-            liveBookmarks = []
-            notifyPhaseChange()
-            return
+        Task {
+            await runningSystemCapture?.stop()
+            persistFinishedCapture(
+                startedAt: startedAt,
+                source: source,
+                micPipeline: finishedMic,
+                systemPipeline: finishedSystem,
+                mixedDestination: mixedDestination,
+                course: course,
+                language: language
+            )
         }
-
-        switch finishedPipeline.finish() {
-        case .success(let (fileURL, totalBytes)):
-            persistLecture(startedAt: startedAt,
-                           duration: Date().timeIntervalSince(startedAt),
-                           fileURL: fileURL,
-                           sizeBytes: totalBytes,
-                           course: course,
-                           language: language)
-        case .failure(let error):
-            errorMessage = "Capture failed while saving: \(error.localizedDescription)"
-        }
-        phase = .idle
-        liveBookmarks = []
-        notifyPhaseChange()
     }
 
     /// Drops a timestamp against the active recording. Option-Command-B adds
@@ -196,7 +212,12 @@ final class CaptureController {
         let candidates = recordingLedger.recoverCandidates(claimedPaths: claimedPaths)
         guard !candidates.isEmpty else { return }
 
-        for candidate in candidates {
+        let adopted = RecordingFileLedger.collapseRecoveryCandidates(candidates)
+        let adoptedPaths = Set(adopted.map { $0.url.standardizedFileURL.path })
+        for leftover in candidates where !adoptedPaths.contains(leftover.url.standardizedFileURL.path) {
+            recordingLedger.discard(filePath: leftover.url.path)
+        }
+        for candidate in adopted {
             let lecture = Lecture(
                 title: "Recovered · \(Self.displayFormatter.string(from: candidate.capturedAt))",
                 capturedAt: candidate.capturedAt,
@@ -227,34 +248,169 @@ final class CaptureController {
         phase.isLive ? activeCourse?.name : nil
     }
 
+    var liveStatusTitle: String {
+        switch activeSource {
+        case .microphone: return "Recording"
+        case .systemAudio: return MeetingAudioTarget.isZoomRunning ? "Recording Zoom" : "Recording system audio"
+        case .mixed: return MeetingAudioTarget.isZoomRunning ? "Recording Zoom + mic" : "Recording system audio + mic"
+        }
+    }
+
     // MARK: - Internals
 
-    private func beginCapture(course: Course?) throws {
+    private func beginCapture(course: Course?, source: CaptureSource) async throws {
+        let stamp = Self.fileStampFormatter.string(from: Date())
+        let baseName = "Lecture \(stamp)"
+        destinationURL = recordingsDirectory.appendingPathComponent("\(baseName).wav")
+
+        if source.includesSystemAudio {
+            let url = source == .mixed
+                ? recordingsDirectory.appendingPathComponent("\(baseName)-system.wav")
+                : destinationURL!
+            let pipeline = try CapturePipeline(
+                sourceFormat: SystemAudioCapture.expectedFormat,
+                destinationURL: url
+            )
+            let capture = SystemAudioCapture()
+            capture.onBuffer = { [pipeline] buffer in
+                pipeline.ingest(buffer)
+            }
+            capture.onFailure = { [weak self] error in
+                Task { @MainActor in
+                    self?.handleSystemCaptureFailure(error)
+                }
+            }
+            try await capture.start()
+            systemPipeline = pipeline
+            systemCapture = capture
+        }
+
+        if source.includesMicrophone {
+            let url = source == .mixed
+                ? recordingsDirectory.appendingPathComponent("\(baseName)-mic.wav")
+                : destinationURL!
+            try startMicrophone(destinationURL: url)
+        }
+
+        liveBookmarks = []
+        activeCourse = course
+        phase = .recording(startedAt: Date())
+        notifyPhaseChange()
+    }
+
+    private func startMicrophone(destinationURL: URL) throws {
         let sourceFormat = engine.inputNode.outputFormat(forBus: 0)
         guard sourceFormat.sampleRate > 0, sourceFormat.channelCount > 0 else {
             throw CaptureError.noInputHardware
         }
 
-        let stamp = Self.fileStampFormatter.string(from: Date())
-        let destinationURL = recordingsDirectory.appendingPathComponent("Lecture \(stamp).wav")
         let newPipeline = try CapturePipeline(sourceFormat: sourceFormat, destinationURL: destinationURL)
-
-        // The tap fires on AVFAudio's realtime render thread, NOT the main
-        // actor. The handler must be @Sendable/nonisolated or the runtime
-        // asserts the wrong queue and traps.
         let tapHandler: @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void = { [newPipeline] buffer, _ in
             newPipeline.ingest(buffer)
         }
         engine.inputNode.installTap(onBus: 0, bufferSize: 4096, format: sourceFormat,
                                     block: tapHandler)
+        microphoneTapInstalled = true
         engine.prepare()
         try engine.start()
+        micPipeline = newPipeline
+    }
 
-        pipeline = newPipeline
-        liveBookmarks = []
-        activeCourse = course
-        phase = .recording(startedAt: Date())
+    private func stopMicrophone() {
+        if microphoneTapInstalled {
+            engine.inputNode.removeTap(onBus: 0)
+            microphoneTapInstalled = false
+        }
+        if engine.isRunning {
+            engine.stop()
+        }
+    }
+
+    private func abortLiveCapture() async {
+        stopMicrophone()
+        micPipeline?.abort()
+        systemPipeline?.abort()
+        micPipeline = nil
+        systemPipeline = nil
+        let capture = systemCapture
+        systemCapture = nil
+        destinationURL = nil
+        await capture?.stop()
+    }
+
+    private func handleSystemCaptureFailure(_ error: Error) {
+        guard case .recording = phase else { return }
+        errorMessage = "System audio capture stopped: \(error.localizedDescription)"
         notifyPhaseChange()
+    }
+
+    private func persistFinishedCapture(
+        startedAt: Date,
+        source: CaptureSource,
+        micPipeline: CapturePipeline?,
+        systemPipeline: CapturePipeline?,
+        mixedDestination: URL?,
+        course: Course?,
+        language: LectureLanguage
+    ) {
+        let micResult = micPipeline?.finish()
+        let systemResult = systemPipeline?.finish()
+
+        let fileURL: URL
+        let sizeBytes: Int64
+
+        do {
+            switch source {
+            case .microphone:
+                let finished = try finishedPair(micResult)
+                fileURL = finished.url
+                sizeBytes = finished.size
+            case .systemAudio:
+                let finished = try finishedPair(systemResult)
+                fileURL = finished.url
+                sizeBytes = finished.size
+            case .mixed:
+                guard let destination = mixedDestination else {
+                    throw CaptureError.mixdownFailed("Missing mix destination.")
+                }
+                let mic = try finishedPair(micResult)
+                let system = try finishedPair(systemResult)
+                sizeBytes = try WAVMixdown.mix(urls: [system.url, mic.url], destination: destination)
+                fileURL = destination
+                try? FileManager.default.removeItem(at: mic.url)
+                try? FileManager.default.removeItem(at: system.url)
+            }
+        } catch {
+            errorMessage = "Capture failed while saving: \(error.localizedDescription)"
+            phase = .idle
+            liveBookmarks = []
+            notifyPhaseChange()
+            return
+        }
+
+        persistLecture(
+            startedAt: startedAt,
+            duration: Date().timeIntervalSince(startedAt),
+            fileURL: fileURL,
+            sizeBytes: sizeBytes,
+            course: course,
+            language: language
+        )
+        phase = .idle
+        liveBookmarks = []
+        notifyPhaseChange()
+    }
+
+    private func finishedPair(_ result: Result<(URL, Int64), Error>?) throws -> (url: URL, size: Int64) {
+        guard let result else {
+            throw CaptureError.mixdownFailed("The recording pipeline was missing.")
+        }
+        switch result {
+        case .success(let pair):
+            return (pair.0, pair.1)
+        case .failure(let error):
+            throw error
+        }
     }
 
     @discardableResult
@@ -296,6 +452,31 @@ final class CaptureController {
                 continuation.resume(returning: granted)
             }
         }
+    }
+
+    private static func systemAudioAccessGranted() async -> Bool {
+        if CGPreflightScreenCaptureAccess() { return true }
+        if CGRequestScreenCaptureAccess() { return true }
+        do {
+            _ = try await SCShareableContent.current
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private static func startFailureMessage(_ error: Error) -> String {
+        if error is CaptureError {
+            return error.localizedDescription
+        }
+        let nsError = error as NSError
+        let text = nsError.localizedDescription
+        if text.localizedCaseInsensitiveContains("declin")
+            || text.localizedCaseInsensitiveContains("not authorized")
+            || (text.localizedCaseInsensitiveContains("screen") && text.localizedCaseInsensitiveContains("denied")) {
+            return CaptureError.systemAudioDenied.localizedDescription
+        }
+        return "Couldn't start capture: \(error.localizedDescription)"
     }
 
     private static let displayFormatter: DateFormatter = {

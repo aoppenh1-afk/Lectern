@@ -62,6 +62,8 @@ targets:
         LecternUpdateRepository: aoppenh1-afk/Lectern
         LSApplicationCategoryType: public.app-category.productivity
         NSMicrophoneUsageDescription: Lectern records your microphone during lectures so they can be transcribed and studied on this Mac.
+        NSAudioCaptureUsageDescription: Lectern captures the audio your Mac is playing — Zoom, Meet, or a lecture video — so it can be transcribed and studied on this Mac. No video is stored.
+        NSScreenCaptureUsageDescription: Lectern uses Screen Recording permission only to capture system audio from Zoom and other lecture playback. No screen video is recorded or saved.
         NSHumanReadableCopyright: ""
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

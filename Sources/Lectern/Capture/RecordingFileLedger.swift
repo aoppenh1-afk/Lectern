@@ -63,6 +63,45 @@ struct RecordingFileLedger {
         }
     }
 
+    /// Pairs `-system` / `-mic` sidecars from a crashed mixed capture and
+    /// prefers the mixed or system file so recovery does not create two lectures.
+    static func collapseRecoveryCandidates(_ candidates: [Candidate]) -> [Candidate] {
+        var byStamp: [String: [Candidate]] = [:]
+        for candidate in candidates {
+            let stamp = recoveryStamp(for: candidate.url)
+            byStamp[stamp, default: []].append(candidate)
+        }
+
+        var adopted: [Candidate] = []
+        for (_, group) in byStamp {
+            if let mixed = group.first(where: { !isSidecar($0.url) }) {
+                adopted.append(mixed)
+                continue
+            }
+            if let system = group.first(where: { $0.url.lastPathComponent.contains("-system.") }) {
+                adopted.append(system)
+                continue
+            }
+            adopted.append(contentsOf: group)
+        }
+        return adopted.sorted { $0.capturedAt < $1.capturedAt }
+    }
+
+    private static func recoveryStamp(for url: URL) -> String {
+        var name = url.deletingPathExtension().lastPathComponent
+        if name.hasSuffix("-system") {
+            name = String(name.dropLast("-system".count))
+        } else if name.hasSuffix("-mic") {
+            name = String(name.dropLast("-mic".count))
+        }
+        return name
+    }
+
+    private static func isSidecar(_ url: URL) -> Bool {
+        let name = url.deletingPathExtension().lastPathComponent
+        return name.hasSuffix("-system") || name.hasSuffix("-mic")
+    }
+
     static func identity(for filePath: String) -> String {
         URL(fileURLWithPath: filePath).standardizedFileURL.lastPathComponent
     }

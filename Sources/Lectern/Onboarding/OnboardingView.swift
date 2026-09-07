@@ -193,7 +193,7 @@ struct OnboardingView: View {
 
     private var welcomeContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            featureRow("mic", "Record", "Press ⌥⌘R anywhere, or use the menu bar icon. Audio stays on this Mac.")
+            featureRow("mic", "Record", "Press ⌥⌘R anywhere, or use the menu bar icon. Microphone for the room; Zoom / system audio for lectures playing on this Mac.")
             featureRow("waveform.and.mic", "Transcribe", "English lectures and mixed English‑Hebrew shiurim, with Hebrew sources written in Hebrew script.")
             featureRow("list.bullet.indent", "Notes", "Nested outline notes in your style, plus flashcards and quizzes, generated through Google's official Antigravity ACP connection.")
             featureRow("building.columns", "Canvas", "Optional: deadlines, grades and course resources beside your lectures.")

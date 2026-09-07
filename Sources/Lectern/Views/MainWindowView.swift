@@ -170,7 +170,7 @@ struct MainWindowView: View {
                         .fill(LecternTheme.recordTint)
                         .frame(width: 6, height: 6)
                         .symbolEffect(.pulse)
-                    Text("Recording…")
+                    Text("\(capture.liveStatusTitle)…")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(LecternTheme.recordTint)
                 }
@@ -212,34 +212,62 @@ struct MainWindowView: View {
 
     private var recordButton: some View {
         let isLive = capture.phase.isLive
-        return Button {
-            capture.toggle(in: selectedCourse)
-        } label: {
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(LecternTheme.recordTint)
-                    .frame(width: 8, height: 8)
-                    .symbolEffect(.pulse, isActive: isLive)
-                Text(isLive ? "Stop Recording" : "Record")
-                    .font(.system(size: 12.5, weight: .semibold))
-                if !isLive {
-                    Text(GlobalRecordHotkey.displayLabel(
-                        keyCode: surfacePreferences.hotKeyCode,
-                        modifiers: surfacePreferences.hotKeyModifiers))
-                        .font(.system(size: 10).monospacedDigit())
-                        .foregroundStyle(.tertiary)
+        let source = surfacePreferences.captureSource
+        return HStack(spacing: 0) {
+            Button {
+                capture.toggle(in: selectedCourse, source: source)
+            } label: {
+                HStack(spacing: 7) {
+                    Circle()
+                        .fill(LecternTheme.recordTint)
+                        .frame(width: 8, height: 8)
+                        .symbolEffect(.pulse, isActive: isLive)
+                    Text(isLive ? "Stop Recording" : source.recordButtonTitle)
+                        .font(.system(size: 12.5, weight: .semibold))
+                    if !isLive {
+                        Text(GlobalRecordHotkey.displayLabel(
+                            keyCode: surfacePreferences.hotKeyCode,
+                            modifiers: surfacePreferences.hotKeyModifiers))
+                            .font(.system(size: 10).monospacedDigit())
+                            .foregroundStyle(.tertiary)
+                    }
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(
-                Capsule().fill(isLive ? LecternTheme.recordTint.opacity(0.10) : LecternTheme.cardFill)
-            )
-            .overlay(Capsule().strokeBorder(cardBorder, lineWidth: 1))
-            .foregroundStyle(LecternTheme.ink)
+            .buttonStyle(.plain)
+            .help(isLive
+                  ? "Stop recording"
+                  : "Record into \(selectedCourse?.name ?? "Unfiled") using \(source.title.lowercased())")
+
+            if !isLive {
+                Menu {
+                    ForEach(CaptureSource.allCases) { item in
+                        Button {
+                            surfacePreferences.setCaptureSource(item)
+                            capture.toggle(in: selectedCourse, source: item)
+                        } label: {
+                            Label(item.title, systemImage: item.systemImage)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.trailing, 12)
+                        .padding(.vertical, 7)
+                        .contentShape(Rectangle())
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("Choose microphone, Zoom / system audio, or both")
+            }
         }
-        .buttonStyle(.plain)
-        .help("Record into \(selectedCourse?.name ?? "Unfiled")")
+        .background(
+            Capsule().fill(isLive ? LecternTheme.recordTint.opacity(0.10) : LecternTheme.cardFill)
+        )
+        .overlay(Capsule().strokeBorder(cardBorder, lineWidth: 1))
+        .foregroundStyle(LecternTheme.ink)
     }
 
     private var canOpenAI: Bool {
@@ -490,11 +518,22 @@ struct MainWindowView: View {
     /// Add-lecture entry point: record now or import an existing audio file.
     private var addLectureMenu: some View {
         Menu {
-            Button {
-                capture.toggle(in: selectedCourse)
-            } label: {
-                Label(capture.phase.isLive ? "Stop Recording" : "Record Lecture",
-                      systemImage: capture.phase.isLive ? "stop.fill" : "mic.fill")
+            if capture.phase.isLive {
+                Button {
+                    capture.stop()
+                } label: {
+                    Label("Stop Recording", systemImage: "stop.fill")
+                }
+            } else {
+                ForEach(CaptureSource.allCases) { source in
+                    Button {
+                        surfacePreferences.setCaptureSource(source)
+                        capture.toggle(in: selectedCourse, source: source)
+                    } label: {
+                        Label(source == .microphone ? "Record Lecture" : source.title,
+                              systemImage: source.systemImage)
+                    }
+                }
             }
             Button {
                 // Menu dismissal and panel presentation share a turn. Hop to the next
@@ -535,7 +574,9 @@ struct MainWindowView: View {
                 EmptyStateView(icon: "waveform.badge.plus",
                                title: "No lectures in \(course.name)",
                                message: "Record your next class or import an audio file. It will land here automatically.",
-                               actionTitle: "Start Recording") { capture.toggle(in: course) }
+                               actionTitle: "Start Recording") {
+                    capture.toggle(in: course, source: surfacePreferences.captureSource)
+                }
             case .unfiled:
                 EmptyStateView(icon: "tray",
                                title: "Nothing unfiled",
