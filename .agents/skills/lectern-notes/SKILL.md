@@ -142,7 +142,7 @@ Write compact English reasoning around standard Hebrew-script Torah vocabulary, 
 
 ### Left-to-right text and punctuation
 
-Write the Markdown in logical reading order for a left-to-right outline, including Hebrew-first headings and source labels. Hebrew words remain in normal Hebrew character order. Lectern handles paragraph direction and Hebrew phrase isolation during Google Docs sync.
+Write the Markdown in logical reading order for a left-to-right outline, including Hebrew-first headings and source labels. Hebrew words remain in normal Hebrew character order. Lectern handles paragraph direction and invisible left-to-right boundary marks during Google Docs sync. Keep the notes themselves free of extra letters or font/color tricks; the exporter supplies the direction cues.
 
 - Return ordinary UTF-8 Markdown. Do not insert invisible direction marks, embeddings, overrides, or isolates, HTML `dir` attributes, literal `\u200e` escapes, or `&lrm;` entities. Direction controls belong to the renderer, not generated content.
 - Write paired punctuation normally: opening `(`, its complete content, closing `)`. Keep both brackets around the intended phrase. Never reverse parentheses or move a comma, colon, or semicolon to the beginning of a Hebrew phrase to imitate how a screenshot looks.

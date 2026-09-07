@@ -8,7 +8,7 @@ import Foundation
 /// tabs to choose the nesting level for `createParagraphBullets` and then
 /// strips them.
 enum NotesMarkdownConverter {
-    static let formatVersion = "v7"
+    static let formatVersion = "v8"
 
     struct WritePlan {
         let text: String
@@ -76,7 +76,7 @@ enum NotesMarkdownConverter {
                 ])
             }
             // The outline always flows left to right, including Hebrew-first
-            // headings. Only Hebrew phrases inside a paragraph use RTL isolates.
+            // headings. Hebrew phrases are bounded by invisible strong LTR marks.
             for paragraph in directionRanges {
                 requests.append([
                     "updateParagraphStyle": [
@@ -134,9 +134,9 @@ enum NotesMarkdownConverter {
         var cursor = 1
 
         for item in items {
-            let isolated = isolateHebrewRuns(in: item.text, boldRanges: item.bold)
-            let renderedText = isolated.text
-            let renderedBold = isolated.bold
+            let anchored = anchorHebrewRuns(in: item.text, boldRanges: item.bold)
+            let renderedText = anchored.text
+            let renderedBold = anchored.bold
 
             let start = cursor
             let textLen = renderedText.utf16.count
@@ -304,7 +304,7 @@ enum NotesMarkdownConverter {
 
     private static func removingDirectionControls(_ text: String) -> String {
         // Rebuild direction at the export boundary, before calculating Markdown
-        // and UTF-16 ranges. Pasted controls must not nest or unbalance our isolates.
+        // and UTF-16 ranges. Replace pasted controls with the export boundary marks.
         String(text.unicodeScalars.filter {
             switch $0.value {
             case 0x061C, 0x200E...0x200F, 0x202A...0x202E, 0x2066...0x2069:
@@ -324,7 +324,7 @@ enum NotesMarkdownConverter {
         }
     }
 
-    private static func isolateHebrewRuns(
+    private static func anchorHebrewRuns(
         in text: String,
         boldRanges: [(start: Int, end: Int)]
     ) -> (text: String, bold: [(start: Int, end: Int)]) {
@@ -333,13 +333,18 @@ enum NotesMarkdownConverter {
         // at a bold boundary would reorder its parts within the LTR paragraph.
         let segments = hebrewSegments(in: text, from: 0, to: textLength)
 
+        // Google Docs does not reliably honor RLI/PDI isolates: adjacent Hebrew
+        // labels reorder and brackets mirror despite an LTR paragraph. U+200E
+        // has the direction of an English letter but no visible glyph or width.
+        // Mark both edges so punctuation and numbers stay in the LTR context.
+        // Verified in Docs with "חנניה: נותנים" and "גירסא 1 (רש״י ורוב ראשונים)".
         var output = ""
         var previousEnd = 0
         for segment in segments {
             output += utf16Substring(text, from: previousEnd, to: segment.start)
-            output += "\u{2067}"
+            output += "\u{200E}"
             output += utf16Substring(text, from: segment.start, to: segment.end)
-            output += "\u{2069}"
+            output += "\u{200E}"
             previousEnd = segment.end
         }
         output += utf16Substring(text, from: previousEnd, to: textLength)
