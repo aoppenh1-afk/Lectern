@@ -92,9 +92,9 @@ xcodebuild -scheme Lectern -destination 'platform=macOS' test
 
 ## Publishing a release (maintainer)
 
-Releases require a persistent code signing certificate so macOS Keychain items (Canvas tokens, Google Docs OAuth, transcription API keys) remain accessible across updates without repeatedly prompting the user.
+Releases require an Apple-issued **Developer ID Application** certificate and its private key for team `ZRU5DU22H4`. Create or import this identity through Xcode's account certificate management using the maintainer's Apple Developer Program account.
 
-Builds and releases are pinned to the original `Lectern Release Signing` certificate fingerprint in `scripts/release-signing.sh`. On another Mac, import the existing `.p12` backup into your login Keychain. Creating a new certificate with the same name does not preserve Keychain access. The setup helper is only for establishing a new identity, not restoring this app's release identity.
+The previous self-signed `Lectern Release Signing` certificate does not prevent repeated Keychain prompts. macOS assigns self-signed apps a Keychain partition based on the build's code hash, which changes on rebuild even when the designated requirement stays the same. Developer ID uses the Apple developer team for this check. See [Apple's partition identity implementation](https://github.com/apple-oss-distributions/Security/blob/main/securityd/src/clientid.cpp).
 
 Run a release with:
 
@@ -102,9 +102,9 @@ Run a release with:
 scripts/release.sh 1.3.1 --notes "What changed"
 ```
 
-The scripts refuse a missing or different certificate and verify the finished app against the pinned signing requirement before packaging. For a disposable local build only, use `LECTERN_SIGN_IDENTITY=- scripts/build-app.sh`. Such builds may require Keychain authorization again.
+The scripts require Developer ID for the pinned team and verify the finished app's certificate chain, team, and bundle identifier before packaging. If several matching identities are installed, select a certificate fingerprint with `LECTERN_SIGN_IDENTITY`. For a disposable local build only, use `LECTERN_SIGN_IDENTITY=- scripts/build-app.sh`. Such builds may require Keychain authorization again.
 
-Credentials saved by an older ad-hoc or differently signed build may prompt once after the transition. Choose **Always Allow** in the macOS Keychain prompt to authorize the stable identity. Future releases must keep using the same certificate. This does not eliminate prompts when the login Keychain itself is locked.
+Existing credentials may prompt during the transition to Developer ID. Choose **Always Allow** to authorize the new identity. Keep subsequent releases on the same Apple team and signing requirement. This does not eliminate prompts when the login Keychain itself is locked. Installing the certificate alone does not change previously released apps; build and publish a new version with it.
 
 This verifies the signing identity, bumps `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml`, builds and signs the app bundle with the persistent certificate, zips, commits, tags `v1.3.1`, pushes, and creates the GitHub release with the zip and its `.sha256`. Installed copies pick it up on their next check.
 

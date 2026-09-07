@@ -259,6 +259,7 @@ struct MainWindowView: View {
                         .contentShape(Rectangle())
                 }
                 .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
                 .fixedSize()
                 .help("Choose microphone, Zoom / system audio, or both")
             }

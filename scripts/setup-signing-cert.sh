@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sets up a permanent self-signed Code Signing certificate named "Lectern Release Signing"
-# in your macOS Keychain to prevent Keychain authorization prompts on app updates.
+# in your macOS Keychain for legacy local builds only.
 #
 # Background:
 # Ad-hoc signed binaries (`codesign --sign -`) have their macOS Keychain Access Control
@@ -8,8 +8,9 @@
 # macOS prompts the user for Keychain permission (for Canvas tokens, Google Docs tokens,
 # transcription API keys, etc.) on every update.
 #
-# A persistent Code Signing certificate ensures the app retains the exact same Designated
-# Requirement (DR) across releases, so macOS allows Keychain access seamlessly after updates.
+# A persistent self-signed certificate retains the Designated Requirement, but macOS
+# still assigns a per-build cdhash Keychain partition. It DOES NOT prevent update prompts.
+# Releases now require Developer ID Application. See README.md.
 #
 # Alternative (GUI method):
 # 1. Open Keychain Access -> Certificate Assistant -> Create a Certificate...
@@ -19,6 +20,9 @@
 # 5. Check "Let me override defaults" to extend validity (e.g. 7300 days).
 # 6. Click Create.
 set -euo pipefail
+
+echo 'This legacy helper creates a self-signed identity and cannot fix update-time Keychain prompts.' >&2
+echo 'For releases, install a Developer ID Application certificate through your Apple Developer account.' >&2
 
 CERT_NAME="Lectern Release Signing"
 BACKUP_PATH="${HOME}/Desktop/Lectern-Release-Signing-BACKUP.p12"
@@ -112,5 +116,5 @@ echo "  (Import password: lectern)"
 echo ""
 echo "CRITICAL: Keep this backup in a safe place (e.g. 1Password / iCloud)."
 echo "If you switch Macs, import this .p12 file so your app releases retain"
-echo "the same cryptographic identity and avoid resetting user Keychains."
+echo "the same cryptographic identity. This does not preserve Keychain partitions across builds."
 echo "================================================================="
