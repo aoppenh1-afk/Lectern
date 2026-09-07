@@ -13,6 +13,8 @@ enum NoteBlockParser {
         case quote(String)
         case divider
         case diagram(code: String)
+        case code(language: String?, code: String)
+        case table(header: [String], rows: [[String]])
         case image(URL)
     }
 
@@ -24,18 +26,28 @@ enum NoteBlockParser {
         var blocks: [Block] = []
         var cursor = markdown.startIndex
 
-        let diagramPattern = try! NSRegularExpression(pattern: #"```mermaid\s*\n(.*?)```"#,
+        // Extract every fenced block so chat and notes share one renderer.
+        // Mermaid fences become live diagrams; any other fence becomes a
+        // monospaced code block. An unclosed fence (common mid-stream) is
+        // left as text so streaming never hides the partial answer.
+        let fencePattern = try! NSRegularExpression(pattern: #"```(\w*)\s*\n(.*?)```"#,
                                                       options: [.dotMatchesLineSeparators])
         let fullRange = NSRange(markdown.startIndex..., in: markdown)
 
-        for match in diagramPattern.matches(in: markdown, range: fullRange) {
+        for match in fencePattern.matches(in: markdown, range: fullRange) {
             guard let fenceRange = Range(match.range, in: markdown),
-                  let codeRange = Range(match.range(at: 1), in: markdown) else { continue }
+                  let codeRange = Range(match.range(at: 2), in: markdown) else { continue }
 
             if cursor < fenceRange.lowerBound {
                 blocks.append(contentsOf: textAndImageBlocks(String(markdown[cursor..<fenceRange.lowerBound])))
             }
-            blocks.append(.diagram(code: markdown[codeRange].trimmingCharacters(in: .whitespacesAndNewlines)))
+            let language = Range(match.range(at: 1), in: markdown).map { String(markdown[$0]).lowercased() } ?? ""
+            let code = String(markdown[codeRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if language == "mermaid" {
+                blocks.append(.diagram(code: code))
+            } else {
+                blocks.append(.code(language: language.isEmpty ? nil : language, code: code))
+            }
             cursor = fenceRange.upperBound
         }
 
@@ -75,7 +87,7 @@ enum NoteBlockParser {
     }
 
     /// Breaks a prose run into block-level markdown: headings, list items,
-    /// quotes, rules, and paragraphs. Inline formatting stays in the content.
+    /// quotes, rules, tables, and paragraphs. Inline formatting stays in the content.
     private static func structuredBlocks(_ text: String) -> [Block] {
         var blocks: [Block] = []
         var paragraph: [String] = []
@@ -91,8 +103,30 @@ enum NoteBlockParser {
             pattern.firstMatch(in: line, range: NSRange(line.startIndex..., in: line))
         }
 
-        for rawLine in text.components(separatedBy: "\n") {
+        let lines = text.components(separatedBy: "\n")
+        var index = 0
+        while index < lines.count {
+            let rawLine = lines[index]
             let line = rawLine.trimmingCharacters(in: .whitespaces)
+
+            // GFM table: header row, delimiter row, then data rows.
+            if isTableRow(line),
+               index + 1 < lines.count,
+               isTableDelimiter(lines[index + 1].trimmingCharacters(in: .whitespaces)) {
+                flushParagraph()
+                lists.reset()
+                let header = splitTableRow(line)
+                var rows: [[String]] = []
+                var cursor = index + 2
+                while cursor < lines.count,
+                      isTableRow(lines[cursor].trimmingCharacters(in: .whitespaces)) {
+                    rows.append(splitTableRow(lines[cursor].trimmingCharacters(in: .whitespaces)))
+                    cursor += 1
+                }
+                blocks.append(.table(header: header, rows: rows))
+                index = cursor
+                continue
+            }
 
             if line.isEmpty {
                 flushParagraph()
@@ -121,9 +155,37 @@ enum NoteBlockParser {
             } else {
                 paragraph.append(line)
             }
+            index += 1
         }
         flushParagraph()
         return blocks
+    }
+
+    private static func isTableRow(_ line: String) -> Bool {
+        guard line.contains("|") else { return false }
+        // Avoid treating a single pipe inside prose as a table.
+        let cells = splitTableRow(line)
+        return cells.count >= 2
+    }
+
+    private static func isTableDelimiter(_ line: String) -> Bool {
+        var trimmed = line.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("|") { trimmed.removeFirst() }
+        if trimmed.hasSuffix("|") { trimmed.removeLast() }
+        let cells = trimmed.components(separatedBy: "|")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        guard !cells.isEmpty else { return false }
+        let cellPattern = try! NSRegularExpression(pattern: #"^:?-{1,}:?$"#)
+        return cells.allSatisfy { cell in
+            cellPattern.firstMatch(in: cell, range: NSRange(cell.startIndex..., in: cell)) != nil
+        }
+    }
+
+    private static func splitTableRow(_ line: String) -> [String] {
+        var trimmed = line.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("|") { trimmed.removeFirst() }
+        if trimmed.hasSuffix("|") { trimmed.removeLast() }
+        return trimmed.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }
     }
 }
 
@@ -201,6 +263,68 @@ struct NotesContentView: View {
 
         case .diagram(let code):
             DiagramBlockView(code: code)
+
+        case .code(let language, let code):
+            VStack(alignment: .leading, spacing: 6) {
+                if let language {
+                    Text(language)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                }
+                Text(code)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(LecternTheme.ink)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous)
+                    .fill(LecternTheme.surfaceFill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous)
+                    .strokeBorder(LecternTheme.hairline, lineWidth: 1)
+            )
+
+        case .table(let header, let rows):
+            let columnCount = max(header.count, rows.map(\.count).max() ?? 0)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(0..<columnCount, id: \.self) { column in
+                        inlineMarkdown(header.indices.contains(column) ? header[column] : "")
+                            .font(.system(size: isCompact ? 11.5 : 12, weight: .semibold))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                    }
+                }
+                .background(Color.primary.opacity(0.045))
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    Divider()
+                    HStack(alignment: .top, spacing: 0) {
+                        ForEach(0..<columnCount, id: \.self) { column in
+                            inlineMarkdown(row.indices.contains(column) ? row[column] : "")
+                                .font(.system(size: isCompact ? 11.5 : 12))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                        }
+                    }
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(LecternTheme.cardFill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(LecternTheme.hairline, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .textSelection(.enabled)
 
         case .image(let url):
             if let nsImage = NSImage(contentsOf: url) {

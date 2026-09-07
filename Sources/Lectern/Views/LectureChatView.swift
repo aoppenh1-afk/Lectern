@@ -282,8 +282,7 @@ struct LectureChatView: View {
                             .padding(.vertical, 4)
                     } else {
                         VStack(alignment: .leading, spacing: 10) {
-                            markdownText(content)
-                                .textSelection(.enabled)
+                            ChatMarkdownContent(markdown: content)
                             if isStreaming {
                                 TypingIndicatorView(dotDiameter: 6)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -291,8 +290,6 @@ struct LectureChatView: View {
                         }
                     }
                 }
-                .font(.system(size: 12.5))
-                .lineSpacing(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(15)
                 .elevatedCard()
@@ -578,10 +575,6 @@ struct LectureChatView: View {
             .shadow(color: Color.black.opacity(0.05), radius: 5, y: 1)
     }
 
-    private func markdownText(_ content: String) -> Text {
-        Text(ChatMarkdownRenderer.attributedString(for: content))
-    }
-
     private func timestamp(_ date: Date) -> some View {
         Text(date.formatted(date: .omitted, time: .shortened))
             .font(.system(size: 9.5).monospacedDigit())
@@ -827,10 +820,7 @@ private struct NoteChangeProposalView: View {
             Label(added ? "After" : "Before", systemImage: added ? "plus.circle.fill" : "minus.circle.fill")
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(tint)
-            Text(ChatMarkdownRenderer.attributedString(for: previewText(section.markdown)))
-                .font(.system(size: 12.5))
-                .foregroundStyle(LecternTheme.ink)
-                .textSelection(.enabled)
+            ChatMarkdownContent(markdown: section.markdown)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(10)
@@ -844,20 +834,18 @@ private struct NoteChangeProposalView: View {
                 .strokeBorder(tint.opacity(0.18))
         )
     }
+}
 
-    private func previewText(_ markdown: String) -> String {
-        if markdown.contains("```mermaid") {
-            return "A diagram was added or updated."
-        }
-        return markdown.split(separator: "\n", omittingEmptySubsequences: false).map { rawLine in
-            var line = String(rawLine)
-            while line.hasPrefix("#") { line.removeFirst() }
-            line = line.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("- ") || line.hasPrefix("* ") {
-                line.replaceSubrange(line.startIndex...line.index(after: line.startIndex), with: "• ")
-            }
-            return line
-        }.joined(separator: "\n")
+/// Shared block-level Markdown renderer for chat: headings, bullets,
+/// numbered lists, quotes, tables, code, and live mermaid diagrams.
+/// Chat previously used an inline-only AttributedString, which left `#`,
+/// `-`, fences, and ```mermaid source visible as raw lines.
+struct ChatMarkdownContent: View {
+    let markdown: String
+
+    var body: some View {
+        NotesContentView(markdown: markdown, isCompact: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

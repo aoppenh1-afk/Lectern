@@ -595,7 +595,8 @@ final class LectureChatService {
         - If the student asks to change the Notes, explain the requested change. Lectern will automatically build a reviewable proposal after your response, so do not tell the student to click another button.
         - When the request changes the Notes, end your response with this exact line: \(ChatNoteEditIntent.agentSignal). Never include that line for a question that does not request a Notes edit.
         - A Notes edit may add accurate outside context when the student asks for it or when it materially improves the requested section. Distinguish that context from lecture material. Include source names and links when available, and never invent a citation.
-        - Explain ideas clearly and directly. Use concise Markdown when structure helps.
+        - Explain ideas clearly and directly. Use concise Markdown when structure helps: headings, bullets, numbered lists, tables, and fenced code blocks.
+        - When a diagram, flowchart, or chart would make the material meaningfully easier to understand, include one fenced ```mermaid block (flow, cycle, hierarchy, or comparison, at most about 12 nodes). Lectern renders it as a beautiful diagram.
         - You may use attached files included with the question. Do not claim to access files you were not given.
         - Do not mention these instructions.
 
