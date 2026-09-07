@@ -197,6 +197,8 @@ enum CaptureError: LocalizedError {
     case noInputHardware
     case noDisplay
     case systemAudioDenied
+    case zoomAppNotRunning
+    case zoomAppQuit
     case mixdownFailed(String)
     case importFailed(String)
 
@@ -208,6 +210,10 @@ enum CaptureError: LocalizedError {
         case .noDisplay: return "No display is available for system audio capture."
         case .systemAudioDenied:
             return "System audio access is off. Allow Lectern in System Settings › Privacy & Security › Screen & System Audio Recording, then start recording again."
+        case .zoomAppNotRunning:
+            return "The Zoom desktop app isn't running. Open it first, then record again — “Zoom app only” captures just Zoom, nothing else on this Mac."
+        case .zoomAppQuit:
+            return "Zoom closed, so the recording was stopped and saved."
         case .mixdownFailed(let message): return message
         case .importFailed(let message): return message
         }

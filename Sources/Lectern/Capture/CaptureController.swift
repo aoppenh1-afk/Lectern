@@ -88,6 +88,7 @@ final class CaptureController {
     private var systemPipeline: CapturePipeline?
     private var systemCapture: SystemAudioCapture?
     private var microphoneTapInstalled = false
+    private var zoomWatchers: [NSObjectProtocol] = []
     private var destinationURL: URL?
     private var activeCourse: Course?
     private var activeLanguage: LectureLanguage = .english
@@ -168,6 +169,7 @@ final class CaptureController {
         micPipeline = nil
         systemPipeline = nil
         systemCapture = nil
+        unwatchZoomLifetime()
         destinationURL = nil
         activeCourse = nil
         activeLanguage = .english
@@ -252,6 +254,7 @@ final class CaptureController {
         switch activeSource {
         case .microphone: return "Recording"
         case .systemAudio: return MeetingAudioTarget.isZoomRunning ? "Recording Zoom" : "Recording system audio"
+        case .zoomApp: return "Recording Zoom app"
         case .mixed: return MeetingAudioTarget.isZoomRunning ? "Recording Zoom + mic" : "Recording system audio + mic"
         }
     }
@@ -280,9 +283,12 @@ final class CaptureController {
                     self?.handleSystemCaptureFailure(error)
                 }
             }
-            try await capture.start()
+            try await capture.start(zoomAppsOnly: source.zoomAppOnly)
             systemPipeline = pipeline
             systemCapture = capture
+            if source.zoomAppOnly {
+                watchZoomLifetime()
+            }
         }
 
         if source.includesMicrophone {
@@ -332,6 +338,7 @@ final class CaptureController {
         systemPipeline?.abort()
         micPipeline = nil
         systemPipeline = nil
+        unwatchZoomLifetime()
         let capture = systemCapture
         systemCapture = nil
         destinationURL = nil
@@ -342,6 +349,58 @@ final class CaptureController {
         guard case .recording = phase else { return }
         errorMessage = "System audio capture stopped: \(error.localizedDescription)"
         notifyPhaseChange()
+    }
+
+    // MARK: - Zoom-only lifetime
+
+    /// Follows the Zoom app while a Zoom-only capture is live. Zoom
+    /// relaunching under a new PID gets re-attached without restarting the
+    /// recording; Zoom quitting ends the recording and keeps what was saved.
+    private func watchZoomLifetime() {
+        unwatchZoomLifetime()
+        let center = NSWorkspace.shared.notificationCenter
+        let handler: @Sendable (Notification) -> Void = { [weak self] note in
+            if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+               !MeetingAudioTarget.isZoomBundleID(app.bundleIdentifier) {
+                return
+            }
+            Task { @MainActor [weak self] in
+                self?.refreshZoomCapture()
+            }
+        }
+        zoomWatchers = [
+            center.addObserver(forName: NSWorkspace.didLaunchApplicationNotification,
+                               object: nil, queue: .main, using: handler),
+            center.addObserver(forName: NSWorkspace.didTerminateApplicationNotification,
+                               object: nil, queue: .main, using: handler),
+        ]
+    }
+
+    private func unwatchZoomLifetime() {
+        let center = NSWorkspace.shared.notificationCenter
+        for token in zoomWatchers {
+            center.removeObserver(token)
+        }
+        zoomWatchers = []
+    }
+
+    private func refreshZoomCapture() {
+        guard case .recording = phase,
+              activeSource.zoomAppOnly,
+              let capture = systemCapture
+        else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await capture.refreshZoomApps()
+            } catch CaptureError.zoomAppQuit {
+                self.stop()
+                self.errorMessage = CaptureError.zoomAppQuit.localizedDescription
+                self.notifyPhaseChange()
+            } catch {
+                self.handleSystemCaptureFailure(error)
+            }
+        }
     }
 
     private func persistFinishedCapture(
@@ -365,7 +424,7 @@ final class CaptureController {
                 let finished = try finishedPair(micResult)
                 fileURL = finished.url
                 sizeBytes = finished.size
-            case .systemAudio:
+            case .systemAudio, .zoomApp:
                 let finished = try finishedPair(systemResult)
                 fileURL = finished.url
                 sizeBytes = finished.size

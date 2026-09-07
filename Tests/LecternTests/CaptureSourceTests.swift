@@ -7,12 +7,18 @@ final class CaptureSourceTests: XCTestCase {
         XCTAssertFalse(CaptureSource.microphone.includesSystemAudio)
         XCTAssertFalse(CaptureSource.systemAudio.includesMicrophone)
         XCTAssertTrue(CaptureSource.systemAudio.includesSystemAudio)
+        XCTAssertFalse(CaptureSource.zoomApp.includesMicrophone)
+        XCTAssertTrue(CaptureSource.zoomApp.includesSystemAudio)
+        XCTAssertTrue(CaptureSource.zoomApp.zoomAppOnly)
+        XCTAssertFalse(CaptureSource.systemAudio.zoomAppOnly)
+        XCTAssertFalse(CaptureSource.mixed.zoomAppOnly)
         XCTAssertTrue(CaptureSource.mixed.includesMicrophone)
         XCTAssertTrue(CaptureSource.mixed.includesSystemAudio)
     }
 
     func testZoomRecordButtonTitle() {
         XCTAssertEqual(CaptureSource.systemAudio.recordButtonTitle, "Record Zoom")
+        XCTAssertEqual(CaptureSource.zoomApp.recordButtonTitle, "Record Zoom app")
         XCTAssertEqual(CaptureSource.mixed.recordButtonTitle, "Record Zoom + Mic")
     }
 
@@ -29,6 +35,8 @@ final class CaptureSourceTests: XCTestCase {
 
         CaptureSource.persist(.systemAudio)
         XCTAssertEqual(CaptureSource.preferred, .systemAudio)
+        CaptureSource.persist(.zoomApp)
+        XCTAssertEqual(CaptureSource.preferred, .zoomApp)
         CaptureSource.persist(.mixed)
         XCTAssertEqual(CaptureSource.preferred, .mixed)
         CaptureSource.persist(.microphone)
@@ -38,6 +46,8 @@ final class CaptureSourceTests: XCTestCase {
     func testZoomBundleIdentification() {
         XCTAssertTrue(MeetingAudioTarget.isZoomBundleID("us.zoom.xos"))
         XCTAssertTrue(MeetingAudioTarget.isZoomBundleID("us.zoom.CptHost"))
+        XCTAssertTrue(MeetingAudioTarget.isZoomBundleID("us.zoom.aomhost"))
+        XCTAssertTrue(MeetingAudioTarget.isZoomBundleID("us.zoom.caphost"))
         XCTAssertTrue(MeetingAudioTarget.isZoomBundleID("us.zoom.ringcentral"))
         XCTAssertFalse(MeetingAudioTarget.isZoomBundleID("com.apple.Safari"))
         XCTAssertFalse(MeetingAudioTarget.isZoomBundleID(nil))

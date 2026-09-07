@@ -233,6 +233,11 @@ struct MenuBarPopoverView: View {
     }
 
     private var sourceCaption: String {
+        if surfacePreferences.captureSource.zoomAppOnly {
+            return MeetingAudioTarget.isZoomRunning
+                ? "Zoom is open. Lectern will capture only the Zoom app."
+                : "Open the Zoom desktop app, then press Record."
+        }
         if surfacePreferences.captureSource.includesSystemAudio, MeetingAudioTarget.isZoomRunning {
             return "Zoom is open. Lectern will capture what this Mac is playing."
         }
