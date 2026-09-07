@@ -3,7 +3,7 @@
 #
 #   scripts/build-app.sh            # -> dist/Lectern.app
 #
-# Uses Developer ID for the pinned Apple team. Ad-hoc signing is for scratch builds only.
+# Uses the original release certificate. Explicit ad-hoc signing is for scratch builds only.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
