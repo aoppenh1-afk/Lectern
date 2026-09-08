@@ -107,8 +107,18 @@ struct SubscriptionsView: View {
     private var failedImportsSection: some View {
         if !failedItems.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Imports needing attention")
-                    .font(.headline)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Imports needing attention")
+                        .font(.headline)
+                    Spacer()
+                    Button("Dismiss All") {
+                        automationService.dismissFailedItems(failedItems)
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .buttonStyle(.plain)
+                    .help("Remove all failed imports from this list")
+                }
                 ForEach(failedItems) { item in
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -118,10 +128,18 @@ struct SubscriptionsView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button("Retry") {
-                            Task { await automationService.retryItem(item) }
+                        HStack(spacing: 8) {
+                            Button("Retry") {
+                                Task { await automationService.retryItem(item) }
+                            }
+                            .disabled(automationService.activeItemIDs.contains(item.id))
+                            Button("Dismiss") {
+                                automationService.dismissItem(item)
+                            }
+                            .foregroundStyle(.secondary)
+                            .disabled(automationService.activeItemIDs.contains(item.id))
+                            .help("Remove this failed import from the list")
                         }
-                        .disabled(automationService.activeItemIDs.contains(item.id))
                     }
                 }
             }

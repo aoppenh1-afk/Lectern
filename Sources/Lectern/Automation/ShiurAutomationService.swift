@@ -422,6 +422,20 @@ final class ShiurAutomationService {
         await processItem(item)
     }
 
+    func dismissItem(_ item: ShiurAutomationItem) {
+        guard !activeItemIDs.contains(item.id) else { return }
+        modelContainer.mainContext.delete(item)
+        try? modelContainer.mainContext.save()
+    }
+
+    func dismissFailedItems(_ items: [ShiurAutomationItem]) {
+        let ids = activeItemIDs
+        for item in items where item.state == .failed && !ids.contains(item.id) {
+            modelContainer.mainContext.delete(item)
+        }
+        try? modelContainer.mainContext.save()
+    }
+
     // MARK: - One-Time Shiur Import
 
     func importShiur(
