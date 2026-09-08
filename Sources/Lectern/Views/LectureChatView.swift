@@ -19,6 +19,8 @@ struct LectureChatView: View {
     @State private var pendingAttachments: [ChatAttachment] = []
     @State private var attachmentError: String?
     @FocusState private var composerFocused: Bool
+    @AppStorage("lectureChat.sourcePanelVisible") private var sourcePanelVisible = true
+    @State private var expandedSourceSections: Set<String> = []
 
     private var source: LectureChatSource? { LectureChatSource.make(for: lecture) }
     private var profiles: [AgentProfile] { AgentProfiles.all() }
@@ -37,7 +39,11 @@ struct LectureChatView: View {
             if source == nil {
                 noSourceState
             } else {
-                conversation
+                HStack(spacing: 0) {
+                    conversation
+                    Divider()
+                    sourceSidebar
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -77,6 +83,22 @@ struct LectureChatView: View {
             }
 
             Spacer()
+
+            if source != nil {
+                Button {
+                    withAnimation(LecternTheme.standardAnimation) {
+                        sourcePanelVisible.toggle()
+                    }
+                } label: {
+                    Image(systemName: "sidebar.right")
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(width: 26, height: 26)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(sourcePanelVisible ? LecternTheme.accent : .secondary)
+                .help(sourcePanelVisible ? "Hide source panel" : "Show source panel")
+            }
 
             Button(action: viewSource) {
                 Label("View Source", systemImage: "rectangle.and.text.magnifyingglass")
@@ -164,6 +186,204 @@ struct LectureChatView: View {
                 .font(.system(size: 9.5))
                 .foregroundStyle(.tertiary)
                 .padding(.bottom, 10)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Source panel
+
+    @ViewBuilder
+    private var sourceSidebar: some View {
+        if sourcePanelVisible {
+            sourcePanel
+        } else {
+            VStack(spacing: 12) {
+                Button {
+                    withAnimation(LecternTheme.standardAnimation) {
+                        sourcePanelVisible = true
+                    }
+                } label: {
+                    Image(systemName: "sidebar.right")
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Show source panel")
+
+                Text("\(sourceSections.count)")
+                    .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(LecternTheme.accent)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(LecternTheme.accent.opacity(0.10), in: Capsule())
+                Spacer()
+            }
+            .padding(.vertical, 12)
+            .frame(width: 46)
+        }
+    }
+
+    private var sourcePanel: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Text("Sources")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(LecternTheme.ink)
+                Spacer()
+                Text("\(sourceSections.count) selected")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                Button {
+                    withAnimation(LecternTheme.standardAnimation) {
+                        sourcePanelVisible = false
+                    }
+                } label: {
+                    Image(systemName: "sidebar.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Collapse source panel")
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+
+            Divider()
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    ForEach(sourceSections) { section in
+                        sourceSectionRow(section)
+                    }
+                }
+                .padding(12)
+            }
+        }
+        .panelCard(cornerRadius: 16)
+        .frame(width: 300)
+        .padding(.trailing, 14)
+        .padding(.vertical, 14)
+    }
+
+    private func sourceSectionRow(_ section: ChatSourceSection) -> some View {
+        DisclosureGroup(isExpanded: Binding(
+            get: { expandedSourceSections.contains(section.id) },
+            set: { expanded in
+                if expanded {
+                    expandedSourceSections.insert(section.id)
+                } else {
+                    expandedSourceSections.remove(section.id)
+                }
+            }
+        )) {
+            Text(section.preview)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .lineSpacing(3)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.primary.opacity(0.035))
+                )
+        } label: {
+            HStack(spacing: 9) {
+                Image(systemName: section.icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(LecternTheme.accent)
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(section.label)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(LecternTheme.ink)
+                        .lineLimit(1)
+                    Text(section.detail)
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 4)
+            }
+        }
+        .tint(.secondary)
+    }
+
+    private var sourceSections: [ChatSourceSection] {
+        var sections: [ChatSourceSection] = []
+
+        if let notes = lecture.artifact(of: .notes)?.content,
+           !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sections.append(ChatSourceSection(
+                id: "notes",
+                label: "Notes",
+                detail: "\(notes.count) characters",
+                icon: "doc.text",
+                preview: sourceExcerpt(notes)
+            ))
+        }
+
+        if let cleaned = lecture.artifact(of: .cleanedTranscript)?.content,
+           !cleaned.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sections.append(ChatSourceSection(
+                id: "cleaned-transcript",
+                label: "Cleaned transcript",
+                detail: "\(cleaned.count) characters",
+                icon: "waveform",
+                preview: sourceExcerpt(cleaned)
+            ))
+        } else if let raw = lecture.artifact(of: .rawTranscript)?.content,
+                  !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sections.append(ChatSourceSection(
+                id: "raw-transcript",
+                label: "Raw transcript",
+                detail: "\(raw.count) characters",
+                icon: "waveform",
+                preview: sourceExcerpt(raw)
+            ))
+        }
+
+        for attachment in lecture.attachments.sorted(by: { $0.addedAt < $1.addedAt }) {
+            let text = attachment.extractedText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { continue }
+            sections.append(ChatSourceSection(
+                id: "lecture-file-\(attachment.name)",
+                label: attachment.name,
+                detail: "Lecture file · \(text.count) characters",
+                icon: referenceAttachmentIcon(for: attachment.kind),
+                preview: sourceExcerpt(text)
+            ))
+        }
+
+        if let course = lecture.course {
+            for attachment in course.attachments.sorted(by: { $0.addedAt < $1.addedAt }) {
+                let text = attachment.extractedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { continue }
+                sections.append(ChatSourceSection(
+                    id: "course-file-\(attachment.name)",
+                    label: attachment.name,
+                    detail: "Course file · \(text.count) characters",
+                    icon: referenceAttachmentIcon(for: attachment.kind),
+                    preview: sourceExcerpt(text)
+                ))
+            }
+        }
+
+        return sections
+    }
+
+    private func sourceExcerpt(_ text: String, limit: Int = 2000) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > limit else { return trimmed }
+        return String(trimmed.prefix(limit)) + "\n\n… (preview truncated)"
+    }
+
+    private func referenceAttachmentIcon(for kind: ReferenceAttachmentKind) -> String {
+        switch kind {
+        case .pdf, .word: return "doc.richtext"
+        case .markdown, .text: return "doc.text"
         }
     }
 
@@ -696,6 +916,14 @@ struct LectureChatView: View {
         modelCatalogsLoading = false
         normalizeThinkingLevel()
     }
+}
+
+private struct ChatSourceSection: Identifiable {
+    let id: String
+    let label: String
+    let detail: String
+    let icon: String
+    let preview: String
 }
 
 struct ThinkingLevelPicker: View {

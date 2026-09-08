@@ -39,33 +39,35 @@ enum LecternTheme {
     // MARK: Paper surfaces (adaptive light/dark)
 
     /// Warm canvas the whole app floats on.
+    /// Dark mode is true OLED black so unused pixels stay off.
     static var paper: Color {
         adaptive(light: NSColor(srgbRed: 0.980, green: 0.978, blue: 0.972, alpha: 1),   // #FAF9F7
-                  dark: NSColor(srgbRed: 0.110, green: 0.110, blue: 0.115, alpha: 1))
+                  dark: NSColor(srgbRed: 0.000, green: 0.000, blue: 0.000, alpha: 1))    // #000000 OLED
     }
 
     static var paperDeep: Color {
         adaptive(light: NSColor(srgbRed: 0.965, green: 0.965, blue: 0.960, alpha: 1),   // #F6F6F5
-                  dark: NSColor(srgbRed: 0.085, green: 0.085, blue: 0.090, alpha: 1))
+                  dark: NSColor(srgbRed: 0.000, green: 0.000, blue: 0.000, alpha: 1))    // #000000 OLED
     }
 
-    /// Solid elevated card: pure white in light mode, raised gray in dark.
+    /// Solid elevated card: pure white in light mode, raised graphite in dark.
     /// Use for floating content cards (chat answers, source sections) that
     /// must read as white sheets above the warm canvas.
     static var canvasCard: Color {
-        Color(nsColor: .controlBackgroundColor)
+        adaptive(light: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 1),   // #FFFFFF
+                  dark: NSColor(srgbRed: 0.086, green: 0.098, blue: 0.114, alpha: 1))    // #16191D OLED card
     }
 
     /// Sage user chat bubble (pale green in light mode).
     static var chatUserBubble: Color {
         adaptive(light: NSColor(srgbRed: 0.882, green: 0.925, blue: 0.878, alpha: 1),   // #E1ECE0
-                  dark: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.14))
+                  dark: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.08))
     }
 
     /// Delicate pale sage fill for active sidebar navigation pill.
     static var sidebarSelectedFill: Color {
         adaptive(light: NSColor(srgbRed: 0.882, green: 0.925, blue: 0.878, alpha: 1),   // #E1ECE0
-                  dark: NSColor(srgbRed: 0.160, green: 0.280, blue: 0.200, alpha: 0.55))
+                  dark: NSColor(srgbRed: 0.110, green: 0.227, blue: 0.157, alpha: 0.65)) // OLED deep green
     }
 
     /// Deep botanical green for active sidebar navigation text & icon.
@@ -77,28 +79,28 @@ enum LecternTheme {
     /// Message cards stay pure `canvasCard` so they lift off the panel.
     /// Dark mode must stay fully opaque: the main window is edge-to-edge
     /// with a clear NSWindow background, so any translucency here lets
-    /// other apps bleed through the workspace.
+    /// other apps bleed through the workspace. OLED: deep graphite on black.
     static var panelFill: Color {
         adaptive(light: NSColor(srgbRed: 0.984, green: 0.980, blue: 0.972, alpha: 1),   // #FBFAF7
-                  dark: NSColor(srgbRed: 0.156, green: 0.156, blue: 0.162, alpha: 1))    // #28282A opaque
+                  dark: NSColor(srgbRed: 0.051, green: 0.059, blue: 0.067, alpha: 1))    // #0D0F11 opaque
     }
 
     /// Milky tint laid over frosted glass so the opacity reads strongly
-    /// against the warm canvas.
+    /// against the warm canvas. Kept minimal in dark so blacks stay crushed.
     static var glassTint: Color {
         adaptive(light: NSColor(white: 1.0, alpha: 0.78),
-                  dark: NSColor(white: 1.0, alpha: 0.05))
+                  dark: NSColor(white: 1.0, alpha: 0.02))
     }
 
     /// Top-light sheen washed over the canvas for depth.
     static var canvasSheen: Color {
         adaptive(light: NSColor(white: 1.0, alpha: 0.35),
-                  dark: NSColor(white: 1.0, alpha: 0.04))
+                  dark: NSColor(white: 1.0, alpha: 0.02))
     }
 
     static var cardFill: Color {
         adaptive(light: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.72),
-                 dark: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.09))
+                 dark: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.06))
     }
 
     /// Deep green-black ink for serif display type on paper.
@@ -139,9 +141,9 @@ enum LecternTheme {
 
     // MARK: Legacy surfaces & ink
 
-    static var hairline: Color { Color.primary.opacity(0.10) }
-    static var surfaceFill: Color { Color.primary.opacity(0.04) }
-    static var subtleFill: Color { Color.primary.opacity(0.055) }
+    static var hairline: Color { Color.primary.opacity(0.13) }
+    static var surfaceFill: Color { Color.primary.opacity(0.05) }
+    static var subtleFill: Color { Color.primary.opacity(0.07) }
 
     static func statusTint(for status: LectureStatus) -> Color {
         switch status {
@@ -606,11 +608,11 @@ struct AppCanvasModifier: ViewModifier {
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 340)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                        .opacity(colorScheme == .dark ? 0.85 : 0.70)
+                        .opacity(colorScheme == .dark ? 0.32 : 0.70)
                         .allowsHitTesting(false)
 
                     if colorScheme == .dark {
-                        Color.black.opacity(0.35)
+                        Color.black.opacity(0.55)
                             .allowsHitTesting(false)
                     } else {
                         LinearGradient(
