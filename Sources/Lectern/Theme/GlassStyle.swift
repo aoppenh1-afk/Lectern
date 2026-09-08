@@ -608,12 +608,19 @@ struct AppCanvasModifier: ViewModifier {
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 340)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                        .opacity(colorScheme == .dark ? 0.32 : 0.70)
+                        .opacity(colorScheme == .dark ? 0.70 : 0.70)
                         .allowsHitTesting(false)
 
                     if colorScheme == .dark {
-                        Color.black.opacity(0.55)
-                            .allowsHitTesting(false)
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.65),
+                                Color.black.opacity(0.25)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .allowsHitTesting(false)
                     } else {
                         LinearGradient(
                             colors: [

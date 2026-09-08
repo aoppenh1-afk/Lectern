@@ -90,13 +90,12 @@ struct LectureChatView: View {
                         sourcePanelVisible.toggle()
                     }
                 } label: {
-                    Image(systemName: "sidebar.right")
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(width: 26, height: 26)
-                        .contentShape(Rectangle())
+                    Image(sourcePanelVisible ? "SourcePanelHide" : "SourcePanelShow")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 22, height: 22)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(sourcePanelVisible ? LecternTheme.accent : .secondary)
                 .help(sourcePanelVisible ? "Hide source panel" : "Show source panel")
             }
 
@@ -203,12 +202,12 @@ struct LectureChatView: View {
                         sourcePanelVisible = true
                     }
                 } label: {
-                    Image(systemName: "sidebar.right")
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(width: 30, height: 30)
+                    Image("SourcePanelShow")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 24, height: 24)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
                 .help("Show source panel")
 
                 Text("\(sourceSections.count)")
@@ -239,12 +238,12 @@ struct LectureChatView: View {
                         sourcePanelVisible = false
                     }
                 } label: {
-                    Image(systemName: "sidebar.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(width: 24, height: 24)
+                    Image("SourcePanelHide")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
                 .help("Collapse source panel")
             }
             .padding(.horizontal, 14)
@@ -308,7 +307,7 @@ struct LectureChatView: View {
                 Spacer(minLength: 4)
             }
         }
-        .tint(.secondary)
+        .disclosureGroupStyle(ChevronlessDisclosureStyle())
     }
 
     private var sourceSections: [ChatSourceSection] {
@@ -924,6 +923,26 @@ private struct ChatSourceSection: Identifiable {
     let detail: String
     let icon: String
     let preview: String
+}
+
+/// Disclosure rows without the default chevron. Tapping the row expands it.
+private struct ChevronlessDisclosureStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(LecternTheme.standardAnimation) {
+                    configuration.isExpanded.toggle()
+                }
+            } label: {
+                configuration.label
+            }
+            .buttonStyle(.plain)
+            if configuration.isExpanded {
+                configuration.content
+                    .padding(.top, 8)
+            }
+        }
+    }
 }
 
 struct ThinkingLevelPicker: View {
