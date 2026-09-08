@@ -349,9 +349,13 @@ struct CourseSynthesisView: View {
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) { sourcesCollapsed = false }
                 } label: {
-                    Image(systemName: "sidebar.left")
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(width: 30, height: 30)
+                    Image("SourcePanelToggle")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 18, height: 18)
+                        .frame(width: 34, height: 34)
+                        .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(LecternTheme.hairline))
                 }
                 .buttonStyle(.plain)
                 .help("Show sources")
@@ -392,9 +396,13 @@ struct CourseSynthesisView: View {
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) { sourcesCollapsed = true }
                     } label: {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .semibold))
-                            .frame(width: 24, height: 24)
+                        Image("SourcePanelToggle")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 16, height: 16)
+                            .frame(width: 28, height: 28)
+                            .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(LecternTheme.hairline))
                     }
                     .buttonStyle(.plain)
                     .help("Collapse sources")
@@ -584,7 +592,7 @@ struct CourseSynthesisView: View {
                         .background(Color.secondary.opacity(0.12), in: Capsule())
                 }
             }
-            .tint(.secondary)
+            .disclosureGroupStyle(ChevronlessDisclosureStyle())
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             Divider()
@@ -646,6 +654,7 @@ struct CourseSynthesisView: View {
                     .font(.system(size: 9).monospacedDigit()).foregroundStyle(.secondary)
             }
         }
+        .disclosureGroupStyle(ChevronlessDisclosureStyle())
         .padding(.vertical, 4)
     }
 

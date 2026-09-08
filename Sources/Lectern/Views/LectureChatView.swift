@@ -90,7 +90,7 @@ struct LectureChatView: View {
                         sourcePanelVisible.toggle()
                     }
                 } label: {
-                    Image(sourcePanelVisible ? "SourcePanelHide" : "SourcePanelShow")
+                    Image("SourcePanelToggle")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 22, height: 22)
@@ -202,7 +202,7 @@ struct LectureChatView: View {
                         sourcePanelVisible = true
                     }
                 } label: {
-                    Image("SourcePanelShow")
+                    Image("SourcePanelToggle")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 24, height: 24)
@@ -238,7 +238,7 @@ struct LectureChatView: View {
                         sourcePanelVisible = false
                     }
                 } label: {
-                    Image("SourcePanelHide")
+                    Image("SourcePanelToggle")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 20, height: 20)
@@ -926,7 +926,7 @@ private struct ChatSourceSection: Identifiable {
 }
 
 /// Disclosure rows without the default chevron. Tapping the row expands it.
-private struct ChevronlessDisclosureStyle: DisclosureGroupStyle {
+struct ChevronlessDisclosureStyle: DisclosureGroupStyle {
     func makeBody(configuration: Configuration) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
