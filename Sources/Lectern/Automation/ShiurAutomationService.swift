@@ -197,80 +197,20 @@ final class ShiurAutomationService {
         }
 
         if item.state == .discovered || item.state == .downloading {
-            item.state = .downloading
-            item.lastAttemptAt = Date()
-            item.downloadAttempts += 1
-            try? modelContainer.mainContext.save()
-
-            let remoteItem = RemoteShiurItem(
-                shiurID: item.shiurID,
-                title: item.title,
-                teacherName: item.teacherName,
-                seriesName: item.seriesName,
-                date: item.publicationDate,
-                duration: item.duration,
-                pageURL: item.pageURL,
-                enclosureURL: item.mediaURL
-            )
-
-            let mediaURL: URL
             do {
-                mediaURL = try await provider.resolveMediaURL(for: remoteItem)
+                _ = try await downloadAndImportLecture(for: item, course: course, remoteItem: RemoteShiurItem(
+                    shiurID: item.shiurID,
+                    title: item.title,
+                    teacherName: item.teacherName,
+                    seriesName: item.seriesName,
+                    date: item.publicationDate,
+                    duration: item.duration,
+                    pageURL: item.pageURL,
+                    enclosureURL: item.mediaURL
+                ))
             } catch {
-                item.state = .failed
-                item.stateMessage = "Media resolution failed: \(error.localizedDescription)"
-                try? modelContainer.mainContext.save()
                 return
             }
-
-            let downloadedFile: URL
-            do {
-                downloadedFile = try await downloader.download(
-                    from: mediaURL,
-                    filenameStem: "\(item.shiurID)-\(item.title)"
-                )
-            } catch {
-                item.state = .failed
-                item.stateMessage = "Download failed: \(error.localizedDescription)"
-                try? modelContainer.mainContext.save()
-                return
-            }
-
-            do {
-                _ = try importService.importAudio(
-                    from: downloadedFile,
-                    metadata: .init(
-                        title: item.title,
-                        course: course,
-                        language: item.language,
-                        capturedAt: item.publicationDate,
-                        sourceProviderRaw: "yutorah",
-                        sourceKey: item.sourceKey,
-                        sourcePageURL: item.pageURLString,
-                        sourceMediaURL: mediaURL.absoluteString,
-                        sourceTeacherName: item.teacherName,
-                        sourceSeriesName: item.seriesName,
-                        sourceSubscriptionID: item.subscriptionID
-                    ),
-                    moveSource: true
-                )
-            } catch {
-                try? FileManager.default.removeItem(at: downloadedFile)
-                item.state = .failed
-                item.stateMessage = "Import failed: \(error.localizedDescription)"
-                try? modelContainer.mainContext.save()
-                return
-            }
-
-            if let subID = item.subscriptionID,
-               let sub = findSubscription(id: subID) {
-                sub.lastImportedAt = Date()
-                sub.lastImportedTitle = item.title
-                sub.importedCount += 1
-            }
-
-            item.state = item.autoTranscribe ? .waitingForTranscription : .complete
-            try? modelContainer.mainContext.save()
         }
 
         // 3. Transcription
@@ -375,6 +315,92 @@ final class ShiurAutomationService {
         }
     }
 
+    // MARK: - Download + Import Stage
+
+    /// Downloads remote audio and creates the Lecture placecard.
+    /// Caller must hold `activeSourceKeys` for `item.sourceKey`.
+    /// On success sets item to `.waitingForTranscription`/`.complete` and returns the Lecture.
+    /// On failure marks item `.failed` and throws the underlying error.
+    private func downloadAndImportLecture(
+        for item: ShiurAutomationItem,
+        course: Course?,
+        remoteItem: RemoteShiurItem
+    ) async throws -> Lecture {
+        // Race: lecture appeared while waiting on activeSourceKeys.
+        if let existing = findExistingLecture(shiurID: item.shiurID) {
+            item.state = item.autoTranscribe ? .waitingForTranscription : .complete
+            item.stateMessage = nil
+            try? modelContainer.mainContext.save()
+            return existing
+        }
+
+        item.state = .downloading
+        item.lastAttemptAt = Date()
+        item.downloadAttempts += 1
+        try? modelContainer.mainContext.save()
+
+        let mediaURL: URL
+        do {
+            mediaURL = try await provider.resolveMediaURL(for: remoteItem)
+        } catch {
+            item.state = .failed
+            item.stateMessage = "Media resolution failed: \(error.localizedDescription)"
+            try? modelContainer.mainContext.save()
+            throw error
+        }
+
+        let downloadedFile: URL
+        do {
+            downloadedFile = try await downloader.download(
+                from: mediaURL,
+                filenameStem: "\(item.shiurID)-\(item.title)"
+            )
+        } catch {
+            item.state = .failed
+            item.stateMessage = "Download failed: \(error.localizedDescription)"
+            try? modelContainer.mainContext.save()
+            throw error
+        }
+
+        let lecture: Lecture
+        do {
+            lecture = try importService.importAudio(
+                from: downloadedFile,
+                metadata: .init(
+                    title: item.title,
+                    course: course,
+                    language: item.language,
+                    capturedAt: item.publicationDate,
+                    sourceProviderRaw: "yutorah",
+                    sourceKey: item.sourceKey,
+                    sourcePageURL: item.pageURLString,
+                    sourceMediaURL: mediaURL.absoluteString,
+                    sourceTeacherName: item.teacherName,
+                    sourceSeriesName: item.seriesName,
+                    sourceSubscriptionID: item.subscriptionID
+                ),
+                moveSource: true
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: downloadedFile)
+            item.state = .failed
+            item.stateMessage = "Import failed: \(error.localizedDescription)"
+            try? modelContainer.mainContext.save()
+            throw error
+        }
+
+        if let subID = item.subscriptionID,
+           let sub = findSubscription(id: subID) {
+            sub.lastImportedAt = Date()
+            sub.lastImportedTitle = item.title
+            sub.importedCount += 1
+        }
+
+        item.state = item.autoTranscribe ? .waitingForTranscription : .complete
+        try? modelContainer.mainContext.save()
+        return lecture
+    }
+
     func retryItem(_ item: ShiurAutomationItem) async {
         guard !activeItemIDs.contains(item.id), item.state == .failed || item.state == .paused else { return }
         if let lecture = findExistingLecture(shiurID: item.shiurID) {
@@ -426,20 +452,45 @@ final class ShiurAutomationService {
             autoTranscribe: autoTranscribe,
             autoGenerateNotes: autoGenerateNotes
         )
+        if let course {
+            automationItem.targetCourseIDData = try? JSONEncoder().encode(course.persistentModelID)
+        }
         modelContainer.mainContext.insert(automationItem)
         try? modelContainer.mainContext.save()
 
-        await processItem(automationItem, targetCourse: course)
-
-        if let created = findExistingLecture(shiurID: remoteItem.shiurID) {
-            return created
+        // Fast path: wait for any concurrent download of the same shiur, then
+        // download + create the Lecture placecard synchronously so the UI can
+        // dismiss with "import successful". Transcription + notes continue in
+        // the background via processItem (failures surface under
+        // "Imports needing attention").
+        while activeSourceKeys.contains(automationItem.sourceKey) {
+            do { try await Task.sleep(for: .milliseconds(100)) }
+            catch { throw CancellationError() }
+        }
+        guard !Task.isCancelled else { throw CancellationError() }
+        activeSourceKeys.insert(automationItem.sourceKey)
+        let lecture: Lecture
+        do {
+            lecture = try await downloadAndImportLecture(
+                for: automationItem,
+                course: course,
+                remoteItem: remoteItem
+            )
+            activeSourceKeys.remove(automationItem.sourceKey)
+        } catch {
+            activeSourceKeys.remove(automationItem.sourceKey)
+            throw error
         }
 
-        throw NSError(
-            domain: "ShiurAutomationService",
-            code: -1,
-            userInfo: [NSLocalizedDescriptionKey: automationItem.stateMessage ?? "Import failed."]
-        )
+        // Background continuation: transcription + notes. processItem skips the
+        // download stage because the lecture now exists.
+        if automationItem.state != .complete {
+            Task {
+                await processItem(automationItem, targetCourse: course)
+            }
+        }
+
+        return lecture
     }
 
     // MARK: - Redownload Audio
