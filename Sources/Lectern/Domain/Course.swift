@@ -9,6 +9,9 @@ final class Course {
     /// Google Doc that holds this course's lecture-note tabs. Created on first push.
     var googleDocId: String?
 
+    /// Course chat and reviewable study drafts, retained across app launches.
+    var studyChatHistory: Data?
+
     // Canvas-backed courses remain ordinary Lectern courses. A nil Canvas ID
     // marks a course created locally by the student.
     var canvasID: Int64?

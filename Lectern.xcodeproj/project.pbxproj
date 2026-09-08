@@ -66,6 +66,7 @@
 		3C19C3525862F290CD24851F /* TranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE4BD4460EFC76CC20503256 /* TranscriptionEngine.swift */; };
 		3C90514FAC181668F41A9CC3 /* NotesContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51D3E04EE9E7EAE2AA0AA37 /* NotesContentView.swift */; };
 		3D5844BEFB098FE7713F88B8 /* LaunchAtLoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B67FCCE28F74E8E6AC84F215 /* LaunchAtLoginManager.swift */; };
+		3E33F385DAAC6FCB6B1566F3 /* ChatStudyMaterialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 795B08D1A7D6BBE0408B836A /* ChatStudyMaterialTests.swift */; };
 		40026814DD41633C8C7DDBF3 /* FlashcardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03592B808597F36DE3B7F38E /* FlashcardsView.swift */; };
 		40CEAE1E9CEA4D5E3168D188 /* DiagramRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5496C48DE5EDC0027745A0E /* DiagramRenderer.swift */; };
 		4120AFA2BDA35DD20981806A /* Color+Hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF40CBB383F0F13DB95789D6 /* Color+Hex.swift */; };
@@ -129,6 +130,7 @@
 		774E46198FF81D34D8A71C78 /* MenuBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73BEE40BCC364B58C68CEB62 /* MenuBarPopoverView.swift */; };
 		79575C2E141B111B720DE15C /* YUTorahRSSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D853730E8F00F809FFF741FD /* YUTorahRSSParser.swift */; };
 		79A6A6E0658A39BDDB91CF63 /* YUTorahFuzzyMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12F61E67B7A6A360B9393A9D /* YUTorahFuzzyMatcher.swift */; };
+		79C7525D859A3CFACA03FC9E /* ChatStudyMaterial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E498DA5E7400A992FE2328 /* ChatStudyMaterial.swift */; };
 		7AADBA9597A6FB92B7749D65 /* AntigravityACP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BFE16C6F2F14A491896949 /* AntigravityACP.swift */; };
 		7AC8FBC32E220BCAA9FD7A42 /* YUTorahSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B431E6A4C6DD679E2D7C259 /* YUTorahSearchService.swift */; };
 		7AE0118F869A861B74F92EEA /* YUTorahModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C72925A022B89EE971A12294 /* YUTorahModels.swift */; };
@@ -153,6 +155,7 @@
 		9057CF2BC820828797889158 /* Recording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */; };
 		91156C78834D510839B91214 /* LectureExportAvailability+Lecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C30D8A14329AC61D5345BC9 /* LectureExportAvailability+Lecture.swift */; };
 		919717555519875DF0C08F6F /* CanvasSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A763F772641D5D2F5F79CDB9 /* CanvasSettingsView.swift */; };
+		923F36EB53C0B3DC97205995 /* ChatStudyMaterialSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AA159496419E6AFC4B89EB7 /* ChatStudyMaterialSheet.swift */; };
 		924578050CE064AB1D124E3D /* YUTorahSearchParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EECE7226265D02716663B45 /* YUTorahSearchParser.swift */; };
 		9265B1AAA24271D2A4BD864F /* LectureExportAvailability+Lecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C30D8A14329AC61D5345BC9 /* LectureExportAvailability+Lecture.swift */; };
 		92BA99F1D8777D835D66AFCF /* AntigravityACP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BFE16C6F2F14A491896949 /* AntigravityACP.swift */; };
@@ -209,11 +212,13 @@
 		C7C73BFFDE8077303DBA5C1B /* ReferenceMaterialPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A8D31EBDA459CA5FB32589 /* ReferenceMaterialPicker.swift */; };
 		C8BD1E39D756D4404C06735D /* LecternBundleOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */; };
 		C90B7860B0E62A59D4F48341 /* SubscriptionEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8910AF0204135B690C41D851 /* SubscriptionEditorView.swift */; };
+		CABD6D162811234B10E2B754 /* ChatStudyMaterialSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AA159496419E6AFC4B89EB7 /* ChatStudyMaterialSheet.swift */; };
 		CB51F1710B7BFE7BFED515EE /* SurfacePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363051532AA63A00332E82D7 /* SurfacePreferences.swift */; };
 		CB7D01FE2F70E7CFBD226E87 /* YUTorahMediaResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE0F3353EF151BC046D963A4 /* YUTorahMediaResolver.swift */; };
 		CBE08C8D503A31D46BFC2FA9 /* AntigravityACPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */; };
 		CC7EE018F7D01EE8A9B73587 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = B564AF96344848C71EE09258 /* README.md */; };
 		CC81062C168BF06111E4201E /* LecternBundleOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */; };
+		CD2B69B1C89D6EB5DABE99C9 /* ChatStudyMaterial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E498DA5E7400A992FE2328 /* ChatStudyMaterial.swift */; };
 		D157831E158E1241D5E064D9 /* RecordingFileLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DEC6C81E9D90FFBE3C748F /* RecordingFileLedger.swift */; };
 		D24BCCE8824C7C7E71EA3526 /* YUTorahSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE3C5081C885AB547B647B4 /* YUTorahSearchView.swift */; };
 		D29E99952FAF0067A32EE720 /* LectureChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC2F44F19A8CD8C4379AC82 /* LectureChatView.swift */; };
@@ -268,6 +273,7 @@
 		16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasClient.swift; sourceTree = "<group>"; };
 		173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recording.swift; sourceTree = "<group>"; };
 		17BFE16C6F2F14A491896949 /* AntigravityACP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACP.swift; sourceTree = "<group>"; };
+		17E498DA5E7400A992FE2328 /* ChatStudyMaterial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStudyMaterial.swift; sourceTree = "<group>"; };
 		19629351EB498E76FFBC6AF2 /* lectern-transcription */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "lectern-transcription"; path = ".agents/skills/lectern-transcription"; sourceTree = SOURCE_ROOT; };
 		1A11419823C0A975075BD958 /* LectureImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureImportService.swift; sourceTree = "<group>"; };
 		1A8E8D62B339AAE8CDACF807 /* YUTorahSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSearchIndex.swift; sourceTree = "<group>"; };
@@ -290,6 +296,7 @@
 		35A92C58BA4F8412B20A3504 /* GoogleDocsSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsSyncService.swift; sourceTree = "<group>"; };
 		363051532AA63A00332E82D7 /* SurfacePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfacePreferences.swift; sourceTree = "<group>"; };
 		39ACF53C363072F06D09190A /* WAVMixdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WAVMixdown.swift; sourceTree = "<group>"; };
+		3AA159496419E6AFC4B89EB7 /* ChatStudyMaterialSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStudyMaterialSheet.swift; sourceTree = "<group>"; };
 		3DFFBA8697AE3C7AB28D15DE /* LectureDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureDetailView.swift; sourceTree = "<group>"; };
 		3EECE7226265D02716663B45 /* YUTorahSearchParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSearchParser.swift; sourceTree = "<group>"; };
 		3F39B466BD1D9EADCD297E23 /* RemoteAudioDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteAudioDownloader.swift; sourceTree = "<group>"; };
@@ -319,6 +326,7 @@
 		73BEE40BCC364B58C68CEB62 /* MenuBarPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPopoverView.swift; sourceTree = "<group>"; };
 		75D3EFB87C0ED82B6A0F9E8F /* SuperAppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuperAppShellView.swift; sourceTree = "<group>"; };
 		76FE69A65922487DBD5E43CA /* PillWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PillWindowController.swift; sourceTree = "<group>"; };
+		795B08D1A7D6BBE0408B836A /* ChatStudyMaterialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStudyMaterialTests.swift; sourceTree = "<group>"; };
 		7F48400CBE26D86C8AA210BB /* GlassStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyle.swift; sourceTree = "<group>"; };
 		832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasClientTests.swift; sourceTree = "<group>"; };
 		85118E4C36171306169DA123 /* CanvasSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasSyncService.swift; sourceTree = "<group>"; };
@@ -478,6 +486,7 @@
 			children = (
 				A763F772641D5D2F5F79CDB9 /* CanvasSettingsView.swift */,
 				31FE176891F8FD111C81F219 /* CanvasWorkspaceViews.swift */,
+				3AA159496419E6AFC4B89EB7 /* ChatStudyMaterialSheet.swift */,
 				BD87EB0581FBD62DD9CC2F0B /* CourseSynthesisView.swift */,
 				03592B808597F36DE3B7F38E /* FlashcardsView.swift */,
 				EDCDE601FE52EA2EF91E5594 /* GenerateSheet.swift */,
@@ -575,6 +584,7 @@
 				832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */,
 				0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */,
 				D877127DC8DE4B1DC47FD222 /* CaptureSourceTests.swift */,
+				795B08D1A7D6BBE0408B836A /* ChatStudyMaterialTests.swift */,
 				2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */,
 				F2ECE882547DAE6ABCD5EC51 /* ExportAvailabilityTests.swift */,
 				60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */,
@@ -712,6 +722,7 @@
 				17BFE16C6F2F14A491896949 /* AntigravityACP.swift */,
 				BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */,
 				61B8478F30090A0838FA7BCC /* ChatMarkdownRenderer.swift */,
+				17E498DA5E7400A992FE2328 /* ChatStudyMaterial.swift */,
 				627A2CDC9029D01B87C36A0C /* CourseSynthesisService.swift */,
 				E5496C48DE5EDC0027745A0E /* DiagramRenderer.swift */,
 				EFE4FA9BA6277A22013E953E /* GenerationService.swift */,
@@ -914,6 +925,9 @@
 				8E6816198EC12C476E419072 /* CardSyncService.swift in Sources */,
 				100C91EA7D7BBC17B0B5FFAE /* ChatMarkdownRenderer.swift in Sources */,
 				76DFF5C7F10FCD387528F6F2 /* ChatMessage.swift in Sources */,
+				CD2B69B1C89D6EB5DABE99C9 /* ChatStudyMaterial.swift in Sources */,
+				CABD6D162811234B10E2B754 /* ChatStudyMaterialSheet.swift in Sources */,
+				3E33F385DAAC6FCB6B1566F3 /* ChatStudyMaterialTests.swift in Sources */,
 				4120AFA2BDA35DD20981806A /* Color+Hex.swift in Sources */,
 				5F48CA518FE926E6F2B01953 /* CompletionNotificationTests.swift in Sources */,
 				B0183D74ECA0C677FCFD815A /* CompletionNotifier.swift in Sources */,
@@ -1036,6 +1050,8 @@
 				506B4E0C2FEE82EABA756F91 /* CardSyncService.swift in Sources */,
 				81AEF8ECD24F2CA06E7E9EA8 /* ChatMarkdownRenderer.swift in Sources */,
 				8BE649B38DF898AC27E78800 /* ChatMessage.swift in Sources */,
+				79C7525D859A3CFACA03FC9E /* ChatStudyMaterial.swift in Sources */,
+				923F36EB53C0B3DC97205995 /* ChatStudyMaterialSheet.swift in Sources */,
 				11B676CDDFEDF8FCE083CA1F /* Color+Hex.swift in Sources */,
 				5CC2CA3F302C627237B9794E /* CompletionNotifier.swift in Sources */,
 				BCC4C4D4D041A3049E9A0007 /* Course.swift in Sources */,

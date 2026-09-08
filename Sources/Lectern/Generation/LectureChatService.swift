@@ -31,6 +31,7 @@ struct LectureChatSource {
             sections.append(("Course file: \(attachment.name)", attachment.extractedText))
         }
 
+        sections.append(contentsOf: ChatStudyMaterial.studySources(for: lecture))
         guard !sections.isEmpty else { return nil }
 
         // Keep Notes whole whenever possible, then spend the remaining

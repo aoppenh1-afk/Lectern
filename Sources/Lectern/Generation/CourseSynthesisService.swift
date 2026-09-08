@@ -36,6 +36,9 @@ struct CourseChatSource {
                       !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 sources.append(("\(lecture.title) raw transcript", raw))
             }
+            sources.append(contentsOf: ChatStudyMaterial.studySources(for: lecture).map {
+                ("\(lecture.title) \($0.0.lowercased())", $0.1)
+            })
             for attachment in lecture.attachments.sorted(by: { $0.addedAt < $1.addedAt }) {
                 sources.append(("\(lecture.title) file: \(attachment.name)", attachment.extractedText))
             }
@@ -74,6 +77,7 @@ struct CourseChatSource {
             appendToChunks(label: label, content: content)
         }
         if !current.isEmpty { chunks.append(current) }
+        guard !chunks.isEmpty else { return nil }
         return CourseChatSource(title: course.name,
                                 labels: labels,
                                 chunks: chunks)
@@ -83,10 +87,12 @@ struct CourseChatSource {
 @MainActor
 @Observable
 final class CourseSynthesisService {
-    struct Turn: Identifiable {
-        let id = UUID()
+    struct Turn: Identifiable, Codable {
+        var id = UUID()
         let question: String
         let answer: String
+        var material: ChatStudyMaterial?
+        var sourceLabels: [String] = []
     }
 
     private(set) var isResponding = false
@@ -96,6 +102,10 @@ final class CourseSynthesisService {
     private(set) var turns: [Turn] = []
     private var task: Task<Void, Never>?
     private var currentCourseID: PersistentIdentifier?
+    private var currentCourse: Course?
+    private var activeTurnID: UUID?
+    private var retryAction: (() -> Void)?
+    var canRetry: Bool { retryAction != nil && lastError != nil && !isResponding }
     private let workspaceDirectory: URL
 
     init() {
@@ -113,7 +123,8 @@ final class CourseSynthesisService {
               attachments: [ReferenceAttachment]? = nil,
               profile: AgentProfile,
               thinkingLevel: ThinkingLevel,
-              modelOverride: String?) {
+              modelOverride: String?,
+              studyRequest: ChatStudyRequest? = nil) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isResponding else { return }
         let hasLocalSources = CourseChatSource.make(
@@ -122,11 +133,21 @@ final class CourseSynthesisService {
             canvasSources: canvasSources,
             attachments: attachments
         ) != nil
-        guard hasLocalSources || !canvasResources.isEmpty else { return }
+        guard hasLocalSources || !canvasResources.isEmpty || studyRequest?.usesTopicOnly == true else {
+            retryAction = nil
+            lastError = "Select a lecture, course file, or Canvas resource before sending."
+            return
+        }
 
-        if currentCourseID != course.persistentModelID {
-            turns = []
-            currentCourseID = course.persistentModelID
+        activate(course)
+        guard currentCourseID == course.persistentModelID else { return }
+        let turnID = UUID()
+        activeTurnID = turnID
+        retryAction = { [weak self] in
+            self?.send(question, course: course, lectures: lectures, canvasSources: canvasSources,
+                       canvasResources: canvasResources, canvasCredentials: canvasCredentials,
+                       attachments: attachments, profile: profile, thinkingLevel: thinkingLevel,
+                       modelOverride: modelOverride, studyRequest: studyRequest)
         }
 
         isResponding = true
@@ -134,7 +155,7 @@ final class CourseSynthesisService {
         pendingQuestion = trimmed
         lastError = nil
         let priorConversation = turns.suffix(6).map {
-            "Student: \($0.question)\n\nAssistant: \($0.answer)"
+            "Student: \($0.question)\n\nAssistant: \($0.material?.preview ?? $0.answer)"
         }.joined(separator: "\n\n")
         task = Task { [weak self] in
             guard let self else { return }
@@ -157,7 +178,11 @@ final class CourseSynthesisService {
                     lectures: lectures,
                     canvasSources: resolvedCanvasSources,
                     attachments: attachments
-                ) else { throw CanvasResourceContentError.invalidResponse }
+                ) ?? (studyRequest?.usesTopicOnly == true ? CourseChatSource(
+                    title: course.name,
+                    labels: ["Student topic and conversation; no course sources"],
+                    chunks: ["Student-supplied topic: \(trimmed)"]
+                ) : nil) else { throw CanvasResourceContentError.invalidResponse }
                 let promptImages = canvasImages
                 let sourceMaterial: String
                 if source.chunks.count == 1 {
@@ -195,6 +220,7 @@ final class CourseSynthesisService {
                         "<subset-findings index=\"\($0.offset + 1)\">\n\($0.element)\n</subset-findings>"
                     }.joined(separator: "\n\n")
                 }
+                try Task.checkCancellation()
                 let prompt = """
                 You are Lectern's course study assistant. Answer using the supplied course sources.
 
@@ -204,6 +230,8 @@ final class CourseSynthesisService {
                 - If the sources do not support a claim, say so.
                 - Cite source names inline. Do not invent citations.
                 - Use concise Markdown when it helps.
+
+                \(studyRequest?.instruction ?? "")
 
                 Course: \(source.title)
 
@@ -223,21 +251,43 @@ final class CourseSynthesisService {
                     workspaceDirectory: workspaceDirectory,
                     images: source.chunks.count == 1 ? promptImages : []
                 ) { [weak self] chunk in
-                    Task { @MainActor in self?.response += chunk }
+                    Task { @MainActor in
+                        guard let self, self.activeTurnID == turnID, studyRequest == nil else { return }
+                        self.response += chunk
+                    }
                 }.trimmingCharacters(in: .whitespacesAndNewlines)
-                turns.append(Turn(question: trimmed, answer: answer))
+                try Task.checkCancellation()
+                guard activeTurnID == turnID else { return }
+                guard !answer.isEmpty else { throw ACPConnection.ACPError.unexpectedResponse }
+                let material = try studyRequest.map {
+                    try ChatStudyMaterial.parse(answer, request: $0, sourceLabels: source.labels,
+                                                modelInfo: modelOverride ?? profile.title)
+                }
+                turns.append(Turn(question: trimmed, answer: material?.preview ?? answer,
+                                  material: material, sourceLabels: source.labels))
+                try persistHistory()
                 response = ""
                 pendingQuestion = nil
             } catch {
+                guard activeTurnID == turnID else { return }
                 lastError = error.localizedDescription
+                response = ""
                 pendingQuestion = nil
             }
+            guard activeTurnID == turnID else { return }
+            activeTurnID = nil
             isResponding = false
             task = nil
         }
     }
 
+    func retry() {
+        guard !isResponding else { return }
+        retryAction?()
+    }
+
     func cancel() {
+        activeTurnID = nil
         task?.cancel()
         task = nil
         isResponding = false
@@ -247,8 +297,145 @@ final class CourseSynthesisService {
 
     func clear() {
         cancel()
+        retryAction = nil
+        let previous = turns
         turns = []
         lastError = nil
+        do { try persistHistory() }
+        catch { turns = previous; lastError = error.localizedDescription }
+    }
+
+    func activate(_ course: Course) {
+        guard currentCourseID != course.persistentModelID else { return }
+        cancel()
+        retryAction = nil
+        do {
+            let history = try course.studyChatHistory.map { try JSONDecoder().decode([Turn].self, from: $0) } ?? []
+            turns = history
+            currentCourse = course
+            currentCourseID = course.persistentModelID
+            lastError = nil
+        } catch {
+            turns = []
+            currentCourse = nil
+            currentCourseID = nil
+            lastError = "Could not read this course's saved chat: \(error.localizedDescription)"
+        }
+    }
+
+    private func persistHistory() throws {
+        guard let course = currentCourse, let context = course.modelContext else { return }
+        let previous = course.studyChatHistory
+        course.studyChatHistory = try JSONEncoder().encode(turns)
+        do { try context.save() }
+        catch { course.studyChatHistory = previous; throw error }
+    }
+
+    /// Appends to the latest destination content and commits the save receipt with the material.
+    /// Failure restores only changes made here, preserving unrelated pending edits.
+    @discardableResult
+    func saveMaterial(_ edited: ChatStudyMaterial, turnID: UUID,
+                      course: Course, lectureID: PersistentIdentifier?, newLectureTitle: String) throws -> Lecture {
+        guard currentCourseID == course.persistentModelID, !course.isDeleted,
+              let context = course.modelContext,
+              let index = turns.firstIndex(where: { $0.id == turnID }),
+              turns[index].material?.savedLectureTitle == nil else {
+            throw ChatStudyMaterial.MaterialError.invalid("This draft has already been saved or its conversation is no longer open.")
+        }
+        try edited.validate()
+        let lecture: Lecture
+        let isNew = lectureID == nil
+        if let lectureID {
+            guard let existing = context.model(for: lectureID) as? Lecture,
+                  !existing.isDeleted, existing.course == course, existing.status == .ready else {
+                throw ChatStudyMaterial.MaterialError.invalid("Choose a ready lecture in this course. The previous destination is no longer available.")
+            }
+            lecture = existing
+        } else {
+            let title = newLectureTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty else { throw ChatStudyMaterial.MaterialError.invalid("Give the new lecture a title.") }
+            lecture = Lecture(title: title, capturedAt: Date(), status: .ready, language: course.language)
+            context.insert(lecture)
+            lecture.course = course
+        }
+
+        let oldArtifacts = lecture.artifacts
+        let oldCards = lecture.flashcards
+        let oldQuestions = lecture.quizItems
+        let notes = lecture.artifact(of: .notes)
+        let oldContent = notes?.content
+        let oldGeneratedAt = notes?.generatedAt
+        let oldModelInfo = notes?.modelInfo
+        let oldHistory = course.studyChatHistory
+        let oldTurn = turns[index]
+        var addedArtifacts: [Artifact] = []
+        var addedCards: [Flashcard] = []
+        var addedQuestions: [QuizItem] = []
+
+        switch edited.kind {
+        case .notes, .studyGuide:
+            let section = "# \(edited.title)\n\n\(NotesMarkdownNormalizer.normalize(edited.markdown))"
+            if let notes {
+                notes.content = notes.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? section : notes.content + "\n\n---\n\n" + section
+                notes.generatedAt = Date()
+                notes.modelInfo = edited.modelInfo
+            } else {
+                let artifact = Artifact(kind: .notes, content: section, modelInfo: edited.modelInfo)
+                context.insert(artifact)
+                artifact.lecture = lecture
+                lecture.artifacts.append(artifact)
+                addedArtifacts.append(artifact)
+            }
+        case .flashcards:
+            var seen = Set(oldCards.map { $0.front.trimmingCharacters(in: .whitespacesAndNewlines) + "\u{0}" + $0.back.trimmingCharacters(in: .whitespacesAndNewlines) })
+            for card in edited.cards {
+                let front = card.front.trimmingCharacters(in: .whitespacesAndNewlines)
+                let back = card.back.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard seen.insert(front + "\u{0}" + back).inserted else { continue }
+                let item = Flashcard(front: front, back: back)
+                context.insert(item)
+                item.lecture = lecture
+                lecture.flashcards.append(item)
+                addedCards.append(item)
+            }
+        case .quiz:
+            let quizID = UUID()
+            for question in edited.questions {
+                let options = question.options.flatMap { $0.isEmpty ? nil : $0 }
+                let item = QuizItem(prompt: question.prompt, options: options, answer: question.answer,
+                                    explanation: question.explanation, kind: options == nil ? .shortAnswer : .multipleChoice)
+                item.quizID = quizID
+                context.insert(item)
+                item.lecture = lecture
+                lecture.quizItems.append(item)
+                addedQuestions.append(item)
+            }
+        }
+        var saved = edited
+        saved.savedLectureTitle = lecture.title
+        turns[index].material = saved
+        do {
+            course.studyChatHistory = try JSONEncoder().encode(turns)
+            try context.save()
+        } catch {
+            turns[index] = oldTurn
+            course.studyChatHistory = oldHistory
+            if let notes, let oldContent, let oldGeneratedAt, let oldModelInfo {
+                notes.content = oldContent
+                notes.generatedAt = oldGeneratedAt
+                notes.modelInfo = oldModelInfo
+            }
+            lecture.artifacts = oldArtifacts
+            lecture.flashcards = oldCards
+            lecture.quizItems = oldQuestions
+            for artifact in addedArtifacts { context.delete(artifact) }
+            for card in addedCards { context.delete(card) }
+            for question in addedQuestions { context.delete(question) }
+            if isNew { context.delete(lecture) }
+            throw error
+        }
+        return lecture
     }
 
     private nonisolated static func request(

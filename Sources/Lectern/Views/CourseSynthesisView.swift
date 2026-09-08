@@ -52,6 +52,12 @@ struct CourseSynthesisView: View {
     @State private var thinkingPickerOpen = false
     @State private var showingImporter = false
     @State private var importError: String?
+    private struct MaterialReview: Identifiable {
+        let id: UUID
+        let material: ChatStudyMaterial
+    }
+    @State private var materialReview: MaterialReview?
+
 
     private var selectedLectures: [Lecture] {
         candidateLectures.filter { selectedLectureIDs.contains($0.persistentModelID) }
@@ -176,6 +182,7 @@ struct CourseSynthesisView: View {
             .padding(.bottom, 14)
         }
         .onAppear {
+            synthesis.activate(course)
             selectedLectureIDs = Set(course.lectures.map(\.persistentModelID))
             selectedCanvasSourceLabels = Set(canvasSources.map(\.label))
             selectedAttachmentIDs = Set(course.attachments.map(\.persistentModelID))
@@ -193,6 +200,9 @@ struct CourseSynthesisView: View {
         }
         .onChange(of: effectiveModelID) { _, _ in normalizeThinkingLevel() }
         .onChange(of: thinkingLevelRaw) { _, _ in applyThinkingToSelectedModel() }
+        .sheet(item: $materialReview) { review in
+            ChatStudyMaterialSheet(course: course, turnID: review.id, material: review.material)
+        }
         .fileImporter(isPresented: $showingImporter,
                       allowedContentTypes: [.data],
                       allowsMultipleSelection: true) { result in
@@ -221,8 +231,29 @@ struct CourseSynthesisView: View {
                                         HStack(alignment: .top, spacing: 12) {
                                             assistantBadge
                                             VStack(alignment: .leading, spacing: 8) {
-                                                NotesContentView(markdown: turn.answer).padding(15).elevatedCard()
-                                                sourceChips
+                                                NotesContentView(markdown: turn.material?.preview ?? turn.answer).padding(15).elevatedCard()
+                                                if let material = turn.material {
+                                                    if let title = material.savedLectureTitle {
+                                                        Label("Saved to \(title)", systemImage: "checkmark.circle.fill")
+                                                            .font(.callout).foregroundStyle(.secondary)
+                                                    } else {
+                                                        Button("Review and save \(material.kind.title.lowercased())") {
+                                                            materialReview = MaterialReview(id: turn.id, material: material)
+                                                        }
+                                                        .buttonStyle(.bordered)
+                                                    }
+                                                } else {
+                                                    Button("Save as notes") {
+                                                        materialReview = MaterialReview(id: turn.id, material: ChatStudyMaterial(
+                                                            kind: .notes, title: String(turn.question.prefix(100)), markdown: turn.answer,
+                                                            sourceLabels: turn.sourceLabels, modelInfo: "Course chat"))
+                                                    }
+                                                    .buttonStyle(.borderless)
+                                                }
+                                                if !turn.sourceLabels.isEmpty {
+                                                    Text("Sources: " + turn.sourceLabels.joined(separator: ", "))
+                                                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                                                }
                                             }
                                         }
                                     }
@@ -282,7 +313,10 @@ struct CourseSynthesisView: View {
             }
 
             if let error = synthesis.lastError {
-                Text(error).font(.system(size: 11)).foregroundStyle(.red).padding(.horizontal, 14)
+                HStack {
+                    Text(error).font(.system(size: 11)).foregroundStyle(.red)
+                    if synthesis.canRetry { Button("Retry") { synthesis.retry() } }
+                }.padding(.horizontal, 14)
             }
 
             CourseSynthesisComposer(
@@ -298,6 +332,7 @@ struct CourseSynthesisView: View {
                 thinkingLevelRaw: $thinkingLevelRaw,
                 modelPickerOpen: $modelPickerOpen,
                 thinkingPickerOpen: $thinkingPickerOpen,
+                hasSelectedSources: selectedSourceCount > 0,
                 onSend: send
             )
             .frame(maxWidth: 820)
@@ -628,7 +663,7 @@ struct CourseSynthesisView: View {
         }
     }
 
-    private func send(_ question: String) {
+    private func send(_ question: String, studyRequest: ChatStudyRequest?) {
         guard let profile = selectedProfile else { return }
         let credentials = try? canvasConnection.credentials()
         withAnimation(LecternTheme.standardAnimation) {
@@ -641,7 +676,8 @@ struct CourseSynthesisView: View {
                            attachments: selectedAttachments,
                            profile: profile,
                            thinkingLevel: thinkingLevel,
-                           modelOverride: effectiveModelID)
+                           modelOverride: effectiveModelID,
+                           studyRequest: studyRequest)
         }
     }
 
@@ -661,7 +697,7 @@ struct CourseSynthesisView: View {
                 Text("AI Assistant")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(LecternTheme.accent)
-                Text("Ask across lectures and course files.")
+                Text("Ask questions or create study materials from your sources.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -706,7 +742,7 @@ struct CourseSynthesisView: View {
                 (Text("Hello! I am your study assistant for ") + Text(course.name).bold() + Text(". How can I help you today?"))
                     .font(.system(size: 13))
                     .foregroundStyle(LecternTheme.ink)
-                Text("Ask me anything about your lectures, notes, or Canvas material.")
+                Text("Ask about your lectures, notes, or Canvas material. Choose Create below to make notes, a study guide, a quiz, or flashcards, then review and save them to a lecture.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(.secondary)
                 if selectedSourceCount > 0 {
@@ -782,7 +818,13 @@ private struct CourseSynthesisComposer: View {
     @Binding var thinkingLevelRaw: String
     @Binding var modelPickerOpen: Bool
     @Binding var thinkingPickerOpen: Bool
-    let onSend: (String) -> Void
+    let hasSelectedSources: Bool
+    let onSend: (String, ChatStudyRequest?) -> Void
+    @State private var creationKind: ChatStudyKind?
+    @State private var itemCount = 10
+    @State private var difficulty = "Standard"
+    @State private var quizFormat = "Mixed"
+    @State private var confirmingClear = false
 
     private var thinkingLevel: ThinkingLevel {
         ThinkingLevel(rawValue: thinkingLevelRaw) ?? .medium
@@ -798,7 +840,40 @@ private struct CourseSynthesisComposer: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TextField("Ask about this course…", text: $question, axis: .vertical)
+            HStack(spacing: 12) {
+                Picker("Mode", selection: $creationKind) {
+                    Text("Ask").tag(Optional<ChatStudyKind>.none)
+                    ForEach(ChatStudyKind.allCases) { kind in
+                        Text("Create \(kind.title.lowercased())").tag(Optional(kind))
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 180)
+                if let creationKind {
+                    if creationKind == .quiz || creationKind == .flashcards {
+                        Picker("Count", selection: $itemCount) {
+                            ForEach([5, 10, 15, 20, 30], id: \.self) { Text("\($0) items").tag($0) }
+                        }.labelsHidden().frame(width: 100)
+                    }
+                    Picker("Difficulty", selection: $difficulty) {
+                        ForEach(["Introductory", "Standard", "Advanced"], id: \.self) { Text($0) }
+                    }.labelsHidden().frame(width: 125)
+                    if creationKind == .quiz {
+                        Picker("Question format", selection: $quizFormat) {
+                            ForEach(["Mixed", "Multiple choice", "Short answer"], id: \.self) { Text($0) }
+                        }.labelsHidden().frame(width: 135)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14).padding(.top, 12)
+            .disabled(synthesis.isResponding)
+            if creationKind != nil && !hasSelectedSources {
+                Text("No sources selected. Enter a topic to create material from your prompt and conversation.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).padding(.top, 8)
+            }
+            TextField(creationKind == nil ? "Ask about this course…" : "What should it cover? Add topics, language, or instructions…", text: $question, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: 15))
                 .lineLimit(1...6)
@@ -852,7 +927,7 @@ private struct CourseSynthesisComposer: View {
                 Spacer()
 
                 if !synthesis.turns.isEmpty {
-                    Button("Clear") { synthesis.clear() }
+                    Button("Clear") { confirmingClear = true }
                         .buttonStyle(.plain)
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -860,7 +935,7 @@ private struct CourseSynthesisComposer: View {
                 }
 
                 ComposerSendButton(
-                    canSend: !questionIsEmpty,
+                    canSend: !questionIsEmpty || (creationKind != nil && hasSelectedSources),
                     isResponding: synthesis.isResponding,
                     send: submit,
                     cancel: { synthesis.cancel() }
@@ -870,13 +945,17 @@ private struct CourseSynthesisComposer: View {
             .padding(.bottom, 12)
         }
         .composerContainer(focused: composerFocused)
+        .confirmationDialog("Clear this course's chat and unsaved drafts? Saved lecture materials will remain.", isPresented: $confirmingClear) {
+            Button("Clear chat and drafts", role: .destructive) { synthesis.clear() }
+        }
     }
 
     private func submit() {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !synthesis.isResponding else { return }
-        question = ""
-        onSend(trimmed)
+        guard (!trimmed.isEmpty || (creationKind != nil && hasSelectedSources)), !synthesis.isResponding else { return }
+        let request = creationKind.map { ChatStudyRequest(kind: $0, count: itemCount, difficulty: difficulty, quizFormat: quizFormat, usesTopicOnly: !hasSelectedSources) }
+        onSend(trimmed.isEmpty ? "Create \(creationKind?.title.lowercased() ?? "study materials") from the selected sources." : trimmed, request)
+        if synthesis.isResponding { question = "" }
     }
 }
 
