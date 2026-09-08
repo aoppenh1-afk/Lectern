@@ -245,33 +245,33 @@ struct SubscriptionsView: View {
     }
 
     private func subscriptionCard(_ sub: ShiurSubscription) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
                 // Leading type icon
                 Image(systemName: leadingIcon(for: sub))
-                    .font(.system(size: 20, weight: .regular))
+                    .font(.system(size: 15, weight: .regular))
                     .foregroundStyle(Color(red: 0.32, green: 0.6, blue: 1.0))
-                    .frame(width: 48, height: 48)
+                    .frame(width: 34, height: 34)
                     .background(
                         Color.blue.opacity(0.12),
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        in: RoundedRectangle(cornerRadius: 9, style: .continuous)
                     )
 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
                     // Title + pills row
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         Text(sub.displayName)
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(LecternTheme.ink)
                             .lineLimit(1)
 
                         pill(icon: pillIcon(for: sub), text: sub.targetType.displayName, accent: true)
 
-                        pillDivider(height: 18)
+                        pillDivider(height: 14)
 
                         pill(icon: "clock", text: sub.cadence.title, accent: false)
 
-                        pillDivider(height: 18)
+                        pillDivider(height: 14)
 
                         if let course = sub.course {
                             pill(icon: "tag", text: course.name, accent: false)
@@ -281,7 +281,7 @@ struct SubscriptionsView: View {
                     }
 
                     // Meta row
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         if sub.autoTranscribe {
                             metaItem(icon: "waveform", text: "Auto-transcribe")
                         }
@@ -303,45 +303,45 @@ struct SubscriptionsView: View {
                     }
                 }
 
-                Spacer(minLength: 16)
+                Spacer(minLength: 12)
 
                 // Right actions
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     Rectangle()
                         .fill(Color.primary.opacity(0.10))
-                        .frame(width: 1, height: 48)
+                        .frame(width: 1, height: 30)
 
                     Button {
                         Task {
                             await automationService.checkSubscription(sub, ignoreDue: true)
                         }
                     } label: {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 6) {
                             Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                             Text("Check Now")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 12.5, weight: .semibold))
                         }
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 11)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
                         .background(
                             Color(red: 0.16, green: 0.38, blue: 0.88),
-                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
                         )
                     }
                     .buttonStyle(.plain)
 
                     Rectangle()
                         .fill(Color.primary.opacity(0.10))
-                        .frame(width: 1, height: 28)
+                        .frame(width: 1, height: 20)
 
-                    HStack(spacing: 18) {
+                    HStack(spacing: 12) {
                         Button {
                             editingSubscription = sub
                         } label: {
                             Image(systemName: "pencil")
-                                .font(.system(size: 16, weight: .regular))
+                                .font(.system(size: 13, weight: .regular))
                                 .foregroundStyle(Color.primary.opacity(0.65))
                         }
                         .buttonStyle(.plain)
@@ -352,7 +352,7 @@ struct SubscriptionsView: View {
                             try? modelContext.save()
                         } label: {
                             Image(systemName: sub.isEnabled ? "pause.circle" : "play.circle")
-                                .font(.system(size: 21, weight: .regular))
+                                .font(.system(size: 17, weight: .regular))
                                 .foregroundStyle(Color.primary.opacity(0.65))
                         }
                         .buttonStyle(.plain)
@@ -363,7 +363,7 @@ struct SubscriptionsView: View {
                             try? modelContext.save()
                         } label: {
                             Image(systemName: "trash")
-                                .font(.system(size: 17, weight: .regular))
+                                .font(.system(size: 14, weight: .regular))
                                 .foregroundStyle(Color.primary.opacity(0.65))
                         }
                         .buttonStyle(.plain)
@@ -385,10 +385,10 @@ struct SubscriptionsView: View {
                 .background(LecternTheme.warningTint.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
-        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(LecternTheme.hairline))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(LecternTheme.hairline))
     }
 
     private func leadingIcon(for sub: ShiurSubscription) -> String {
@@ -410,16 +410,16 @@ struct SubscriptionsView: View {
     }
 
     private func pill(icon: String, text: String, accent: Bool) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
             Text(text)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 11.5, weight: .medium))
                 .lineLimit(1)
         }
         .foregroundStyle(accent ? Color(red: 0.36, green: 0.63, blue: 1.0) : Color.primary.opacity(0.72))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
         .background(
             (accent ? Color.blue.opacity(0.14) : Color.primary.opacity(0.05)),
             in: Capsule()
@@ -440,12 +440,12 @@ struct SubscriptionsView: View {
     }
 
     private func metaItem(icon: String, text: String) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .regular))
+                .font(.system(size: 11, weight: .regular))
                 .foregroundStyle(.secondary)
             Text(text)
-                .font(.system(size: 13))
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
@@ -454,7 +454,7 @@ struct SubscriptionsView: View {
     private func metaDivider() -> some View {
         Rectangle()
             .fill(Color.primary.opacity(0.12))
-            .frame(width: 1, height: 14)
+            .frame(width: 1, height: 12)
     }
 
     private var pasteLinkPopover: some View {
