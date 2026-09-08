@@ -246,89 +246,129 @@ struct SubscriptionsView: View {
 
     private func subscriptionCard(_ sub: ShiurSubscription) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(sub.displayName)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(LecternTheme.ink)
+            HStack(spacing: 16) {
+                // Leading type icon
+                Image(systemName: leadingIcon(for: sub))
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundStyle(Color(red: 0.32, green: 0.6, blue: 1.0))
+                    .frame(width: 48, height: 48)
+                    .background(
+                        Color.blue.opacity(0.12),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
 
-                        let targetColor: Color = {
-                            switch sub.targetType {
-                            case .teacher: return .blue
-                            case .series: return .orange
-                            case .collection: return .teal
-                            case .rss: return .purple
-                            }
-                        }()
-                        badge(sub.targetType.displayName, color: targetColor)
-                        badge(sub.cadence.title, color: .blue)
+                VStack(alignment: .leading, spacing: 10) {
+                    // Title + pills row
+                    HStack(spacing: 10) {
+                        Text(sub.displayName)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(LecternTheme.ink)
+                            .lineLimit(1)
+
+                        pill(icon: pillIcon(for: sub), text: sub.targetType.displayName, accent: true)
+
+                        pillDivider(height: 18)
+
+                        pill(icon: "clock", text: sub.cadence.title, accent: false)
+
+                        pillDivider(height: 18)
+
                         if let course = sub.course {
-                            badge(course.name, color: .green)
+                            pill(icon: "tag", text: course.name, accent: false)
                         } else {
-                            badge("Unfiled", color: .gray)
+                            pill(icon: "tag", text: "Unfiled", accent: false)
                         }
                     }
 
+                    // Meta row
                     HStack(spacing: 12) {
                         if sub.autoTranscribe {
-                            Label("Auto-transcribe", systemImage: "waveform")
+                            metaItem(icon: "waveform", text: "Auto-transcribe")
+                        }
+                        if sub.autoTranscribe && sub.autoGenerateNotes {
+                            metaDivider()
                         }
                         if sub.autoGenerateNotes {
-                            Label("Clean up transcript & note taking", systemImage: "sparkles")
+                            metaItem(icon: "sparkles", text: "Clean up transcript & note taking")
                         }
-                        Text("Imported: \(sub.importedCount)")
+                        if sub.autoTranscribe || sub.autoGenerateNotes {
+                            metaDivider()
+                        }
+                        metaItem(icon: "doc.text", text: "Imported: \(sub.importedCount)")
+                        metaDivider()
                         if let lastImport = sub.lastImportedTitle {
-                            Text("Latest: \(lastImport)")
+                            metaItem(icon: "clock", text: "Latest: \(lastImport)")
                                 .lineLimit(1)
                         }
                     }
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
                 }
 
-                Spacer()
+                Spacer(minLength: 16)
 
-                HStack(spacing: 8) {
-                    Button("Check Now") {
+                // Right actions
+                HStack(spacing: 16) {
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.10))
+                        .frame(width: 1, height: 48)
+
+                    Button {
                         Task {
                             await automationService.checkSubscription(sub, ignoreDue: true)
                         }
-                    }
-                    .font(.system(size: 11.5, weight: .medium))
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
-
-                    Button {
-                        editingSubscription = sub
                     } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 12))
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Check Now")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 11)
+                        .background(
+                            Color(red: 0.16, green: 0.38, blue: 0.88),
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        )
                     }
                     .buttonStyle(.plain)
 
-                    Button {
-                        sub.isEnabled.toggle()
-                        try? modelContext.save()
-                    } label: {
-                        Image(systemName: sub.isEnabled ? "pause.circle" : "play.circle")
-                            .font(.system(size: 13))
-                            .foregroundStyle(sub.isEnabled ? Color.secondary : LecternTheme.accent)
-                    }
-                    .buttonStyle(.plain)
-                    .help(sub.isEnabled ? "Pause subscription" : "Resume subscription")
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.10))
+                        .frame(width: 1, height: 28)
 
-                    Button {
-                        modelContext.delete(sub)
-                        try? modelContext.save()
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                    HStack(spacing: 18) {
+                        Button {
+                            editingSubscription = sub
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundStyle(Color.primary.opacity(0.65))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Edit subscription")
+
+                        Button {
+                            sub.isEnabled.toggle()
+                            try? modelContext.save()
+                        } label: {
+                            Image(systemName: sub.isEnabled ? "pause.circle" : "play.circle")
+                                .font(.system(size: 21, weight: .regular))
+                                .foregroundStyle(Color.primary.opacity(0.65))
+                        }
+                        .buttonStyle(.plain)
+                        .help(sub.isEnabled ? "Pause subscription" : "Resume subscription")
+
+                        Button {
+                            modelContext.delete(sub)
+                            try? modelContext.save()
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 17, weight: .regular))
+                                .foregroundStyle(Color.primary.opacity(0.65))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Delete subscription")
                     }
-                    .buttonStyle(.plain)
                 }
             }
 
@@ -345,18 +385,76 @@ struct SubscriptionsView: View {
                 .background(LecternTheme.warningTint.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
             }
         }
-        .padding(16)
-        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(LecternTheme.hairline))
+        .padding(.horizontal, 24)
+        .padding(.vertical, 20)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(LecternTheme.hairline))
     }
 
-    private func badge(_ title: String, color: Color) -> some View {
-        Text(title)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(color)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.10), in: Capsule())
+    private func leadingIcon(for sub: ShiurSubscription) -> String {
+        switch sub.targetType {
+        case .teacher: return "person"
+        case .series: return "square.stack"
+        case .collection: return "book"
+        case .rss: return "antenna.radiowaves.left.and.right"
+        }
+    }
+
+    private func pillIcon(for sub: ShiurSubscription) -> String {
+        switch sub.targetType {
+        case .teacher: return "person"
+        case .series: return "square.stack"
+        case .collection: return "circle.stack"
+        case .rss: return "link"
+        }
+    }
+
+    private func pill(icon: String, text: String, accent: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .medium))
+            Text(text)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(accent ? Color(red: 0.36, green: 0.63, blue: 1.0) : Color.primary.opacity(0.72))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            (accent ? Color.blue.opacity(0.14) : Color.primary.opacity(0.05)),
+            in: Capsule()
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(
+                    accent ? Color.blue.opacity(0.28) : Color.primary.opacity(0.10),
+                    lineWidth: 1
+                )
+        )
+    }
+
+    private func pillDivider(height: CGFloat) -> some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.12))
+            .frame(width: 1, height: height)
+    }
+
+    private func metaItem(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(.secondary)
+            Text(text)
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private func metaDivider() -> some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.12))
+            .frame(width: 1, height: 14)
     }
 
     private var pasteLinkPopover: some View {

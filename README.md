@@ -112,7 +112,7 @@ This verifies the signing identity, bumps `MARKETING_VERSION` / `CURRENT_PROJECT
 
 - Recordings, transcripts and notes stay in `~/Library/Application Support/Lectern`.
 - Zoom / system-audio capture uses ScreenCaptureKit. macOS gates that behind Screen & System Audio Recording permission; Lectern discards the dummy video frames and stores only the WAV.
-- Canvas tokens, Google Docs OAuth state, transcription API keys and any GitHub token are stored in the macOS Keychain. The official Antigravity ACP agent stores its own credential in a private Lectern profile.
+- Canvas tokens, Google Docs OAuth state and transcription API keys are stored in the macOS Keychain. The official Antigravity ACP agent stores its own credential in a private Lectern profile.
 - Antigravity prompts and supported attachments are sent through ACP. Lecture audio uses ACP's native audio content block instead of a workspace path hint.
 - This repository does not contain credentials. Do not commit `.env` files or tokens.
 

@@ -9,8 +9,7 @@ struct AppRelease: Identifiable, Hashable, Sendable {
     let name: String
     let notes: String
     let htmlURL: URL
-    /// GitHub API URL of the `.zip` asset. Downloading through the API (not
-    /// `browser_download_url`) is what works for private repositories.
+    /// GitHub API URL of the `.zip` asset.
     let assetAPIURL: URL?
     let assetName: String?
     let checksumAPIURL: URL?
@@ -53,7 +52,7 @@ struct AppVersion: Comparable, Hashable, Sendable, CustomStringConvertible {
 
 enum AppUpdaterError: LocalizedError {
     case repositoryNotConfigured
-    case notFound(hasToken: Bool)
+    case notFound
     case unauthorized
     case rateLimited
     case http(Int)
@@ -67,14 +66,12 @@ enum AppUpdaterError: LocalizedError {
         switch self {
         case .repositoryNotConfigured:
             return "This build has no update repository configured."
-        case .notFound(let hasToken):
-            return hasToken
-                ? "No release was found. The token may not have access to the repository, or nothing has been published yet."
-                : "GitHub returned 404. While the repository is private you need a GitHub token in Settings › General to check for updates, or download the latest release from the Releases page."
+        case .notFound:
+            return "GitHub returned 404. Nothing has been published yet, or download the latest release from the Releases page."
         case .unauthorized:
-            return "GitHub rejected the token. Create a fine-grained token with read access to the repository's Contents and paste it in Settings › General."
+            return "GitHub rejected the request (401)."
         case .rateLimited:
-            return "GitHub rate limit reached. Try again in a few minutes or add a token."
+            return "GitHub rate limit reached. Try again in a few minutes."
         case .http(let code):
             return "GitHub returned HTTP \(code)."
         case .noAsset:
@@ -110,7 +107,6 @@ final class AppUpdater {
     }
 
     static let repositoryInfoKey = "LecternUpdateRepository"
-    static let tokenReference = "github-updates-token"
     static let autoCheckKey = "updates.autoCheck"
     static let lastCheckKey = "updates.lastCheck"
     static let skippedVersionKey = "updates.skippedVersion"
@@ -149,23 +145,6 @@ final class AppUpdater {
     var autoCheckEnabled: Bool {
         get { userDefaults.bool(forKey: Self.autoCheckKey) }
         set { userDefaults.set(newValue, forKey: Self.autoCheckKey) }
-    }
-
-    var hasToken: Bool {
-        (try? KeychainCredentialStore.read(reference: Self.tokenReference)).map { !$0.isEmpty } ?? false
-    }
-
-    var maskedToken: String? {
-        KeychainCredentialStore.maskedSuffix(reference: Self.tokenReference)
-    }
-
-    func setToken(_ token: String) throws {
-        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            try KeychainCredentialStore.remove(reference: Self.tokenReference)
-        } else {
-            try KeychainCredentialStore.save(trimmed, reference: Self.tokenReference)
-        }
     }
 
     // MARK: Checking
@@ -379,38 +358,18 @@ final class AppUpdater {
 
     // MARK: Networking
 
-    private func authorizedRequest(_ url: URL, accept: String) -> URLRequest {
+    private func makeRequest(_ url: URL, accept: String) -> URLRequest {
         var request = URLRequest(url: url)
         request.setValue(accept, forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("Lectern/\(currentVersion)", forHTTPHeaderField: "User-Agent")
-        if let token = try? KeychainCredentialStore.read(reference: Self.tokenReference), !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
         return request
     }
 
     private func get(_ url: URL, accept: String) async throws -> Data {
-        let (data, response) = try await session.data(
-            for: authorizedRequest(url, accept: accept),
-            delegate: RedirectAuthStripper())
+        let (data, response) = try await session.data(for: makeRequest(url, accept: accept))
         try Self.check(response)
         return data
-    }
-
-    /// GitHub answers asset downloads with a redirect to signed object storage,
-    /// which rejects requests that still carry the GitHub bearer token.
-    private final class RedirectAuthStripper: NSObject, URLSessionTaskDelegate {
-        func urlSession(
-            _ session: URLSession, task: URLSessionTask,
-            willPerformHTTPRedirection response: HTTPURLResponse,
-            newRequest request: URLRequest
-        ) async -> URLRequest? {
-            guard request.url?.host != task.originalRequest?.url?.host else { return request }
-            var stripped = request
-            stripped.setValue(nil, forHTTPHeaderField: "Authorization")
-            return stripped
-        }
     }
 
     /// Streams the asset to disk with a download task. `URLSession.bytes`
@@ -427,16 +386,6 @@ final class AppUpdater {
             self.destination = destination
             self.progress = progress
             self.continuation = continuation
-        }
-
-        func urlSession(_ session: URLSession, task: URLSessionTask,
-                        willPerformHTTPRedirection response: HTTPURLResponse,
-                        newRequest request: URLRequest,
-                        completionHandler: @escaping (URLRequest?) -> Void) {
-            guard request.url?.host != task.originalRequest?.url?.host else { return completionHandler(request) }
-            var stripped = request
-            stripped.setValue(nil, forHTTPHeaderField: "Authorization")
-            completionHandler(stripped)
         }
 
         func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
@@ -468,7 +417,7 @@ final class AppUpdater {
     }
 
     private func download(_ url: URL, to destination: URL, progress: @escaping @MainActor (Double) -> Void) async throws {
-        let request = authorizedRequest(url, accept: "application/octet-stream")
+        let request = makeRequest(url, accept: "application/octet-stream")
         let response: URLResponse = try await withCheckedThrowingContinuation { continuation in
             let delegate = DownloadDelegate(
                 destination: destination,
@@ -489,8 +438,7 @@ final class AppUpdater {
         case 403 where http.value(forHTTPHeaderField: "X-RateLimit-Remaining") == "0":
             throw AppUpdaterError.rateLimited
         case 403, 404:
-            let hasToken = (try? KeychainCredentialStore.read(reference: tokenReference)).map { !$0.isEmpty } ?? false
-            throw AppUpdaterError.notFound(hasToken: hasToken)
+            throw AppUpdaterError.notFound
         default: throw AppUpdaterError.http(http.statusCode)
         }
     }

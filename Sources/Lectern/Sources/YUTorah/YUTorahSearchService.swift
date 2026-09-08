@@ -97,6 +97,13 @@ actor YUTorahSearchService {
         page: Int = 1
     ) async -> YUTorahSearchResults {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isUnfiltered = teacherID == nil && seriesID == nil && collectionID == nil && subcategoryID == nil
+        // The subscription UI calls this method directly, bypassing search()'s local fallback.
+        let suggestedTeachers = isUnfiltered && !trimmed.isEmpty
+            ? searchIndex.findTeachers(query: trimmed, limit: 10).filter { $0.isConfident }.map {
+                YUTorahFacetTeacher(id: $0.entry.id, rawName: $0.entry.name, lastName: nil,
+                                    shiurCount: $0.entry.shiurCount ?? 0)
+            } : []
         var components = URLComponents(string: "https://api.yutorah.org/search")
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "start", value: "\(max(1, page))")
@@ -129,13 +136,14 @@ actor YUTorahSearchService {
 
         if let (data, response) = try? await session.data(for: request),
            let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
-           let apiResponse = try? JSONDecoder().decode(YUTorahAPISearchResponse.self, from: data) {
+           let apiResponse = try? JSONDecoder().decode(YUTorahAPISearchResponse.self, from: data),
+           apiResponse.response != nil {
 
             let totalShiurim = apiResponse.response?.numFound ?? 0
             let docs = apiResponse.response?.docs ?? []
             let parsedShiurim = Self.parseAPIDocs(docs)
 
-            let teachers = (apiResponse.facetCounts?.facetFields?.teachers ?? []).compactMap { t -> YUTorahFacetTeacher? in
+            var teachers = (apiResponse.facetCounts?.facetFields?.teachers ?? []).compactMap { t -> YUTorahFacetTeacher? in
                 guard let id = t.teacherId, let rawName = t.teacherName else { return nil }
                 return YUTorahFacetTeacher(
                     id: id,
@@ -143,6 +151,10 @@ actor YUTorahSearchService {
                     lastName: t.teacherLastName,
                     shiurCount: t.match ?? 0
                 )
+            }
+
+            if totalShiurim == 0 && teachers.isEmpty {
+                teachers = suggestedTeachers
             }
 
             let collections = (apiResponse.facetCounts?.facetFields?.collections ?? []).compactMap { c -> YUTorahFacetCollection? in
@@ -181,12 +193,6 @@ actor YUTorahSearchService {
                     ?? searchIndex.teacher(forID: teacherID).map {
                         YUTorahFacetTeacher(id: $0.id, rawName: $0.name, lastName: nil, shiurCount: totalShiurim)
                     }
-            } else if let topTeacher = teachers.first, !trimmed.isEmpty {
-                let score = YUTorahFuzzyMatcher.score(query: trimmed, candidate: topTeacher.displayName).score
-                let altScore = YUTorahFuzzyMatcher.score(query: trimmed, candidate: topTeacher.rawName).score
-                if max(score, altScore) >= 0.70 {
-                    activeTeacher = topTeacher
-                }
             }
 
             let activeSubcat = subcategoryID.flatMap { scID in
@@ -208,15 +214,14 @@ actor YUTorahSearchService {
             )
         }
 
-        // Fallback: Classic search endpoint
-        let fallbackShiurim = await fetchSearchResults(query: trimmed, maxResults: 30)
-        let localTeachers = searchIndex.findTeachers(query: trimmed, limit: 10).map {
-            YUTorahFacetTeacher(id: $0.entry.id, rawName: $0.entry.name, lastName: nil, shiurCount: $0.entry.shiurCount ?? fallbackShiurim.count)
-        }
-        let localSeries = searchIndex.findSeries(query: trimmed, limit: 10).map {
+        guard !Task.isCancelled else { return .empty }
+        // The legacy endpoint cannot preserve these drilldown filters.
+        let fallbackShiurim = isUnfiltered ? await fetchSearchResults(query: trimmed, maxResults: 30) : []
+        let localTeachers = suggestedTeachers
+        let localSeries = (isUnfiltered ? searchIndex.findSeries(query: trimmed, limit: 10) : []).map {
             YUTorahFacetSeries(id: $0.entry.id, title: $0.entry.title, shiurCount: 0)
         }
-        let localCollections = searchIndex.findCollections(query: trimmed, limit: 10).map {
+        let localCollections = (isUnfiltered ? searchIndex.findCollections(query: trimmed, limit: 10) : []).map {
             YUTorahFacetCollection(id: $0.entry.id, title: $0.entry.title, shiurCount: 0)
         }
 
@@ -230,8 +235,13 @@ actor YUTorahSearchService {
             collections: localCollections,
             series: localSeries,
             subcategories: [],
-            activeTeacher: localTeachers.first,
-            activeSubcategory: nil
+            activeTeacher: teacherID.flatMap { id in
+                searchIndex.teacher(forID: id).map {
+                    YUTorahFacetTeacher(id: $0.id, rawName: $0.name, lastName: nil, shiurCount: 0)
+                }
+            },
+            activeSubcategory: nil,
+            failureMessage: "YU Torah search couldn't load. Check your connection and try again. Any suggestions below come from this Mac's teacher catalog."
         )
     }
 

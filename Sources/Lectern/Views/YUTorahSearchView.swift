@@ -11,6 +11,7 @@ struct YUTorahSearchView: View {
     @State private var searchResults: YUTorahSearchResults = .empty
     @State private var selectedTab: SearchTab = .overview
     @State private var searchTask: Task<Void, Never>?
+    @State private var searchRequestID = UUID()
 
     // Active Drilldown Filters
     @State private var activeTeacher: YUTorahFacetTeacher? = nil
@@ -44,6 +45,15 @@ struct YUTorahSearchView: View {
             }
 
             if shouldShowContent {
+                if let message = searchResults.failureMessage {
+                    HStack {
+                        Text(message)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Button("Retry") { performDebouncedSearch(query) }
+                            .disabled(isSearching)
+                    }
+                }
                 tabBar
                 tabContent
             }
@@ -841,6 +851,8 @@ struct YUTorahSearchView: View {
 
     private func performDebouncedSearch(_ text: String) {
         searchTask?.cancel()
+        searchRequestID = UUID()
+        isLoadingMoreShiurim = false
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty || activeTeacher != nil else {
             searchResults = .empty
@@ -862,10 +874,8 @@ struct YUTorahSearchView: View {
             guard !Task.isCancelled else { return }
 
             await MainActor.run {
+                guard !Task.isCancelled else { return }
                 self.searchResults = results
-                if self.activeTeacher == nil, let matched = results.activeTeacher {
-                    self.activeTeacher = matched
-                }
                 self.isSearching = false
             }
         }
@@ -874,10 +884,13 @@ struct YUTorahSearchView: View {
     private func performTeacherSearch(_ teacher: YUTorahFacetTeacher) {
         activeTeacher = teacher
         activeSubcategory = nil
+        query = ""
         selectedTab = .overview
         isSearching = true
 
         searchTask?.cancel()
+        searchRequestID = UUID()
+        isLoadingMoreShiurim = false
         searchTask = Task {
             let results = await searchService.searchStructured(
                 query: query.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -885,6 +898,7 @@ struct YUTorahSearchView: View {
                 page: 1
             )
             await MainActor.run {
+                guard !Task.isCancelled else { return }
                 self.searchResults = results
                 self.isSearching = false
             }
@@ -894,6 +908,8 @@ struct YUTorahSearchView: View {
     private func performSubcategoryFilter(_ subcategory: YUTorahFacetSubcategory) {
         isSearching = true
         searchTask?.cancel()
+        searchRequestID = UUID()
+        isLoadingMoreShiurim = false
         searchTask = Task {
             let results = await searchService.searchStructured(
                 query: query.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -902,6 +918,7 @@ struct YUTorahSearchView: View {
                 page: 1
             )
             await MainActor.run {
+                guard !Task.isCancelled else { return }
                 self.searchResults = results
                 self.isSearching = false
             }
@@ -912,6 +929,7 @@ struct YUTorahSearchView: View {
         guard !isLoadingMoreShiurim, searchResults.currentPage < searchResults.totalPages else { return }
         isLoadingMoreShiurim = true
         let nextPage = searchResults.currentPage + 1
+        let requestID = searchRequestID
 
         Task {
             let nextResults = await searchService.searchStructured(
@@ -922,6 +940,12 @@ struct YUTorahSearchView: View {
             )
 
             await MainActor.run {
+                guard requestID == searchRequestID else { return }
+                if let message = nextResults.failureMessage {
+                    searchResults.failureMessage = message
+                    isLoadingMoreShiurim = false
+                    return
+                }
                 var combinedShiurim = self.searchResults.shiurim
                 var seen = Set(combinedShiurim.map(\.shiurID))
                 for item in nextResults.shiurim where !seen.contains(item.shiurID) {

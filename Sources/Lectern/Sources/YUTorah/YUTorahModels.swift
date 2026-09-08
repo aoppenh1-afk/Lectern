@@ -203,6 +203,7 @@ struct YUTorahSearchResults: Sendable {
     let subcategories: [YUTorahFacetSubcategory]
     let activeTeacher: YUTorahFacetTeacher?
     let activeSubcategory: YUTorahFacetSubcategory?
+    var failureMessage: String? = nil
 
     static let empty = YUTorahSearchResults(
         query: "",

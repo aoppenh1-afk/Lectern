@@ -284,8 +284,6 @@ private struct GeneralPane: View {
     @Environment(OnboardingState.self) private var onboarding
     @Environment(\.openWindow) private var openWindow
 
-    @State private var token = ""
-    @State private var tokenMessage: String?
     @State private var autoCheck = true
 
     private var build: String {
@@ -330,40 +328,6 @@ private struct GeneralPane: View {
                             .font(.system(size: 12))
                     }
                 }
-            }
-
-            SettingsCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("GitHub token")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(LecternTheme.ink)
-                        Spacer()
-                        if let masked = updater.maskedToken {
-                            Text(masked).font(.system(size: 10).monospaced()).foregroundStyle(.secondary)
-                        }
-                    }
-                    Text("Only needed while the Lectern repository is private. Create a fine-grained personal access token at github.com › Settings › Developer settings, limited to this repository with Contents: Read-only. It is stored in your Keychain.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 8) {
-                        SecureField(updater.hasToken ? "Leave blank to keep current token" : "github_pat_…", text: $token)
-                            .textFieldStyle(.roundedBorder)
-                            .controlSize(.small)
-                        Button("Save") { saveToken() }
-                            .controlSize(.small)
-                            .disabled(token.trimmingCharacters(in: .whitespaces).isEmpty)
-                        if updater.hasToken {
-                            Button("Remove") { removeToken() }
-                                .controlSize(.small)
-                        }
-                    }
-                    if let tokenMessage {
-                        Text(tokenMessage).font(.system(size: 11)).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(16)
             }
 
             SettingsCard {
@@ -412,26 +376,6 @@ private struct GeneralPane: View {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(LecternTheme.warningTint)
         default:
             EmptyView()
-        }
-    }
-
-    private func saveToken() {
-        do {
-            try updater.setToken(token)
-            token = ""
-            tokenMessage = "Token saved to Keychain."
-        } catch {
-            tokenMessage = error.localizedDescription
-        }
-    }
-
-    private func removeToken() {
-        do {
-            try updater.setToken("")
-            token = ""
-            tokenMessage = "Token removed."
-        } catch {
-            tokenMessage = error.localizedDescription
         }
     }
 }
@@ -725,61 +669,85 @@ struct GoogleDocsPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("OAuth client")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(LecternTheme.ink)
-                    Text("Google Cloud Console → enable Google Docs API → create an OAuth client of type Desktop. Then Google Auth Platform → Audience → add the Gmail you’ll sign in with as a test user. Being the project owner does not count. Keep the app in Testing; do not publish it.")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .top, spacing: 12) {
+                        googleDocsIcon("doc.richtext", tint: LecternTheme.accent)
 
-                    TextField("Client ID", text: $clientID)
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
-                    SecureField("Client secret", text: $clientSecret)
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
-                }
-                .padding(16)
-            }
-
-            SettingsCard {
-                SettingsRow(
-                    title: auth.isSignedIn ? (auth.email ?? "Signed in") : "Not signed in",
-                    caption: "Lectern creates one Google Doc per course and one tab per lecture. Pushing overwrites that tab.",
-                    showsDivider: false
-                ) {
-                    if auth.isSignedIn {
-                        Button("Sign out") {
-                            auth.signOut()
-                        }
-                        .controlSize(.small)
-                    } else if auth.isSigningIn {
-                        Button("Cancel") {
-                            auth.cancelSignIn()
-                        }
-                        .controlSize(.small)
-                    } else {
-                        Button {
-                            Task {
-                                commitCredentials()
-                                try? await auth.signIn()
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                Text("Google Docs")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(LecternTheme.ink)
+                                statusChip
                             }
-                        } label: {
-                            Text("Sign in with Google")
+                            Text("Lectern creates one Google Doc per course and one tab per lecture. Pushing overwrites that tab.")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        .controlSize(.small)
-                        .disabled(clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                }
-            }
 
-            if let error = auth.lastError, !auth.isSignedIn {
-                Text(error)
-                    .font(.system(size: 11))
-                    .foregroundStyle(LecternTheme.warningTint)
-                    .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                    }
+                    .padding(16)
+
+                    googleDocsDivider
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        SectionLabel(title: "OAuth client")
+                        Text("Google Cloud Console → enable Google Docs API → create an OAuth client of type Desktop. Then Google Auth Platform → Audience → add the Gmail you’ll sign in with as a test user. Being the project owner does not count. Keep the app in Testing; do not publish it.")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            SettingsFieldLabel(title: "Client ID")
+                            SettingsTextField(placeholder: "Your OAuth client ID", text: $clientID)
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            SettingsFieldLabel(title: "Client secret")
+                            SettingsSecureField(placeholder: "Your OAuth client secret", text: $clientSecret)
+                        }
+                    }
+                    .padding(16)
+
+                    googleDocsDivider
+
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "person.crop.circle")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(LecternTheme.accent)
+                            .frame(width: 20, height: 20)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            SectionLabel(title: "Google account")
+                            Text(accountMessage)
+                                .font(.system(size: 12.5, weight: .medium))
+                                .foregroundStyle(LecternTheme.ink)
+                            if let detail = accountDetail {
+                                Text(detail)
+                                    .font(.system(size: 10.5))
+                                    .foregroundStyle(.tertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            if let error = auth.lastError, !auth.isSignedIn {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 11))
+                                    Text(error)
+                                        .font(.system(size: 11))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .foregroundStyle(LecternTheme.warningTint)
+                                .padding(.top, 2)
+                            }
+                        }
+
+                        Spacer(minLength: 12)
+
+                        accountActions
+                    }
+                    .padding(16)
+                }
             }
         }
         .onAppear {
@@ -791,6 +759,80 @@ struct GoogleDocsPane: View {
         }
         .onChange(of: clientID) { _, _ in commitCredentials() }
         .onChange(of: clientSecret) { _, _ in commitCredentials() }
+    }
+
+    private var statusChip: StatusChip {
+        if auth.isSignedIn {
+            StatusChip("Signed in", LecternTheme.successTint, icon: "checkmark")
+        } else if auth.isSigningIn {
+            StatusChip("Signing in", LecternTheme.accent, icon: "arrow.down.circle")
+        } else {
+            StatusChip("Not connected", .secondary, icon: "circle.dashed")
+        }
+    }
+
+    private var accountMessage: String {
+        if auth.isSignedIn {
+            auth.email ?? "Signed in"
+        } else if auth.isSigningIn {
+            "Waiting for the browser…"
+        } else {
+            "Not signed in"
+        }
+    }
+
+    private var accountDetail: String? {
+        if auth.isSignedIn {
+            return "Lectern pushes notes into your course document."
+        } else if auth.isSigningIn {
+            return "Finish signing in with Google in your browser."
+        } else {
+            return "Sign in to push notes to Google Docs."
+        }
+    }
+
+    @ViewBuilder
+    private var accountActions: some View {
+        if auth.isSignedIn {
+            Button("Sign out") {
+                auth.signOut()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        } else if auth.isSigningIn {
+            Button("Cancel") {
+                auth.cancelSignIn()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        } else {
+            Button {
+                Task {
+                    commitCredentials()
+                    try? await auth.signIn()
+                }
+            } label: {
+                Text("Sign in with Google")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .disabled(clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    private var googleDocsDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.07))
+            .frame(height: 1)
+            .padding(.leading, 52)
+    }
+
+    private func googleDocsIcon(_ name: String, tint: Color) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: 36, height: 36)
+            .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 
     private func commitCredentials() {

@@ -779,10 +779,88 @@ struct YUTorahSubscriptionTests {
         let service = YUTorahSearchService()
         let items = await service.fetchCollectionShiurim(collectionID: 15365)
 
-        #expect(items.count == 3, "Expected 3 shiurim in collection 15365 (Rav Shulman Perek Kirah)")
+        #expect(items.count >= 3, "Expected at least the original 3 shiurim in collection 15365 (Rav Shulman Perek Kirah)")
         let hasBishul = items.contains { $0.title.contains("בישול") }
         #expect(hasBishul, "Expected to find בישול אחר בישול shiur")
         #expect(items.first?.enclosureURL != nil, "Expected direct audio download URL")
     }
 }
 
+
+struct YUTorahFreshInstallSearchTests {
+    private func service(response: String = "empty") -> YUTorahSearchService {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [YUTorahSearchFixtureProtocol.self]
+        configuration.httpAdditionalHeaders = ["X-Lectern-Test-Response": response]
+        return YUTorahSearchService(
+            searchIndex: YUTorahSearchIndex(cacheFileURL: FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString).appendingPathComponent("index.json")),
+            session: URLSession(configuration: configuration)
+        )
+    }
+
+    @Test func emptyRemoteSearchStillFindsRosensweigWithoutCache() async {
+        let results = await service().searchStructured(query: "Rabbi Rosensweig")
+        #expect(results.teachers.contains { $0.id == 80146 })
+        #expect(!results.isEmpty)
+        #expect(results.activeTeacher == nil)
+    }
+
+    @Test func matchingTeacherDoesNotAutomaticallyBecomeAFilter() async {
+        let results = await service(response: "teacher").searchStructured(query: "Rabbi Rosensweig")
+        #expect(results.teachers.contains { $0.id == 80146 })
+        #expect(results.activeTeacher == nil)
+    }
+
+    @Test func connectionFailureIsVisibleAndKeepsTeacherSuggestions() async {
+        let results = await service(response: "offline").searchStructured(query: "Rabbi Rosensweig")
+        #expect(results.failureMessage != nil)
+        #expect(results.teachers.contains { $0.id == 80146 })
+        #expect(results.activeTeacher == nil)
+    }
+
+    @Test func filteredConnectionFailureDoesNotReturnUnfilteredSuggestions() async {
+        let results = await service(response: "offline").searchStructured(query: "Rabbi Rosensweig", teacherID: 80153)
+        #expect(results.failureMessage != nil)
+        #expect(results.teachers.isEmpty)
+        #expect(results.shiurim.isEmpty)
+    }
+
+    @Test func validEmptySearchIsNotAConnectionFailure() async {
+        let results = await service().searchStructured(query: "unmatched-topic-123456789")
+        #expect(results.failureMessage == nil)
+        #expect(results.isEmpty)
+    }
+
+    @Test func explicitTeacherFilterIsPreserved() async {
+        let results = await service(response: "teacher").searchStructured(query: "", teacherID: 80146)
+        #expect(results.activeTeacher?.id == 80146)
+    }
+
+    @Test func emptyFilteredSearchDoesNotSuggestUnrelatedTeachers() async {
+        let results = await service().searchStructured(query: "Rabbi Rosensweig", teacherID: 80153)
+        #expect(results.teachers.isEmpty)
+    }
+}
+
+private final class YUTorahSearchFixtureProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        if request.value(forHTTPHeaderField: "X-Lectern-Test-Response") == "offline" {
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            return
+        }
+        let payload: String
+        if request.value(forHTTPHeaderField: "X-Lectern-Test-Response") == "teacher" {
+            payload = #"{"response":{"numFound":3527,"docs":[]},"facet_counts":{"facet_fields":{"teachers":[{"TeacherId":80146,"TeacherName":"Rabbi Michael Rosensweig","Match":3527}]}}}"#
+        } else {
+            payload = #"{"response":{"numFound":0,"docs":[]}}"#
+        }
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 200,
+            httpVersion: nil, headerFields: nil)!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(payload.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}

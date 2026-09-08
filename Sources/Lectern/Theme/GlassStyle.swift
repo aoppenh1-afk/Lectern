@@ -281,6 +281,78 @@ struct SectionLabel: View {
     }
 }
 
+/// Regular field label used above a single input. Sentence case and ink,
+/// quieter than a section header so forms read like the rest of Settings.
+struct SettingsFieldLabel: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(LecternTheme.ink)
+    }
+}
+
+/// Soft single-line text input for Settings forms: comfortable padding,
+/// quiet surface fill, hairline border, accent ring on focus. System type,
+/// not monospaced, so addresses and IDs read like the rest of the UI.
+struct SettingsTextField: View {
+    let placeholder: String
+    @Binding var text: String
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField(placeholder, text: $text)
+            .textFieldStyle(.plain)
+            .font(.system(size: 12.5))
+            .foregroundStyle(LecternTheme.ink)
+            .focused($focused)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous)
+                    .fill(LecternTheme.surfaceFill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous)
+                    .strokeBorder(
+                        focused ? LecternTheme.accent.opacity(0.55) : LecternTheme.hairline,
+                        lineWidth: focused ? 1.5 : 1
+                    )
+            )
+            .animation(LecternTheme.standardAnimation, value: focused)
+    }
+}
+
+/// Secure counterpart to SettingsTextField, for tokens and secrets.
+struct SettingsSecureField: View {
+    let placeholder: String
+    @Binding var text: String
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        SecureField(placeholder, text: $text)
+            .textFieldStyle(.plain)
+            .font(.system(size: 12.5))
+            .foregroundStyle(LecternTheme.ink)
+            .focused($focused)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous)
+                    .fill(LecternTheme.surfaceFill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous)
+                    .strokeBorder(
+                        focused ? LecternTheme.accent.opacity(0.55) : LecternTheme.hairline,
+                        lineWidth: focused ? 1.5 : 1
+                    )
+            )
+            .animation(LecternTheme.standardAnimation, value: focused)
+    }
+}
+
 /// Flat content card: stepped surface fill plus hairline border. No shadow.
 struct SurfaceCard<Content: View>: View {
     var padding: CGFloat = 16
