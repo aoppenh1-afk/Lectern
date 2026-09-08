@@ -75,9 +75,12 @@ enum LecternTheme {
 
     /// Near-white fill for large floating panels (chat column, sources).
     /// Message cards stay pure `canvasCard` so they lift off the panel.
+    /// Dark mode must stay fully opaque: the main window is edge-to-edge
+    /// with a clear NSWindow background, so any translucency here lets
+    /// other apps bleed through the workspace.
     static var panelFill: Color {
         adaptive(light: NSColor(srgbRed: 0.984, green: 0.980, blue: 0.972, alpha: 1),   // #FBFAF7
-                  dark: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.06))
+                  dark: NSColor(srgbRed: 0.156, green: 0.156, blue: 0.162, alpha: 1))    // #28282A opaque
     }
 
     /// Milky tint laid over frosted glass so the opacity reads strongly
@@ -95,7 +98,7 @@ enum LecternTheme {
 
     static var cardFill: Color {
         adaptive(light: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.72),
-                 dark: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.05))
+                 dark: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.09))
     }
 
     /// Deep green-black ink for serif display type on paper.
@@ -594,7 +597,9 @@ struct AppCanvasModifier: ViewModifier {
         content
             .background {
                 ZStack(alignment: .bottomLeading) {
-                    LecternTheme.panelFill
+                    // Opaque base: the window itself is clear for edge-to-edge
+                    // rendering, so this must block other apps behind us.
+                    LecternTheme.paper
 
                     Image("SidebarBotanical")
                         .resizable()

@@ -1,8 +1,8 @@
 import Foundation
 
-/// Spoken language of a lecture. Automatic on-device transcription uses
-/// Parakeet for English and whisper.cpp for mixed Hebrew/English shiurim.
-/// An explicit Settings choice such as Gemini through Antigravity overrides that.
+/// Spoken language of a lecture. Automatic transcription uses
+/// Antigravity ACP for both English and mixed Hebrew/English shiurim.
+/// An explicit Settings choice such as Parakeet or whisper.cpp overrides that.
 enum LectureLanguage: String, Codable, CaseIterable, Identifiable, Sendable {
     case english
     case hebrewEnglish
@@ -19,9 +19,9 @@ enum LectureLanguage: String, Codable, CaseIterable, Identifiable, Sendable {
     var caption: String {
         switch self {
         case .english:
-            return "English-only lectures. Automatic on-device transcription uses Parakeet."
+            return "English-only lectures. Automatic transcription uses Antigravity ACP."
         case .hebrewEnglish:
-            return "Shiurim that mix English and Hebrew. Automatic on-device transcription uses whisper.cpp."
+            return "Shiurim that mix English and Hebrew. Automatic transcription uses Antigravity ACP."
         }
     }
 }

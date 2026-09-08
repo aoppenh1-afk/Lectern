@@ -60,7 +60,7 @@ struct TranscriptionSettingsPane: View {
                         get: { builtInFamilyID(preferences.builtInModelID) },
                         set: { selectBuiltInFamily($0, preferences: preferences) }
                     )) {
-                        Text("Automatic by lecture language").tag("")
+                        Text("Automatic (Antigravity ACP)").tag("")
                         ForEach(BuiltInTranscriptionModel.allCases) { model in
                             Text(model.title).tag(model.id)
                         }

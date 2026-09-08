@@ -581,8 +581,8 @@ private struct RecordingPane: View {
             SettingsRow(
                 title: "Hebrew + English (shiurim)",
                 caption: WhisperTranscriptionEngine.isCLIInstalled
-                    ? "whisper.cpp is available for automatic on-device shiur transcription. The Transcription settings default still applies, including Gemini through Antigravity."
-                    : "Automatic on-device shiur transcription needs whisper.cpp: brew install whisper-cpp",
+                    ? "Automatic transcription uses Antigravity ACP. whisper.cpp is available as an on-device fallback."
+                    : "Automatic transcription uses Antigravity ACP. For an on-device fallback, install whisper.cpp: brew install whisper-cpp",
                 showsDivider: false
             ) {
                 Image(systemName: WhisperTranscriptionEngine.isCLIInstalled

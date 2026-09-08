@@ -124,8 +124,10 @@ final class TranscriptionProviderTests: XCTestCase {
     }
 
     func testBuiltInTranscriptionModelResolvesAutomaticAndExplicitChoices() {
-        XCTAssertEqual(BuiltInTranscriptionModel.resolve(nil, language: .english), .parakeet)
-        XCTAssertEqual(BuiltInTranscriptionModel.resolve(nil, language: .hebrewEnglish), .whisper)
+        XCTAssertEqual(BuiltInTranscriptionModel.resolve(nil, language: .english), .antigravity)
+        XCTAssertEqual(BuiltInTranscriptionModel.resolve(nil, language: .hebrewEnglish), .antigravity)
+        XCTAssertEqual(BuiltInTranscriptionModel.automatic(for: .english), .antigravity)
+        XCTAssertEqual(BuiltInTranscriptionModel.automatic(for: .hebrewEnglish), .antigravity)
         XCTAssertEqual(
             BuiltInTranscriptionModel.resolve(BuiltInTranscriptionModel.antigravity.id, language: .english),
             .antigravity
@@ -200,7 +202,7 @@ final class TranscriptionProviderTests: XCTestCase {
         XCTAssertTrue(plan.progressSubtitle().localizedCaseInsensitiveContains("antigravity"))
     }
 
-    func testAutomaticHebrewImportStillUsesWhisper() {
+    func testAutomaticHebrewImportUsesAntigravity() {
         let plan = TranscriptionJobPlan.resolve(
             preferenceSource: .local,
             preferenceBuiltInModelID: nil,
@@ -209,10 +211,24 @@ final class TranscriptionProviderTests: XCTestCase {
             language: .hebrewEnglish
         )
 
-        XCTAssertEqual(plan, .local(.whisper))
-        XCTAssertTrue(plan.usesWhisperCLI)
-        XCTAssertFalse(plan.usesAntigravityACPClient)
-        XCTAssertTrue(plan.progressSubtitle().localizedCaseInsensitiveContains("whisper.cpp"))
+        XCTAssertEqual(plan, .local(.antigravity))
+        XCTAssertTrue(plan.usesAntigravityACPClient)
+        XCTAssertFalse(plan.usesWhisperCLI)
+        XCTAssertTrue(plan.progressSubtitle().localizedCaseInsensitiveContains("antigravity"))
+    }
+
+    func testAutomaticEnglishImportUsesAntigravity() {
+        let plan = TranscriptionJobPlan.resolve(
+            preferenceSource: .local,
+            preferenceBuiltInModelID: nil,
+            lectureSource: nil,
+            lectureModelID: nil,
+            language: .english
+        )
+
+        XCTAssertEqual(plan, .local(.antigravity))
+        XCTAssertTrue(plan.usesAntigravityACPClient)
+        XCTAssertFalse(plan.usesWhisperCLI)
     }
 
     func testStaleWhisperModelDoesNotOverrideGeminiPreferenceWhenLectureFollowsSettings() {

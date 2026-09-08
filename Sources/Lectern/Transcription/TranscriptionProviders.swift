@@ -53,9 +53,9 @@ enum BuiltInTranscriptionModel: String, Codable, CaseIterable, Identifiable, Sen
 
     var subtitle: String {
         switch self {
-        case .parakeet: return "On-device · best for English lectures"
-        case .whisper: return "On-device · best for English and Hebrew shiurim"
-        case .antigravity: return "Google Antigravity · official ACP connection"
+        case .parakeet: return "On-device · English lectures"
+        case .whisper: return "On-device · English and Hebrew shiurim"
+        case .antigravity: return "Google Antigravity · automatic default · official ACP connection"
         }
     }
 
@@ -70,7 +70,8 @@ enum BuiltInTranscriptionModel: String, Codable, CaseIterable, Identifiable, Sen
     var usesAntigravity: Bool { self == .antigravity }
 
     static func automatic(for language: LectureLanguage) -> BuiltInTranscriptionModel {
-        language == .hebrewEnglish ? .whisper : .parakeet
+        _ = language
+        return .antigravity
     }
 
     static func resolve(_ storedValue: String?, language: LectureLanguage) -> BuiltInTranscriptionModel {
@@ -121,7 +122,7 @@ enum BuiltInTranscriptionModel: String, Codable, CaseIterable, Identifiable, Sen
 }
 
 /// Picks the transcriber for a new or retried job. An explicit Settings model
-/// such as Gemini 3.8 Flash High wins over the Hebrew→whisper automatic default.
+/// such as Whisper wins over the Antigravity ACP automatic default.
 enum TranscriptionJobPlan: Equatable, Sendable {
     case askEachTime
     case local(BuiltInTranscriptionModel)
