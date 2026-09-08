@@ -37,6 +37,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
+	<key>LecternGoogleOAuthClientID</key>
+	<string>$(LECTERN_GOOGLE_CLIENT_ID)</string>
+	<key>LecternGoogleOAuthClientSecret</key>
+	<string>$(LECTERN_GOOGLE_CLIENT_SECRET)</string>
 	<key>LecternUpdateRepository</key>
 	<string>aoppenh1-afk/Lectern</string>
 	<key>NSAppTransportSecurity</key>
@@ -44,12 +48,12 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Lectern captures the audio your Mac is playing — Zoom, Meet, or a lecture video — so it can be transcribed and studied on this Mac. No video is stored.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Lectern records your microphone during lectures so they can be transcribed and studied on this Mac.</string>
-	<key>NSAudioCaptureUsageDescription</key>
-	<string>Lectern captures the audio your Mac is playing — Zoom, Meet, or a lecture video — so it can be transcribed and studied on this Mac. No video is stored.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Lectern uses Screen Recording permission only to capture system audio from Zoom and other lecture playback. No screen video is recorded or saved.</string>
 	<key>UTExportedTypeDeclarations</key>

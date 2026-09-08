@@ -3,18 +3,15 @@ import AppKit
 import Foundation
 import Security
 
-/// Desktop OAuth for Google Docs. Client ID/secret live in Settings; the
-/// refresh token lives in the Keychain.
+/// Shared desktop OAuth configuration ships in the app; tokens live in Keychain.
 @MainActor
 @Observable
 final class GoogleDocsAuth {
-    private static let clientIDKey = "google.oauth.clientID"
-    private static let clientSecretKey = "google.oauth.clientSecret"
     private static let keychainService = "com.lectern.google-oauth"
     private static let keychainAccount = "authState"
 
-    private static let documentsScope = "https://www.googleapis.com/auth/documents"
-    private static let driveFileScope = "https://www.googleapis.com/auth/drive.file"
+    static let scopes = ["https://www.googleapis.com/auth/drive.file"]
+    private let configuration = GoogleOAuthConfiguration(info: Bundle.main.infoDictionary ?? [:])
 
     private var authState: OIDAuthState?
     private var redirectHandler: OIDRedirectHTTPHandler?
@@ -26,15 +23,7 @@ final class GoogleDocsAuth {
     private(set) var isSigningIn = false
     private(set) var lastError: String?
 
-    var clientID: String {
-        get { UserDefaults.standard.string(forKey: Self.clientIDKey) ?? "" }
-        set { UserDefaults.standard.set(newValue, forKey: Self.clientIDKey) }
-    }
-
-    var clientSecret: String {
-        get { UserDefaults.standard.string(forKey: Self.clientSecretKey) ?? "" }
-        set { UserDefaults.standard.set(newValue, forKey: Self.clientSecretKey) }
-    }
+    var isConfigured: Bool { configuration.isConfigured }
 
     init() {
         changeForwarder.onChange = { [weak self] state in
@@ -47,16 +36,14 @@ final class GoogleDocsAuth {
     }
 
     func signIn() async throws {
-        let clientID = clientID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !clientID.isEmpty else { throw GoogleDocsError.missingClientID }
-
-        let secret = clientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !isSigningIn else { return }
         isSigningIn = true
         lastError = nil
         defer { isSigningIn = false }
 
         do {
-            try await runAuthorization(clientID: clientID, secret: secret)
+            guard isConfigured else { throw GoogleDocsError.missingClientID }
+            try await runAuthorization(clientID: configuration.clientID, secret: configuration.clientSecret)
         } catch {
             lastError = error.localizedDescription
             throw error
@@ -85,7 +72,7 @@ final class GoogleDocsAuth {
             configuration: configuration,
             clientId: clientID,
             clientSecret: secret.isEmpty ? nil : secret,
-            scopes: [OIDScopeOpenID, OIDScopeEmail, Self.documentsScope, Self.driveFileScope],
+            scopes: Self.scopes,
             redirectURL: redirectURI,
             responseType: OIDResponseTypeCode,
             additionalParameters: [
@@ -174,10 +161,18 @@ final class GoogleDocsAuth {
     }
 
     private func restore() {
+        // An unconfigured development build must not erase a working release session.
+        guard isConfigured else { return }
         guard let data = loadKeychain() else { return }
         do {
             let state = try NSKeyedUnarchiver.unarchivedObject(ofClass: OIDAuthState.self, from: data)
             if let state {
+                let request = state.lastAuthorizationResponse.request
+                guard configuration.accepts(clientID: request.clientID, scope: request.scope) else {
+                    lastError = "Connect Google Docs again to use Lectern’s updated file permissions. Previously granted access can be removed in your Google Account."
+                    deleteKeychain()
+                    return
+                }
                 apply(state)
             }
         } catch {

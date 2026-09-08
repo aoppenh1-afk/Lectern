@@ -39,9 +39,10 @@ struct LectureChatView: View {
             if source == nil {
                 noSourceState
             } else {
-                HStack(spacing: 0) {
+                // The source panel floats over the conversation so it never
+                // squeezes the chat or gets clipped on narrow windows.
+                ZStack(alignment: .topTrailing) {
                     conversation
-                    Divider()
                     sourceSidebar
                 }
             }
@@ -83,21 +84,6 @@ struct LectureChatView: View {
             }
 
             Spacer()
-
-            if source != nil {
-                Button {
-                    withAnimation(LecternTheme.standardAnimation) {
-                        sourcePanelVisible.toggle()
-                    }
-                } label: {
-                    Image("SourcePanelToggle")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.plain)
-                .help(sourcePanelVisible ? "Hide source panel" : "Show source panel")
-            }
 
             Button(action: viewSource) {
                 Label("View Source", systemImage: "rectangle.and.text.magnifyingglass")
@@ -195,8 +181,9 @@ struct LectureChatView: View {
     private var sourceSidebar: some View {
         if sourcePanelVisible {
             sourcePanel
+                .transition(.move(edge: .trailing).combined(with: .opacity))
         } else {
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
                 Button {
                     withAnimation(LecternTheme.standardAnimation) {
                         sourcePanelVisible = true
@@ -205,7 +192,7 @@ struct LectureChatView: View {
                     Image("SourcePanelToggle")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 24, height: 24)
+                        .frame(width: 18, height: 18)
                 }
                 .buttonStyle(.plain)
                 .help("Show source panel")
@@ -216,10 +203,15 @@ struct LectureChatView: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
                     .background(LecternTheme.accent.opacity(0.10), in: Capsule())
-                Spacer()
             }
             .padding(.vertical, 12)
-            .frame(width: 46)
+            .padding(.horizontal, 9)
+            .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(LecternTheme.hairline, lineWidth: 1))
+            .shadow(color: Color.black.opacity(0.10), radius: 12, y: 3)
+            .padding(.trailing, 14)
+            .padding(.top, 14)
+            .transition(.move(edge: .trailing).combined(with: .opacity))
         }
     }
 
@@ -262,6 +254,8 @@ struct LectureChatView: View {
         }
         .panelCard(cornerRadius: 16)
         .frame(width: 300)
+        .frame(maxHeight: .infinity)
+        .shadow(color: Color.black.opacity(0.12), radius: 16, y: 4)
         .padding(.trailing, 14)
         .padding(.vertical, 14)
     }
@@ -401,7 +395,7 @@ struct LectureChatView: View {
                     .lineSpacing(3)
             }
 
-            HStack(spacing: 9) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 9)], spacing: 9) {
                 suggestion("Summarize this lecture", icon: "text.alignleft")
                 suggestion("Turn into a study guide", icon: "book.closed")
                 suggestion("Generate flashcards", icon: "rectangle.on.rectangle.angled")

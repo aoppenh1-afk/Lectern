@@ -21,11 +21,21 @@ fi
 rm -rf "$DIST/Lectern.app"
 mkdir -p "$DIST"
 
+GOOGLE_BUILD_SETTINGS=()
+if [[ -f "$ROOT/.build/GoogleOAuth.xcconfig" ]]; then
+  GOOGLE_BUILD_SETTINGS+=(-xcconfig "$ROOT/.build/GoogleOAuth.xcconfig")
+fi
+if [[ -n "${LECTERN_GOOGLE_CLIENT_ID:-}" ]]; then
+  GOOGLE_BUILD_SETTINGS+=("LECTERN_GOOGLE_CLIENT_ID=$LECTERN_GOOGLE_CLIENT_ID")
+  GOOGLE_BUILD_SETTINGS+=("LECTERN_GOOGLE_CLIENT_SECRET=${LECTERN_GOOGLE_CLIENT_SECRET:-}")
+fi
+
 xcodebuild \
   -scheme Lectern \
   -configuration Release \
   -destination 'platform=macOS' \
   -derivedDataPath "$DERIVED" \
+  ${GOOGLE_BUILD_SETTINGS[@]+"${GOOGLE_BUILD_SETTINGS[@]}"} \
   build \
   | tee "$DIST/build.log"
 

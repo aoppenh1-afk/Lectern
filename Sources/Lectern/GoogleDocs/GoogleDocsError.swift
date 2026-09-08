@@ -11,11 +11,11 @@ enum GoogleDocsError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingClientID:
-            return "Add a Google OAuth client ID in Settings before pushing notes."
+            return "Google Docs is not configured in this build. Ask the app distributor for a configured build."
         case .notSignedIn:
             return "Sign in to Google in Settings, then try again."
         case .cancelled:
-            return "Sign-in didn’t finish. If Google said access_denied, add that Gmail as a test user under Audience, then try again."
+            return "Sign-in did not finish. Try connecting Google Docs again."
         case .noNotes:
             return "Generate notes for this lecture before pushing to Google Docs."
         case .api(_, let message):

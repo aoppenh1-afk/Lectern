@@ -6,6 +6,7 @@ struct CanvasSettingsPane: View {
     @State private var domain = ""
     @State private var token = ""
     @State private var message: String?
+    @State private var showsWalkthrough = true
 
     private var isConnected: Bool { connection.isConnected }
     private var canConnect: Bool {
@@ -113,38 +114,99 @@ struct CanvasSettingsPane: View {
             }
 
             SettingsCard {
-                HStack(alignment: .top, spacing: 12) {
-                    settingsIcon("key", tint: .secondary)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        settingsIcon("key", tint: .secondary)
 
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text("Create a Canvas token")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(LecternTheme.ink)
-                        Text("In Canvas, open Account > Settings, find Approved Integrations, and create a new access token. Some schools disable student-created tokens; in that case Lectern will need an OAuth developer key from campus IT.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        if let date = sync.lastSyncAt {
-                            MetaText(["Last sync \(date.formatted(date: .abbreviated, time: .shortened))"])
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Create a Canvas token")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(LecternTheme.ink)
+                            Text("Four steps in Canvas. It takes about a minute.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
                         }
-                        if !sync.lastWarnings.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Some Canvas sections could not sync")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(LecternTheme.warningTint)
-                                ForEach(sync.lastWarnings.prefix(4), id: \.self) { warning in
-                                    Text(warning)
-                                        .font(.system(size: 10.5))
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
+
+                        Spacer()
+
+                        Button(showsWalkthrough ? "Hide steps" : "Show steps") {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                showsWalkthrough.toggle()
+                            }
+                        }
+                        .buttonStyle(.link)
+                        .font(.system(size: 11, weight: .medium))
+                    }
+
+                    if showsWalkthrough {
+                        VStack(alignment: .leading, spacing: 14) {
+                            walkthroughStep(
+                                number: 1,
+                                text: "In Canvas, click Account in the left sidebar, then Settings.",
+                                imageName: "CanvasTokenStep1"
+                            )
+                            walkthroughStep(
+                                number: 2,
+                                text: "Scroll to Approved Integrations, then click + New Access Token.",
+                                imageName: "CanvasTokenStep2"
+                            )
+                            walkthroughStep(
+                                number: 3,
+                                text: "Purpose: Lectern. Pick an expiry date, then Generate Token. Many schools cap expiry at 30 days.",
+                                imageName: "CanvasTokenStep3"
+                            )
+                            walkthroughStep(
+                                number: 4,
+                                text: "Copy the token now. Canvas shows it once. Paste it above, then Connect and sync.",
+                                imageName: "CanvasTokenStep4"
+                            )
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("When the token lapses, repeat these steps and paste the new token above. If your school blocks student tokens, ask campus IT for an OAuth developer key.")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if let guideURL = URL(string: "https://community.instructure.com/en/kb/articles/662901-how-do-i-manage-api-access-tokens-in-my-user-account") {
+                                    Link("Open full Canvas guide", destination: guideURL)
+                                        .font(.system(size: 11, weight: .medium))
                                 }
                             }
-                            .padding(.top, 2)
                         }
                     }
                 }
                 .padding(14)
+            }
+
+            if sync.lastSyncAt != nil || !sync.lastWarnings.isEmpty {
+                SettingsCard {
+                    HStack(alignment: .top, spacing: 12) {
+                        settingsIcon("arrow.clockwise", tint: .secondary)
+
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("Sync status")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(LecternTheme.ink)
+                            if let date = sync.lastSyncAt {
+                                MetaText(["Last sync \(date.formatted(date: .abbreviated, time: .shortened))"])
+                            }
+                            if !sync.lastWarnings.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Some Canvas sections could not sync")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(LecternTheme.warningTint)
+                                    ForEach(sync.lastWarnings.prefix(4), id: \.self) { warning in
+                                        Text(warning)
+                                            .font(.system(size: 10.5))
+                                            .foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }
+                                .padding(.top, 2)
+                            }
+                        }
+                    }
+                    .padding(14)
+                }
             }
         }
         .onAppear { domain = connection.domain }
@@ -163,6 +225,32 @@ struct CanvasSettingsPane: View {
             .fill(Color.primary.opacity(0.07))
             .frame(height: 1)
             .padding(.leading, 52)
+    }
+
+    private func walkthroughStep(number: Int, text: String, imageName: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                Text("\(number)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 20, height: 20)
+                    .background(LecternTheme.accent, in: Circle())
+                Text(text)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(LecternTheme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Image(imageName)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
+                )
+                .accessibilityLabel("Canvas screenshot for step \(number)")
+        }
     }
 
     private func settingsIcon(_ name: String, tint: Color) -> some View {

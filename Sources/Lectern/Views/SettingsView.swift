@@ -663,9 +663,6 @@ private struct AnkiPane: View {
 struct GoogleDocsPane: View {
     @Environment(GoogleDocsAuth.self) private var auth
 
-    @State private var clientID = ""
-    @State private var clientSecret = ""
-
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsCard {
@@ -687,26 +684,6 @@ struct GoogleDocsPane: View {
                         }
 
                         Spacer()
-                    }
-                    .padding(16)
-
-                    googleDocsDivider
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        SectionLabel(title: "OAuth client")
-                        Text("Google Cloud Console → enable Google Docs API → create an OAuth client of type Desktop. Then Google Auth Platform → Audience → add the Gmail you’ll sign in with as a test user. Being the project owner does not count. Keep the app in Testing; do not publish it.")
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(.tertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            SettingsFieldLabel(title: "Client ID")
-                            SettingsTextField(placeholder: "Your OAuth client ID", text: $clientID)
-                        }
-                        VStack(alignment: .leading, spacing: 6) {
-                            SettingsFieldLabel(title: "Client secret")
-                            SettingsSecureField(placeholder: "Your OAuth client secret", text: $clientSecret)
-                        }
                     }
                     .padding(16)
 
@@ -750,15 +727,6 @@ struct GoogleDocsPane: View {
                 }
             }
         }
-        .onAppear {
-            clientID = auth.clientID
-            clientSecret = auth.clientSecret
-        }
-        .onDisappear {
-            commitCredentials()
-        }
-        .onChange(of: clientID) { _, _ in commitCredentials() }
-        .onChange(of: clientSecret) { _, _ in commitCredentials() }
     }
 
     private var statusChip: StatusChip {
@@ -787,7 +755,9 @@ struct GoogleDocsPane: View {
         } else if auth.isSigningIn {
             return "Finish signing in with Google in your browser."
         } else {
-            return "Sign in to push notes to Google Docs."
+            return auth.isConfigured
+                ? "Allow access to files Lectern creates or that you choose to use with it. Your other Drive files stay private."
+                : "Google Docs is not configured in this build. Ask the app distributor for a configured build."
         }
     }
 
@@ -808,15 +778,14 @@ struct GoogleDocsPane: View {
         } else {
             Button {
                 Task {
-                    commitCredentials()
                     try? await auth.signIn()
                 }
             } label: {
-                Text("Sign in with Google")
+                Text("Connect Google Docs")
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
-            .disabled(clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(!auth.isConfigured)
         }
     }
 
@@ -833,11 +802,6 @@ struct GoogleDocsPane: View {
             .foregroundStyle(tint)
             .frame(width: 36, height: 36)
             .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-    }
-
-    private func commitCredentials() {
-        auth.clientID = clientID
-        auth.clientSecret = clientSecret
     }
 }
 

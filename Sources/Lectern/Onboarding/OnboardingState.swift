@@ -2,12 +2,12 @@ import Foundation
 import Observation
 
 /// Tracks whether this Mac has been through the setup assistant. Bump
-/// `currentVersion` when a new step is added so existing users see it once.
+/// `currentVersion` when the walkthrough changes so existing users see it once.
 @Observable
 @MainActor
 final class OnboardingState {
     static let completedVersionKey = "onboarding.completedVersion"
-    static let currentVersion = 1
+    static let currentVersion = 2
 
     var isPresented = false
 

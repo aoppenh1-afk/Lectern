@@ -9,7 +9,7 @@ Lectern launches [Google's official Antigravity ACP agent](https://github.com/ag
 - macOS 26 or later, Apple silicon
 - Xcode 26 (full Xcode, not only Command Line Tools) to build from source
 - A Google account with access to Antigravity
-- Optional: a Canvas personal access token; a Google Cloud OAuth desktop client for Google Docs
+- Optional: a Canvas personal access token; a Google account for Google Docs
 
 ## Install from a release
 
@@ -27,7 +27,7 @@ You can also do this from System Settings › Privacy & Security › Open Anyway
 4. Complete the setup assistant:
    - **Antigravity** (required). Click *Install Antigravity* so Lectern can download and verify Google's official ACP runtime, then click *Sign in with Google*. The normal `agy` CLI is not required and its sign-in is intentionally separate.
    - **Canvas** (optional). School Canvas address plus a personal access token (Canvas › Account › Settings › Approved Integrations › New Access Token). Stored in Keychain.
-   - **Google Docs** (optional). Needs your own OAuth client from Google Cloud Console. Most people skip this.
+   - **Google Docs** (optional). Click Connect Google Docs and approve access in your browser. The distributed app must include Lectern’s shared OAuth client.
 
 Rerun the assistant from **Settings › General**.
 
@@ -119,3 +119,47 @@ This verifies the signing identity, bumps `MARKETING_VERSION` / `CURRENT_PROJECT
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+
+### Google Docs release configuration
+
+Users connect their Google account in Settings → Google Docs. Lectern requests only
+`https://www.googleapis.com/auth/drive.file`, with no full-Docs, full-Drive, email, or
+profile scope. Google Docs supports this scope for creating documents, reading their
+tabs, and updating them. Tokens remain in the macOS Keychain. AppAuth uses the system
+browser, a loopback redirect, and PKCE. No hosted OAuth backend is needed.
+
+The app maintainer must configure one shared Google Cloud project before distributing
+this feature:
+
+1. Enable Google Docs API and create an OAuth client of type **Desktop app**.
+2. Configure the external audience, Lectern branding, support contact, homepage and
+   privacy policy. List only `drive.file` under Data Access. Remove the old
+   `documents` scope from the consent configuration.
+3. Move the audience to **In production** for distribution. Complete any brand
+   verification Google requests. Testing mode still limits users and can show
+   warnings; changing code does not publish or verify the Google project.
+4. Supply `LECTERN_GOOGLE_CLIENT_ID` and `LECTERN_GOOGLE_CLIENT_SECRET` as Xcode build
+   settings, or export both variables before running `scripts/build-app.sh`.
+   Use the downloaded Desktop client values. They identify a public desktop client
+   and are embedded in Info.plist, so they are extractable from the app. Never use
+   a web-server client secret here or treat these values as confidential credentials.
+5. Test a release build with a separate Google account: connect, push two lectures
+   in one course, edit and push one again, restart the app and push again. Confirm
+   one document with two tabs, updated content, and no unexpected consent warning.
+
+Builds without a client show an unavailable message instead of credential fields.
+Existing sessions from a different client or with broader requested scopes require
+reconnection. Local sign-out does not revoke old Google grants; users can remove
+those in their Google Account connections. A new Google project may not be able to
+read documents created by the old client. If Google returns 404, Lectern leaves the
+old document intact and creates a replacement on the next push. Other API errors
+remain visible instead of silently creating duplicates.
+
+Google lists `drive.file` as non-sensitive, so it avoids sensitive/restricted scope
+review. This does not guarantee that every account or project will show no warning.
+Standard Docs API use is currently available at no additional cost, subject to
+Google’s quotas. Google currently plans charges for exceeding those quotas later
+in 2026, so this is not a promise of unlimited free use. See [Docs scopes](https://developers.google.com/workspace/docs/api/auth),
+[usage limits](https://developers.google.com/workspace/docs/api/limits), and
+[brand verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/brand-verification).

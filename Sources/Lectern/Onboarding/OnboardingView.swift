@@ -133,7 +133,7 @@ struct OnboardingView: View {
         case .canvas:
             return "Connect Canvas to pull courses, deadlines, grades and announcements into Lectern. You can skip this and add it later in Settings › Canvas."
         case .googleDocs:
-            return "Push notes to Google Docs, one document per course. This needs your own Google OAuth client, so most people skip it for now. Settings › Google Docs has the same form."
+            return "Connect your Google account to push notes, with one document per course and one tab per lecture. Lectern only requests access to files it creates or that you choose to use with it. You can also connect later in Settings."
         case .finish:
             return "That is everything Lectern needs. You can rerun this assistant any time from Settings › General."
         }

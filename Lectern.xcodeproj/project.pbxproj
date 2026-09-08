@@ -120,6 +120,7 @@
 		6CEA910FD49F1BE8BB05BCCF /* ShiurImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C5B6AFA684E43B8FEA1573E /* ShiurImportSheet.swift */; };
 		6E93D4DC8C530BC4C5472563 /* GoogleDocsSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A92C58BA4F8412B20A3504 /* GoogleDocsSyncService.swift */; };
 		6F51FC24AF770F80FDB1414E /* LecternBundleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A00E389C268DAA3F3B2249 /* LecternBundleService.swift */; };
+		71D0F30C0C4DB0C346EEE723 /* GoogleOAuthConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4423ED80F0768A3752F0DC45 /* GoogleOAuthConfigurationTests.swift */; };
 		7354896DDC4659DE0B74DC24 /* RemoteAudioDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F39B466BD1D9EADCD297E23 /* RemoteAudioDownloader.swift */; };
 		738476D698B44E747F8CC745 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F31D7E05008BB4C97BB3E77 /* StatusBarController.swift */; };
 		73E019E6325643CA84769460 /* UpdatePromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB3E3B37AF7F3949572FF90 /* UpdatePromptView.swift */; };
@@ -145,6 +146,7 @@
 		822D17F6137D0CEC6245E31E /* CapturePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0999EBAFBCFF39D7F174D28 /* CapturePipeline.swift */; };
 		82688AA7EC72B3D17C7DE1B1 /* NotesContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51D3E04EE9E7EAE2AA0AA37 /* NotesContentView.swift */; };
 		83C3227214598844795493DD /* CourseSynthesisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627A2CDC9029D01B87C36A0C /* CourseSynthesisService.swift */; };
+		842D8599706A74FB64C53E5E /* GoogleOAuthConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 522F58B2452A56EBECCA5001 /* GoogleOAuthConfiguration.swift */; };
 		86CA65565DB52DB819C9C7BB /* CanvasWorkspaceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FE176891F8FD111C81F219 /* CanvasWorkspaceViews.swift */; };
 		87D749F58B1B9A6848DD93E5 /* LectureImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A11419823C0A975075BD958 /* LectureImportService.swift */; };
 		8ADBECF8CDB31C153F5376F3 /* NotesMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D8E9C05E6FE70084DD545AC /* NotesMarkdown.swift */; };
@@ -249,6 +251,7 @@
 		EC58924FF09B859FC286942E /* AgentDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07DF18B64B18FC06E4CC2F90 /* AgentDetector.swift */; };
 		EDBE348219FB004D97CA1195 /* RemoteAudioDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F39B466BD1D9EADCD297E23 /* RemoteAudioDownloader.swift */; };
 		EE93387A69A06B5C2A41B40A /* CanvasWorkspaceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FE176891F8FD111C81F219 /* CanvasWorkspaceViews.swift */; };
+		F0BE959424B6DC733048E2C7 /* GoogleOAuthConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 522F58B2452A56EBECCA5001 /* GoogleOAuthConfiguration.swift */; };
 		F191B80121AB8567694DC6AD /* tone.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 98C927F4415DF74ED2A9D3B7 /* tone.mp3 */; };
 		FAFA9988CDD3DB96E29A6F7D /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F761716AB6F39B0F119719 /* OnboardingView.swift */; };
 		FC87DA91A3A31762AD9A9EC4 /* LectureChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 405F827FE93E4C441645FA2B /* LectureChatService.swift */; };
@@ -304,6 +307,7 @@
 		439436382A9383B21132AFA7 /* TranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionService.swift; sourceTree = "<group>"; };
 		439DF4E05C878D8E23AA6E75 /* SystemAudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioCapture.swift; sourceTree = "<group>"; };
 		43BAFC671A118892D77577AD /* ShiurSubscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiurSubscription.swift; sourceTree = "<group>"; };
+		4423ED80F0768A3752F0DC45 /* GoogleOAuthConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleOAuthConfigurationTests.swift; sourceTree = "<group>"; };
 		4803A2E0B42C392ED5460F0F /* Prompts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Prompts.swift; sourceTree = "<group>"; };
 		4992B00709F638881F00A8B3 /* YUTorahSourceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSourceProvider.swift; sourceTree = "<group>"; };
 		4C30D8A14329AC61D5345BC9 /* LectureExportAvailability+Lecture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LectureExportAvailability+Lecture.swift"; sourceTree = "<group>"; };
@@ -311,6 +315,7 @@
 		4D642A5FC231E577576031CA /* ParakeetTDT */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ParakeetTDT; path = Vendor/ParakeetTDT; sourceTree = SOURCE_ROOT; };
 		510EE419EF1BDEB5F0F5897D /* LectureDocumentRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureDocumentRenderer.swift; sourceTree = "<group>"; };
 		518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionProviderTests.swift; sourceTree = "<group>"; };
+		522F58B2452A56EBECCA5001 /* GoogleOAuthConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleOAuthConfiguration.swift; sourceTree = "<group>"; };
 		52B1F78BFD01E4667FE613F2 /* ReferenceMaterialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceMaterialService.swift; sourceTree = "<group>"; };
 		576A2CBC9D67B86F6B125E6E /* ExternalTranscriptionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalTranscriptionEngine.swift; sourceTree = "<group>"; };
 		5F31D7E05008BB4C97BB3E77 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
@@ -587,6 +592,7 @@
 				795B08D1A7D6BBE0408B836A /* ChatStudyMaterialTests.swift */,
 				2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */,
 				F2ECE882547DAE6ABCD5EC51 /* ExportAvailabilityTests.swift */,
+				4423ED80F0768A3752F0DC45 /* GoogleOAuthConfigurationTests.swift */,
 				60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */,
 				518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */,
 				EC7DCD05473F0313914D4564 /* YUTorahSubscriptionTests.swift */,
@@ -689,6 +695,7 @@
 				BBF49011BFA6F50BCA8A7598 /* GoogleDocsClient.swift */,
 				DF820DB24255443A5561D031 /* GoogleDocsError.swift */,
 				35A92C58BA4F8412B20A3504 /* GoogleDocsSyncService.swift */,
+				522F58B2452A56EBECCA5001 /* GoogleOAuthConfiguration.swift */,
 				CD3E8ECFA5DBAF53FDF24214 /* NotesMarkdownConverter.swift */,
 			);
 			path = GoogleDocs;
@@ -949,6 +956,8 @@
 				92ED10122EC5ED40F4589F2E /* GoogleDocsError.swift in Sources */,
 				195EA20634018DCA43CF70BD /* GoogleDocsNotesBar.swift in Sources */,
 				A410E80D82033153C89AB820 /* GoogleDocsSyncService.swift in Sources */,
+				F0BE959424B6DC733048E2C7 /* GoogleOAuthConfiguration.swift in Sources */,
+				71D0F30C0C4DB0C346EEE723 /* GoogleOAuthConfigurationTests.swift in Sources */,
 				1E2C8FDA18A3C566CC1F9976 /* LaunchAtLoginManager.swift in Sources */,
 				3158EBAA6071DBEBA9BFF8F3 /* LecternApp.swift in Sources */,
 				C8BD1E39D756D4404C06735D /* LecternBundleOptions.swift in Sources */,
@@ -1071,6 +1080,7 @@
 				AD86591E3E90890763F6171D /* GoogleDocsError.swift in Sources */,
 				93D3161AC57DF8C49442C3CB /* GoogleDocsNotesBar.swift in Sources */,
 				6E93D4DC8C530BC4C5472563 /* GoogleDocsSyncService.swift in Sources */,
+				842D8599706A74FB64C53E5E /* GoogleOAuthConfiguration.swift in Sources */,
 				3D5844BEFB098FE7713F88B8 /* LaunchAtLoginManager.swift in Sources */,
 				6A84AD8F988068C3C6298016 /* LecternApp.swift in Sources */,
 				CC81062C168BF06111E4201E /* LecternBundleOptions.swift in Sources */,

@@ -155,6 +155,8 @@ final class GoogleDocsSyncService {
         if let id = lecture.googleTabId, let match = document.tabs.first(where: { $0.id == id }) {
             return match
         }
+        // A replacement document or deleted tab needs its content written again.
+        lecture.googleNotesHash = nil
         if let match = document.tabs.first(where: { $0.title == title }) {
             return match
         }

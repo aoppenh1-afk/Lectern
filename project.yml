@@ -60,6 +60,8 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # GitHub "owner/repo" the in-app updater polls for releases.
         LecternUpdateRepository: aoppenh1-afk/Lectern
+        LecternGoogleOAuthClientID: $(LECTERN_GOOGLE_CLIENT_ID)
+        LecternGoogleOAuthClientSecret: $(LECTERN_GOOGLE_CLIENT_SECRET)
         LSApplicationCategoryType: public.app-category.productivity
         NSMicrophoneUsageDescription: Lectern records your microphone during lectures so they can be transcribed and studied on this Mac.
         NSAudioCaptureUsageDescription: Lectern captures the audio your Mac is playing — Zoom, Meet, or a lecture video — so it can be transcribed and studied on this Mac. No video is stored.
