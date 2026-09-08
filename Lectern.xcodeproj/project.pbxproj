@@ -212,6 +212,7 @@
 		CB51F1710B7BFE7BFED515EE /* SurfacePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363051532AA63A00332E82D7 /* SurfacePreferences.swift */; };
 		CB7D01FE2F70E7CFBD226E87 /* YUTorahMediaResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE0F3353EF151BC046D963A4 /* YUTorahMediaResolver.swift */; };
 		CBE08C8D503A31D46BFC2FA9 /* AntigravityACPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */; };
+		CC7EE018F7D01EE8A9B73587 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = B564AF96344848C71EE09258 /* README.md */; };
 		CC81062C168BF06111E4201E /* LecternBundleOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */; };
 		D157831E158E1241D5E064D9 /* RecordingFileLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DEC6C81E9D90FFBE3C748F /* RecordingFileLedger.swift */; };
 		D24BCCE8824C7C7E71EA3526 /* YUTorahSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE3C5081C885AB547B647B4 /* YUTorahSearchView.swift */; };
@@ -243,6 +244,7 @@
 		EC58924FF09B859FC286942E /* AgentDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07DF18B64B18FC06E4CC2F90 /* AgentDetector.swift */; };
 		EDBE348219FB004D97CA1195 /* RemoteAudioDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F39B466BD1D9EADCD297E23 /* RemoteAudioDownloader.swift */; };
 		EE93387A69A06B5C2A41B40A /* CanvasWorkspaceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FE176891F8FD111C81F219 /* CanvasWorkspaceViews.swift */; };
+		F191B80121AB8567694DC6AD /* tone.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 98C927F4415DF74ED2A9D3B7 /* tone.mp3 */; };
 		FAFA9988CDD3DB96E29A6F7D /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F761716AB6F39B0F119719 /* OnboardingView.swift */; };
 		FC87DA91A3A31762AD9A9EC4 /* LectureChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 405F827FE93E4C441645FA2B /* LectureChatService.swift */; };
 		FD91D9A3281EA0A3E2804653 /* AnkiConnectClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3217A5B8A37DD8207DD0478 /* AnkiConnectClient.swift */; };
@@ -328,6 +330,7 @@
 		8E407430088644634374A45C /* QuizReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizReviewView.swift; sourceTree = "<group>"; };
 		97F761716AB6F39B0F119719 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		9867BCA00FA030004AA4F6F8 /* YUTorahURLResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahURLResolver.swift; sourceTree = "<group>"; };
+		98C927F4415DF74ED2A9D3B7 /* tone.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = tone.mp3; sourceTree = "<group>"; };
 		9B73D14E51C0E213359B9BDF /* CaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureController.swift; sourceTree = "<group>"; };
 		9C260A0B06C75ACB5BBD3905 /* AgentModelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentModelCatalog.swift; sourceTree = "<group>"; };
 		9C6AC1B3F5C73C9B7EF6CD77 /* ReferenceAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceAttachment.swift; sourceTree = "<group>"; };
@@ -341,6 +344,7 @@
 		B1636BFF993825C1A1D7F801 /* LectureImportPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureImportPicker.swift; sourceTree = "<group>"; };
 		B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACPTests.swift; sourceTree = "<group>"; };
 		B3217A5B8A37DD8207DD0478 /* AnkiConnectClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnkiConnectClient.swift; sourceTree = "<group>"; };
+		B564AF96344848C71EE09258 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		B67FCCE28F74E8E6AC84F215 /* LaunchAtLoginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginManager.swift; sourceTree = "<group>"; };
 		BB85EBEEFA4C4DD64A6BA221 /* LiveBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveBookmark.swift; sourceTree = "<group>"; };
 		BBF49011BFA6F50BCA8A7598 /* GoogleDocsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsClient.swift; sourceTree = "<group>"; };
@@ -576,6 +580,7 @@
 				60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */,
 				518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */,
 				EC7DCD05473F0313914D4564 /* YUTorahSubscriptionTests.swift */,
+				70F43C2783FA3C249FCCC19F /* Fixtures */,
 			);
 			path = LecternTests;
 			sourceTree = "<group>";
@@ -602,6 +607,15 @@
 				57C666E0599B31DACFA50FC1 /* LecternTests */,
 			);
 			path = Tests;
+			sourceTree = "<group>";
+		};
+		70F43C2783FA3C249FCCC19F /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				B564AF96344848C71EE09258 /* README.md */,
+				98C927F4415DF74ED2A9D3B7 /* tone.mp3 */,
+			);
+			path = Fixtures;
 			sourceTree = "<group>";
 		};
 		79DF3FC9D9044DFF8596F9CB /* Playback */ = {
@@ -791,6 +805,7 @@
 			buildConfigurationList = 91AD56F8AAC7AD6704F9E8AF /* Build configuration list for PBXNativeTarget "LecternTests" */;
 			buildPhases = (
 				16097EF29F7A14E927C6D6DE /* Sources */,
+				F1C726634285E7F8F381F266 /* Resources */,
 				5558B018E8226C4B47BDA799 /* Frameworks */,
 			);
 			buildRules = (
@@ -850,6 +865,15 @@
 				BAE06F9E7A1E483EB1DC7E6B /* lectern-notes in Resources */,
 				0EA7814AC3CB85466CD5675D /* lectern-transcription in Resources */,
 				945656E2CCCE5BFD98EBA189 /* mermaid.min.js in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F1C726634285E7F8F381F266 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC7EE018F7D01EE8A9B73587 /* README.md in Resources */,
+				F191B80121AB8567694DC6AD /* tone.mp3 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

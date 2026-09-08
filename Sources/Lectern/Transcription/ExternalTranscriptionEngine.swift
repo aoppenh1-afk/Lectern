@@ -183,7 +183,19 @@ private struct AntigravityTranscriptionAdapter: TranscriptionProviderAdapter {
             let modelID = request.connection.modelID.isEmpty
                 ? AntigravityACPClient.transcriptionModelID
                 : request.connection.modelID
-            let prepared = try await prepareAudio(request.audioURL, request.durationSeconds)
+            let prepared: AntigravityAudioPreparer.PreparedAudio
+            do {
+                prepared = try await prepareAudio(request.audioURL, request.durationSeconds)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                let failure = error as NSError
+                throw ExternalTranscriptionError(
+                    code: .unsupportedMedia, retryable: false, fallbackEligible: true,
+                    userMessage: "Lectern couldn't prepare the audio for Antigravity: \(failure.localizedFailureReason ?? failure.localizedDescription)",
+                    safeDiagnostics: "Audio preparation failed before ACP submission; \(failure.domain) (\(failure.code))."
+                )
+            }
             defer { prepared.remove() }
 
             var combinedSegments: [NormalizedTranscriptionSegment] = []
@@ -813,7 +825,30 @@ struct AntigravityAudioPreparer {
         let duration = loadedDuration.isFinite && loadedDuration > 0
             ? loadedDuration
             : requestedDuration
-        let nominalRanges = plannedRanges(fileBytes: fileBytes, durationSeconds: duration)
+        guard duration.isFinite, duration > 0 else {
+            throw AntigravityACPError.unsupportedAttachment(
+                "Lectern couldn't determine this recording's duration for splitting."
+            )
+        }
+        // MP3 and PCM cannot be copied directly into an M4A container. Preserve
+        // AAC/ALAC samples, but encode other codecs using Apple's AAC exporter.
+        let tracks = try await asset.loadTracks(withMediaType: .audio)
+        var canPassthrough = !tracks.isEmpty
+        for track in tracks {
+            let formats = try await track.load(.formatDescriptions)
+            if formats.isEmpty || !formats.allSatisfy({
+                let codec = CMFormatDescriptionGetMediaSubType($0)
+                return codec == kAudioFormatMPEG4AAC || codec == kAudioFormatAppleLossless
+            }) {
+                canPassthrough = false
+            }
+        }
+        let preset = canPassthrough ? AVAssetExportPresetPassthrough : AVAssetExportPresetAppleM4A
+        // A low-bitrate source can grow when encoded as AAC. Budget 384 kbit/s
+        // for conversion, including headroom over the stereo AAC preset, and
+        // still verify every exported file against the native attachment limit.
+        let plannedBytes = canPassthrough ? fileBytes : max(fileBytes, Int64(ceil(duration * 48_000)))
+        let nominalRanges = plannedRanges(fileBytes: plannedBytes, durationSeconds: duration)
         guard nominalRanges.count > 1 else {
             return PreparedAudio(
                 chunks: [.init(url: source, startSeconds: 0, durationSeconds: duration)],
@@ -822,7 +857,7 @@ struct AntigravityAudioPreparer {
         }
         let nominalBoundaries = nominalRanges.dropLast().map(\.coreEndSeconds)
         var refinedBoundaries: [Double] = []
-        let bytesPerSecond = Double(fileBytes) / duration
+        let bytesPerSecond = Double(plannedBytes) / duration
         let maximumCoreDuration = Double(
             Int64(AntigravityACPContent.maximumAudioBytes) - sizeHeadroomBytes
         ) / bytesPerSecond
@@ -851,7 +886,7 @@ struct AntigravityAudioPreparer {
             refinedBoundaries.append(min(upper, max(lower, refined)))
         }
         let ranges = ranges(
-            fileBytes: fileBytes,
+            fileBytes: plannedBytes,
             durationSeconds: duration,
             boundaries: refinedBoundaries
         )
@@ -869,7 +904,7 @@ struct AntigravityAudioPreparer {
                 let output = directory.appendingPathComponent("part-\(index + 1).m4a")
                 guard let exporter = AVAssetExportSession(
                     asset: asset,
-                    presetName: AVAssetExportPresetPassthrough
+                    presetName: preset
                 ) else {
                     throw AntigravityACPError.unsupportedAttachment(
                         "Lectern couldn't prepare this recording for Antigravity."

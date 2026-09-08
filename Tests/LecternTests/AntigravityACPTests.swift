@@ -102,6 +102,81 @@ final class AntigravityACPTests: XCTestCase {
         )
     }
 
+    // Repeat low-bitrate MP3 frames to exercise YUTorah-sized input and AAC expansion.
+    func testLargeMP3IsConvertedToPlayableBoundedChunks() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Lectern-MP3-Test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/tone.mp3")
+        let frames = try Data(contentsOf: fixture)
+        var recording = Data()
+        while recording.count <= AntigravityAudioPreparer.targetBytes {
+            recording.append(frames)
+        }
+        let source = directory.appendingPathComponent("subscription.MP3")
+        try recording.write(to: source)
+        let sourceDuration = try await AVURLAsset(url: source).load(.duration).seconds
+
+        let prepared = try await AntigravityAudioPreparer.prepare(source, durationSeconds: 0)
+        defer { prepared.remove() }
+        XCTAssertGreaterThan(prepared.chunks.count, 1)
+        XCTAssertEqual(prepared.chunks.first?.coreStartSeconds, 0)
+        XCTAssertEqual(prepared.chunks.last?.coreEndSeconds ?? 0, sourceDuration, accuracy: 0.1)
+        for chunk in prepared.chunks {
+            let size = try chunk.url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            XCTAssertGreaterThan(size, 0)
+            XCTAssertLessThanOrEqual(size, AntigravityACPContent.maximumAudioBytes)
+            let asset = AVURLAsset(url: chunk.url)
+            let duration = try await asset.load(.duration).seconds
+            XCTAssertEqual(duration, chunk.durationSeconds, accuracy: 0.2)
+            let tracks = try await asset.loadTracks(withMediaType: .audio)
+            let track = try XCTUnwrap(tracks.first)
+            let formats = try await track.load(.formatDescriptions)
+            XCTAssertEqual(CMFormatDescriptionGetMediaSubType(try XCTUnwrap(formats.first)), kAudioFormatMPEG4AAC)
+        }
+        let chunkURLs = prepared.chunks.map(\.url)
+        prepared.remove()
+        XCTAssertTrue(chunkURLs.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
+        XCTAssertEqual(try Data(contentsOf: source), recording)
+    }
+
+    func testAudioPreparationFailureIdentifiesLocalStageBeforeACPSubmission() async throws {
+        let source = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Lectern-Preparation-Test-\(UUID().uuidString).mp3")
+        try Data("fixture".utf8).write(to: source)
+        defer { try? FileManager.default.removeItem(at: source) }
+        let client = AntigravityACPClient(connectionFactory: {
+            XCTFail("Audio preparation must finish before connecting to ACP")
+            throw CancellationError()
+        })
+        let engine = ExternalTranscriptionEngine(
+            antigravity: client,
+            antigravityAudioPreparation: { _, _ in
+                throw NSError(domain: AVFoundationErrorDomain, code: -11838, userInfo: [
+                    NSLocalizedDescriptionKey: "Operation Stopped",
+                    NSLocalizedFailureReasonErrorKey: "The operation is not supported for this media.",
+                ])
+            }
+        )
+        do {
+            _ = try await engine.transcribe(.init(
+                audioURL: source, durationSeconds: 30, lectureLanguage: .hebrewEnglish,
+                connection: .builtInAntigravity(), attemptNumber: 1
+            )) { _ in }
+            XCTFail("Expected a preparation error")
+        } catch let error as ExternalTranscriptionError {
+            XCTAssertEqual(error.code, .unsupportedMedia)
+            XCTAssertTrue(error.fallbackEligible)
+            XCTAssertFalse(error.retryable)
+            XCTAssertTrue(error.userMessage.contains("couldn't prepare the audio"))
+            XCTAssertTrue(error.userMessage.contains("not supported for this media"))
+            XCTAssertEqual(error.safeDiagnostics,
+                "Audio preparation failed before ACP submission; AVFoundationErrorDomain (-11838).")
+        }
+    }
+
     func testQuietBoundarySelectionPrefersNearbySilence() {
         let points = stride(from: 85.0, through: 115.0, by: 0.25).map { time in
             AntigravityAudioPreparer.EnergyPoint(
