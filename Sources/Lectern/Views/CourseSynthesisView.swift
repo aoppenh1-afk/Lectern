@@ -821,6 +821,7 @@ private struct CourseSynthesisComposer: View {
     let hasSelectedSources: Bool
     let onSend: (String, ChatStudyRequest?) -> Void
     @State private var creationKind: ChatStudyKind?
+    @State private var goalPickerOpen = false
     @State private var itemCount = 10
     @State private var difficulty = "Standard"
     @State private var quizFormat = "Mixed"
@@ -834,22 +835,18 @@ private struct CourseSynthesisComposer: View {
         thinkingLevels.isEmpty ? modelLabel : ComposerShortModelLabel(modelLabel)
     }
 
+    private var goalTitle: String {
+        creationKind.map { "Create \($0.title.lowercased())" } ?? "Ask"
+    }
+
     private var questionIsEmpty: Bool {
         question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Picker("Mode", selection: $creationKind) {
-                    Text("Ask").tag(Optional<ChatStudyKind>.none)
-                    ForEach(ChatStudyKind.allCases) { kind in
-                        Text("Create \(kind.title.lowercased())").tag(Optional(kind))
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 180)
-                if let creationKind {
+            if let creationKind {
+                HStack(spacing: 12) {
                     if creationKind == .quiz || creationKind == .flashcards {
                         Picker("Count", selection: $itemCount) {
                             ForEach([5, 10, 15, 20, 30], id: \.self) { Text("\($0) items").tag($0) }
@@ -863,11 +860,11 @@ private struct CourseSynthesisComposer: View {
                             ForEach(["Mixed", "Multiple choice", "Short answer"], id: \.self) { Text($0) }
                         }.labelsHidden().frame(width: 135)
                     }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+                .padding(.horizontal, 14).padding(.top, 12)
+                .disabled(synthesis.isResponding)
             }
-            .padding(.horizontal, 14).padding(.top, 12)
-            .disabled(synthesis.isResponding)
             if creationKind != nil && !hasSelectedSources {
                 Text("No sources selected. Enter a topic to create material from your prompt and conversation.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -924,6 +921,21 @@ private struct CourseSynthesisComposer: View {
                     }
                 }
 
+                ComposerDivider()
+
+                ComposerMenuButton {
+                    goalPickerOpen.toggle()
+                } content: {
+                    Text(goalTitle)
+                }
+                .disabled(synthesis.isResponding)
+                .popover(isPresented: $goalPickerOpen, arrowEdge: .bottom) {
+                    CourseGoalPicker(
+                        selection: $creationKind,
+                        isPresented: $goalPickerOpen
+                    )
+                }
+
                 Spacer()
 
                 if !synthesis.turns.isEmpty {
@@ -956,6 +968,59 @@ private struct CourseSynthesisComposer: View {
         let request = creationKind.map { ChatStudyRequest(kind: $0, count: itemCount, difficulty: difficulty, quizFormat: quizFormat, usesTopicOnly: !hasSelectedSources) }
         onSend(trimmed.isEmpty ? "Create \(creationKind?.title.lowercased() ?? "study materials") from the selected sources." : trimmed, request)
         if synthesis.isResponding { question = "" }
+    }
+}
+
+private struct CourseGoalPicker: View {
+    @Binding var selection: ChatStudyKind?
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Goal")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 3)
+
+            goalRow(title: "Ask", isSelected: selection == nil) {
+                selection = nil
+                isPresented = false
+            }
+            ForEach(ChatStudyKind.allCases) { kind in
+                goalRow(title: "Create \(kind.title.lowercased())", isSelected: selection == kind) {
+                    selection = kind
+                    isPresented = false
+                }
+            }
+        }
+        .padding(6)
+        .frame(width: 210)
+        .background(LecternTheme.paper)
+    }
+
+    private func goalRow(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Text(title)
+                    .font(.system(size: 13))
+                Spacer(minLength: 16)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+            }
+            .foregroundStyle(LecternTheme.ink)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(isSelected ? Color.primary.opacity(0.07) : .clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

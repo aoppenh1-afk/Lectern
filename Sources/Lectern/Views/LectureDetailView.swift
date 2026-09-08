@@ -171,9 +171,9 @@ struct LectureDetailView: View {
                         .controlSize(.small)
                         .tint(LecternTheme.processingTint)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(lecture.statusMessage ?? "Transcribing on-device")
+                        Text(liveStatusMessage)
                             .font(.system(size: 13, weight: .medium))
-                        Text(transcribingSubtitle)
+                        Text(liveTranscribingSubtitle)
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -198,6 +198,27 @@ struct LectureDetailView: View {
         case .recording, .ready:
             EmptyView()
         }
+    }
+
+    /// Title for the transcribing hero. Prefers the service's live state so a
+    /// fallback hop repaints immediately; falls back to the persisted message.
+    private var liveStatusMessage: String {
+        if transcription.activeID == lecture.persistentModelID,
+           let live = transcription.activeStatusMessage, !live.isEmpty {
+            return live
+        }
+        return lecture.statusMessage ?? "Transcribing on-device"
+    }
+
+    /// Subtitle for the transcribing hero. The plan-derived subtitle is static
+    /// for local plans, so prefer the service's live subtitle which tracks the
+    /// actual running attempt (e.g. Antigravity vs on-device fallback).
+    private var liveTranscribingSubtitle: String {
+        if transcription.activeID == lecture.persistentModelID,
+           let live = transcription.activeSubtitle, !live.isEmpty {
+            return live
+        }
+        return transcribingSubtitle
     }
 
     private var transcribingSubtitle: String {

@@ -10,6 +10,12 @@ final class TranscriptionService {
     private(set) var isRunning = false
     private(set) var activeLectureTitle: String?
     private(set) var lastError: String?
+    /// Live hero state for the active lecture. Mirrors the persisted
+    /// `Lecture.statusMessage`/subtitle writes so the transcribing hero
+    /// repaints on every fallback hop instead of only after the job ends.
+    private(set) var activeID: PersistentIdentifier?
+    private(set) var activeStatusMessage: String?
+    private(set) var activeSubtitle: String?
 
     private let modelContainer: ModelContainer
     private let preferences: TranscriptionPreferences
@@ -19,7 +25,6 @@ final class TranscriptionService {
     private let externalEngine: ExternalTranscriptionEngine
     private let jobStore = TranscriptionJobStore()
     private var pendingIDs: [PersistentIdentifier] = []
-    private var activeID: PersistentIdentifier?
     private var activeTask: Task<Void, Never>?
 
     init(
@@ -57,6 +62,33 @@ final class TranscriptionService {
     func cancelAll() {
         pendingIDs.removeAll()
         activeTask?.cancel()
+    }
+
+    /// Mirror a persisted status write into live `@Observable` state so the
+    /// transcribing hero repaints immediately for the active lecture, even
+    /// when SwiftData observation alone would only surface after the job.
+    private func publishLiveStatus(message: String?, subtitle: String?, for lecture: Lecture) {
+        lecture.statusMessage = message
+        if activeID == lecture.persistentModelID {
+            activeStatusMessage = message
+            if let subtitle { activeSubtitle = subtitle }
+        }
+        try? modelContainer.mainContext.save()
+    }
+
+    /// Mirror a message-only update (e.g. progress percent) without touching
+    /// the live subtitle, which already names the running model/connection.
+    private func publishLiveMessage(_ message: String, for lecture: Lecture) {
+        lecture.statusMessage = message
+        if activeID == lecture.persistentModelID {
+            activeStatusMessage = message
+        }
+        try? modelContainer.mainContext.save()
+    }
+
+    private func clearLiveStatus() {
+        activeStatusMessage = nil
+        activeSubtitle = nil
     }
 
     /// Scan the store for lectures that need transcription and enqueue them.
@@ -154,6 +186,7 @@ final class TranscriptionService {
         isRunning = false
         activeID = nil
         activeLectureTitle = nil
+        clearLiveStatus()
         activeTask = nil
         drainQueue()
     }
@@ -171,6 +204,7 @@ final class TranscriptionService {
 
         activeLectureTitle = lecture.title
         lastError = nil
+        clearLiveStatus()
 
         let language = lecture.language
         let plan = TranscriptionJobPlan.resolve(
@@ -218,18 +252,32 @@ final class TranscriptionService {
                     ? lecture.transcriptModelID
                     : preferences.builtInModelID
             )
-            lecture.statusMessage = "Preparing Antigravity transcription"
+            publishLiveStatus(
+                message: "Preparing Antigravity transcription",
+                subtitle: TranscriptionJobPlan.local(.antigravity).progressSubtitle(),
+                for: lecture
+            )
         case .local(let model):
             lecture.transcriptProviderRaw = TranscriptionProviderID.local.rawValue
             lecture.transcriptConnectionName = "On this Mac"
             lecture.transcriptModelID = model.modelInfo
-            lecture.statusMessage = "Preparing on-device transcription"
+            publishLiveStatus(
+                message: "Preparing on-device transcription",
+                subtitle: TranscriptionJobPlan.local(model).progressSubtitle(),
+                for: lecture
+            )
         case .external:
-            lecture.statusMessage = "Preparing secure API transcription"
+            publishLiveStatus(
+                message: "Preparing secure API transcription",
+                subtitle: TranscriptionJobPlan.external.progressSubtitle(
+                    connectionName: lecture.transcriptConnectionName
+                ),
+                for: lecture
+            )
         case .askEachTime:
             break
         }
-        try? context.save()
+        await Task.yield()
 
         let checkpoint = TranscriptionCheckpointState()
         let persistProgress: @MainActor @Sendable ([TranscriptSegment], Double) -> Void = { partialSegments, fraction in
@@ -241,10 +289,12 @@ final class TranscriptionService {
             artifact.content = Self.markdown(from: partialSegments)
             artifact.generatedAt = Date()
             let percent = Int((fraction * 100).rounded())
-            lecture.statusMessage = language == .hebrewEnglish
-                ? "Transcribing (English + Hebrew): \(percent)%"
-                : "Transcribing on device: \(percent)%"
-            try? context.save()
+            self.publishLiveMessage(
+                language == .hebrewEnglish
+                    ? "Transcribing (English + Hebrew): \(percent)%"
+                    : "Transcribing on device: \(percent)%",
+                for: lecture
+            )
         }
 
         do {
@@ -383,14 +433,13 @@ final class TranscriptionService {
             artifact.generatedAt = Date()
             lecture.status = .ready
             lecture.statusMessage = nil
+            clearLiveStatus()
             try? context.save()
             completionNotifier.deliver(.transcriptionFinished(lectureTitle: lecture.title))
         } catch is CancellationError {
-            lecture.statusMessage = "Transcription paused"
-            try? context.save()
+            publishLiveMessage("Transcription paused", for: lecture)
         } catch let error as ExternalTranscriptionError where error.code == .cancelled {
-            lecture.statusMessage = "Transcription paused"
-            try? context.save()
+            publishLiveMessage("Transcription paused", for: lecture)
         } catch {
             lecture.status = .failed
             lecture.statusMessage = error.localizedDescription
@@ -415,8 +464,12 @@ final class TranscriptionService {
         guard !candidates.isEmpty else { return nil }
         var failures: [String] = []
         for model in candidates {
-            lecture.statusMessage = "Trying on-device \(model.title)…"
-            try? modelContainer.mainContext.save()
+            publishLiveStatus(
+                message: "Trying on-device \(model.title)…",
+                subtitle: TranscriptionJobPlan.local(model).progressSubtitle(),
+                for: lecture
+            )
+            await Task.yield()
             do {
                 let segments = try await transcribeLocally(
                     recordingPath: recordingPath,
@@ -482,12 +535,15 @@ final class TranscriptionService {
                 throw WhisperTranscriptionEngine.cliMissing
             }
             if !whisperEngine.isModelCached {
-                lecture.statusMessage = "Downloading Hebrew-capable Whisper model (~1.1 GB)…"
-                try? modelContainer.mainContext.save()
+                publishLiveStatus(
+                    message: "Downloading Hebrew-capable Whisper model (~1.1 GB)…",
+                    subtitle: TranscriptionJobPlan.local(.whisper).progressSubtitle(),
+                    for: lecture
+                )
                 try await whisperEngine.downloadModel { fraction in
                     guard lecture.status == .transcribing else { return }
                     let percent = Int((fraction * 100).rounded())
-                    lecture.statusMessage = "Downloading Whisper model: \(percent)%"
+                    self.publishLiveMessage("Downloading Whisper model: \(percent)%", for: lecture)
                 }
             }
             return try await whisperEngine.transcribe(
@@ -579,8 +635,20 @@ final class TranscriptionService {
             lecture.transcriptProviderRaw = connection.provider.rawValue
             lecture.transcriptConnectionName = connection.runningDisplayName
             lecture.transcriptModelID = connection.modelID
-            lecture.statusMessage = "Transcribing with \(connection.runningDisplayName)"
-            try? modelContainer.mainContext.save()
+            let attemptSubtitle: String
+            if connection.provider == .antigravityCLI {
+                attemptSubtitle = TranscriptionJobPlan.local(.antigravity).progressSubtitle()
+            } else {
+                attemptSubtitle = TranscriptionJobPlan.external.progressSubtitle(
+                    connectionName: connection.runningDisplayName
+                )
+            }
+            publishLiveStatus(
+                message: "Transcribing with \(connection.runningDisplayName)",
+                subtitle: attemptSubtitle,
+                for: lecture
+            )
+            await Task.yield()
 
             let resumeID = job.attempts[index].providerJobID
             let request = ExternalTranscriptionRequest(

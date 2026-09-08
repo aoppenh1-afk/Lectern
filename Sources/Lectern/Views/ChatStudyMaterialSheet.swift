@@ -17,6 +17,20 @@ struct ChatStudyMaterialSheet: View {
         lectures.filter { $0.course == course && $0.status == .ready }
     }
 
+    private var saveOptions: [StudioDropdownOption<PersistentIdentifier?>] {
+        [StudioDropdownOption(
+            value: Optional<PersistentIdentifier>.none,
+            title: "New lecture in \(course.name)",
+            subtitle: "Creates a new lecture"
+        )] + destinations.map { lecture in
+            StudioDropdownOption(
+                value: Optional(lecture.persistentModelID),
+                title: lecture.title,
+                subtitle: lecture.capturedAt.formatted(date: .abbreviated, time: .shortened)
+            )
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -26,13 +40,14 @@ struct ChatStudyMaterialSheet: View {
             }
             TextField("Material title", text: $material.title).textFieldStyle(.roundedBorder)
             HStack {
-                Picker("Save to", selection: $destinationID) {
-                    Text("New lecture in \(course.name)").tag(Optional<PersistentIdentifier>.none)
-                    ForEach(destinations) { lecture in
-                        Text(lecture.title).tag(Optional(lecture.persistentModelID))
-                    }
-                }
-                .frame(maxWidth: .infinity)
+                StudioDropdown(
+                    title: "Save to",
+                    selection: $destinationID,
+                    options: saveOptions,
+                    width: 380,
+                    icon: "tray.and.arrow.down"
+                )
+                Spacer(minLength: 12)
                 Toggle("Edit draft", isOn: $editing).toggleStyle(.switch)
             }
             if destinationID == nil {
