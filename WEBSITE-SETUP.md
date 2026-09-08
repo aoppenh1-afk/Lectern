@@ -7,22 +7,18 @@ The site is not live until you publish it.
 
 ## Use the existing Lectern repository
 
-1. Commit and push `website/` and `.github/workflows/website.yml` to the `main`
-   branch of `aoppenh1-afk/Lectern`. Include this guide if useful. Keep the OAuth
-   JSON, `.build/`, `dist/`, and local build logs out of GitHub.
-2. In GitHub, open the repository's **Settings → Pages**.
-3. Under **Build and deployment → Source**, choose **GitHub Actions**.
-4. Open **Actions → Publish Lectern website → Run workflow**, select `main`, and run.
-5. Wait for deployment to succeed. Open the URL shown by the deployment.
-   For this repository, the expected default URL is
+1. Commit and push the root `index.html`, `privacy.html`, `terms.html`,
+   `style.css`, `icon.png`, and `.nojekyll` files to `main`.
+2. In GitHub, open **Settings → Pages** and choose **Deploy from a branch →
+   main → /(root)**. This is the current live configuration.
+3. Wait for the Pages deployment to succeed, then open
    `https://aoppenh1-afk.github.io/Lectern/`.
-6. Open Privacy and Terms from the homepage and confirm all pages are public
-   without signing in. Review the policy, including the published support address
-   `senderopp@gmail.com`, before using it for your public OAuth registration.
+4. Confirm Privacy and Terms work without signing in.
 
-The workflow publishes only `website/`, so existing internal `docs/` files and the
-application source are not part of the website. Publication is manual. After site
-changes, run the workflow again.
+GitHub redeploys when changes are pushed. No custom Actions workflow is needed.
+The `website/` directory is a portable copy used for the downloadable zip; keep
+it synchronized with the root website files when editing the site. Never upload
+the OAuth JSON, `.build/`, `dist/`, or local build logs.
 
 ## Or upload the zip to a separate website repository
 
