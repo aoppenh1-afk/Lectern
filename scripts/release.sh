@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cuts a release: bumps the version, builds, zips, tags, pushes, and publishes
+# Cuts a release: bumps the version, builds ZIP and DMG packages, tags, pushes, and publishes
 # a GitHub release that the in-app updater can find.
 #
 #   scripts/release.sh 1.2.0 [--notes "What changed"]
@@ -61,6 +61,9 @@ rm -f "$ZIP" "$ZIP.sha256"
 ditto -c -k --keepParent dist/Lectern.app "$ZIP"
 shasum -a 256 "$ZIP" | sed -E "s#dist/##" > "$ZIP.sha256"
 
+DMG="dist/Lectern-$VERSION.dmg"
+"$ROOT/scripts/package-dmg.sh" "$ROOT/dist/Lectern.app" "$ROOT/$DMG"
+
 git add project.yml Lectern.xcodeproj/project.pbxproj Support/Info.plist
 git commit -m "Release $VERSION"
 git tag -a "v$VERSION" -m "Lectern $VERSION"
@@ -70,7 +73,7 @@ git push origin "v$VERSION"
 if [[ -z "$NOTES" ]]; then
   NOTES="Lectern $VERSION"
 fi
-gh release create "v$VERSION" "$ZIP" "$ZIP.sha256" \
+gh release create "v$VERSION" "$ZIP" "$ZIP.sha256" "$DMG" "$DMG.sha256" \
   --repo "$REPO" \
   --title "Lectern $VERSION" \
   --notes "$NOTES"

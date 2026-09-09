@@ -13,8 +13,8 @@ Lectern launches [Google's official Antigravity ACP agent](https://github.com/ag
 
 ## Install from a release
 
-1. Open the [latest release](https://github.com/aoppenh1-afk/Lectern/releases/latest) and download `Lectern-<version>.zip`.
-2. Unzip it and drag `Lectern.app` into **Applications**.
+1. Follow the [illustrated installation guide](install.html), or download `Lectern-<version>.dmg` from the [latest release](https://github.com/aoppenh1-afk/Lectern/releases/latest).
+2. Open the DMG and drag Lectern onto the **Applications** folder in the installer window. Wait for copying to finish, then eject the installer. ZIP downloads are also available: unzip and drag `Lectern.app` into Applications.
 3. Clear the download quarantine so macOS will open the ad-hoc signed build:
 
 ```bash
@@ -163,3 +163,7 @@ Google’s quotas. Google currently plans charges for exceeding those quotas lat
 in 2026, so this is not a promise of unlimited free use. See [Docs scopes](https://developers.google.com/workspace/docs/api/auth),
 [usage limits](https://developers.google.com/workspace/docs/api/limits), and
 [brand verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/brand-verification).
+
+### DMG packaging
+
+Releases publish a drag-to-Applications DMG for new installs and keep the ZIP plus checksum for in-app updates. `scripts/package-dmg.sh /path/to/Lectern.app /path/to/Lectern-version.dmg` packages an existing signed app without rebuilding it. It requires macOS and Python 3 with venv support, and installs the pinned packaging dependencies from `scripts/dmg-requirements.txt` into the ignored `dist/.dmg-tools` environment.
