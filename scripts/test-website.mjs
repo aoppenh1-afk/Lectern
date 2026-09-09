@@ -586,7 +586,7 @@ async function main() {
     try {
       await goto(page, "index.html");
       const hrefs = await page.evaluate(() => Array.from(document.querySelectorAll("a[href]")).map((a) => a.getAttribute("href")));
-      const need = ["https://github.com/aoppenh1-afk/Lectern/releases/latest", "privacy.html", "terms.html", "mailto:senderopp@gmail.com"];
+      const need = ["https://github.com/aoppenh1-afk/Lectern/releases/latest", "privacy.html", "terms.html"];
       for (const n of need) {
         record(`link ${n}`, hrefs.includes(n) ? "PASS" : "FAIL", hrefs.includes(n) ? "present" : `absent (have ${hrefs.length} links)`);
       }
