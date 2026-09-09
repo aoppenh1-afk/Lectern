@@ -1,0 +1,61 @@
+name: macOS CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: macos-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Show macOS / Xcode / SDK
+        run: |
+          set -euo pipefail
+          sw_vers
+          xcode-select -p
+          xcodebuild -version
+          xcrun --show-sdk-version
+          xcrun --sdk macosx --show-sdk-path
+          echo "Available Xcode apps:"
+          ls /Applications | grep -i Xcode || true
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build Lectern
+        run: |
+          set -euo pipefail
+          # CI uses unsigned Debug builds; release signing in scripts/build-app.sh is maintainer-only.
+          xcodebuild \
+            -scheme Lectern \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath .build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=- \
+            build
+
+      - name: Test Lectern
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -scheme Lectern \
+            -destination 'platform=macOS' \
+            -derivedDataPath .build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=- \
+            test
