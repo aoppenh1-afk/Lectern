@@ -13,25 +13,22 @@ concurrency:
 jobs:
   build-and-test:
     name: Build & Test
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Select newest available Xcode
+      - name: Show macOS / Xcode / SDK
         run: |
           set -euo pipefail
+          sw_vers
+          xcode-select -p
+          xcodebuild -version
+          xcrun --show-sdk-version
+          xcrun --sdk macosx --show-sdk-path
           echo "Available Xcode apps:"
           ls /Applications | grep -i Xcode || true
-          # Prefer Xcode 26 if present; otherwise use the active/default toolchain.
-          if [[ -d "/Applications/Xcode_26.app" ]]; then
-            sudo xcode-select -s /Applications/Xcode_26.app
-          elif [[ -d "/Applications/Xcode-26.0.app" ]]; then
-            sudo xcode-select -s /Applications/Xcode-26.0.app
-          fi
-          xcodebuild -version
-          sw_vers
 
       - name: Install XcodeGen
         run: brew install xcodegen
