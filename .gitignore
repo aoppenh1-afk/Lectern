@@ -23,3 +23,7 @@ plan.md
 *.key
 *.cer
 *.crt
+
+# Generated Vercel website output and local project settings
+.vercel-site/
+.vercel/
