@@ -831,7 +831,10 @@ private struct CourseSynthesisComposer: View {
     let onSend: (String, ChatStudyRequest?) -> Void
     @State private var creationKind: ChatStudyKind?
     @State private var goalPickerOpen = false
-    @State private var itemCount = 10
+    @State private var countPickerOpen = false
+    @State private var difficultyPickerOpen = false
+    @State private var formatPickerOpen = false
+    @State private var itemCount: Int? = 10
     @State private var difficulty = "Standard"
     @State private var quizFormat = "Mixed"
     @State private var confirmingClear = false
@@ -848,6 +851,10 @@ private struct CourseSynthesisComposer: View {
         creationKind.map { "Create \($0.title.lowercased())" } ?? "Ask"
     }
 
+    private var countTitle: String {
+        itemCount.map { "\($0) items" } ?? "Auto"
+    }
+
     private var questionIsEmpty: Bool {
         question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -855,23 +862,55 @@ private struct CourseSynthesisComposer: View {
     var body: some View {
         VStack(spacing: 0) {
             if let creationKind {
-                HStack(spacing: 12) {
+                HStack(spacing: 6) {
                     if creationKind == .quiz || creationKind == .flashcards {
-                        Picker("Count", selection: $itemCount) {
-                            ForEach([5, 10, 15, 20, 30], id: \.self) { Text("\($0) items").tag($0) }
-                        }.labelsHidden().frame(width: 100)
+                        ComposerMenuButton {
+                            countPickerOpen.toggle()
+                        } content: {
+                            Text(countTitle)
+                        }
+                        .popover(isPresented: $countPickerOpen, arrowEdge: .bottom) {
+                            CourseCountPicker(
+                                selection: $itemCount,
+                                isPresented: $countPickerOpen
+                            )
+                        }
+
+                        ComposerDivider()
                     }
-                    Picker("Difficulty", selection: $difficulty) {
-                        ForEach(["Introductory", "Standard", "Advanced"], id: \.self) { Text($0) }
-                    }.labelsHidden().frame(width: 125)
+                    ComposerMenuButton {
+                        difficultyPickerOpen.toggle()
+                    } content: {
+                        Text(difficulty)
+                    }
+                    .popover(isPresented: $difficultyPickerOpen, arrowEdge: .bottom) {
+                        CourseOptionPicker(
+                            title: "Difficulty",
+                            options: ["Introductory", "Standard", "Advanced"],
+                            selection: $difficulty,
+                            isPresented: $difficultyPickerOpen
+                        )
+                    }
                     if creationKind == .quiz {
-                        Picker("Question format", selection: $quizFormat) {
-                            ForEach(["Mixed", "Multiple choice", "Short answer"], id: \.self) { Text($0) }
-                        }.labelsHidden().frame(width: 135)
+                        ComposerDivider()
+
+                        ComposerMenuButton {
+                            formatPickerOpen.toggle()
+                        } content: {
+                            Text(quizFormat)
+                        }
+                        .popover(isPresented: $formatPickerOpen, arrowEdge: .bottom) {
+                            CourseOptionPicker(
+                                title: "Question format",
+                                options: ["Mixed", "Multiple choice", "Short answer"],
+                                selection: $quizFormat,
+                                isPresented: $formatPickerOpen
+                            )
+                        }
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 14).padding(.top, 12)
+                .padding(.horizontal, 12).padding(.top, 12)
                 .disabled(synthesis.isResponding)
             }
             if creationKind != nil && !hasSelectedSources {
@@ -1030,6 +1069,113 @@ private struct CourseGoalPicker: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct CourseCountPicker: View {
+    @Binding var selection: Int?
+    @Binding var isPresented: Bool
+
+    private let fixedCounts = [5, 10, 15, 20, 30]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Amount")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 3)
+
+            optionRow(title: "Auto", subtitle: "AI decides", isSelected: selection == nil) {
+                selection = nil
+                isPresented = false
+            }
+            ForEach(fixedCounts, id: \.self) { count in
+                optionRow(title: "\(count) items", subtitle: nil, isSelected: selection == count) {
+                    selection = count
+                    isPresented = false
+                }
+            }
+        }
+        .padding(6)
+        .frame(width: 210)
+        .background(LecternTheme.paper)
+    }
+
+    private func optionRow(title: String, subtitle: String?, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Text(title)
+                    .font(.system(size: 13))
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 16)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+            }
+            .foregroundStyle(LecternTheme.ink)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(isSelected ? Color.primary.opacity(0.07) : .clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct CourseOptionPicker: View {
+    let title: String
+    let options: [String]
+    @Binding var selection: String
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 3)
+
+            ForEach(options, id: \.self) { option in
+                Button {
+                    selection = option
+                    isPresented = false
+                } label: {
+                    HStack(spacing: 7) {
+                        Text(option)
+                            .font(.system(size: 13))
+                        Spacer(minLength: 16)
+                        if selection == option {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                    }
+                    .foregroundStyle(LecternTheme.ink)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(selection == option ? Color.primary.opacity(0.07) : .clear)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .frame(width: 210)
+        .background(LecternTheme.paper)
     }
 }
 
