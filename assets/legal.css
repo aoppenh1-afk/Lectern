@@ -1,0 +1,297 @@
+/* Lectern legal pages: privacy.html and terms.html only.
+   Self-sufficient. Does not depend on old root style.css classes.
+   Palette: warm paper #FAF9F7, ink #293029, moss #1A5336, sage #E1ECE0. */
+
+.legal-page {
+  --legal-paper: #FAF9F7;
+  --legal-ink: #293029;
+  --legal-muted: #4E594E;
+  --legal-moss: #1A5336;
+  --legal-moss-dark: #0F3A24;
+  --legal-sage: #E1ECE0;
+  --legal-callout: #EAEFE2;
+  --legal-line: #DED7C6;
+  --legal-card: #FFFFFF;
+  --legal-focus: #1A5336;
+  background: var(--legal-paper);
+  color: var(--legal-ink);
+}
+
+/* Skip link */
+.legal-page .skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -6rem;
+  z-index: 50;
+  background: var(--legal-moss);
+  color: #fff;
+  padding: 0.65rem 1rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+.legal-page .skip-link:focus {
+  top: 0.75rem;
+  color: #fff;
+}
+
+/* Page frame. The global style.css owns .site-header, .site-header-inner,
+   .site-container, .site-footer, and .site-footer-inner.
+   Legal CSS only refines legal content, never the shared wrapper. */
+.legal-page .site-header-inner {
+  gap: 8px 20px;
+}
+
+/* Editorial hero */
+.legal-page .legal-main {
+  display: block;
+  padding-bottom: 3rem;
+}
+.legal-page .legal-hero {
+  max-width: 44rem;
+  padding: 2.75rem 0 1.5rem;
+}
+.legal-page .legal-eyebrow {
+  margin: 0 0 0.9rem;
+  color: var(--legal-moss);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.legal-page .legal-title {
+  margin: 0 0 0.75rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  font-size: clamp(2.25rem, 5vw, 3.25rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.legal-page .legal-meta {
+  margin: 0 0 1rem;
+  color: var(--legal-muted);
+  font-size: 0.92rem;
+}
+.legal-page .legal-lede {
+  margin: 0;
+  color: var(--legal-muted);
+  font-size: 1.12rem;
+  line-height: 1.65;
+  max-width: 38rem;
+}
+.legal-page .legal-hero-rule {
+  margin-top: 1.75rem;
+  border: 0;
+  border-top: 2px solid var(--legal-moss);
+  width: 4.5rem;
+}
+
+/* Two-column reading layout: contents plus article */
+.legal-page .legal-layout {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 2.5rem;
+  align-items: start;
+  padding-top: 0.5rem;
+}
+.legal-page .legal-toc {
+  position: sticky;
+  top: 1rem;
+  background: var(--legal-card);
+  border: 1px solid var(--legal-line);
+  border-top: 4px solid var(--legal-moss);
+  border-radius: 0.75rem;
+  padding: 1.1rem 1.15rem 1.25rem;
+  font-size: 0.92rem;
+}
+.legal-page .legal-toc-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--legal-moss);
+}
+.legal-page .legal-toc ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: legal-toc;
+}
+.legal-page .legal-toc li {
+  counter-increment: legal-toc;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.32rem 0;
+  line-height: 1.45;
+}
+.legal-page .legal-toc li::before {
+  content: counter(legal-toc, decimal-leading-zero);
+  flex: none;
+  width: 1.75rem;
+  color: var(--legal-moss);
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding-top: 0.2rem;
+  font-variant-numeric: tabular-nums;
+}
+.legal-page .legal-toc a {
+  color: var(--legal-ink);
+  text-decoration: none;
+}
+.legal-page .legal-toc a:hover {
+  color: var(--legal-moss-dark);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Narrow reading measure */
+.legal-page .legal-article {
+  max-width: 42rem;
+  min-width: 0;
+  font-size: 1.02rem;
+  line-height: 1.75;
+}
+.legal-page .legal-article p {
+  margin: 0 0 1.15rem;
+}
+.legal-page .legal-callout {
+  margin: 1.5rem 0 2rem;
+  padding: 1rem 1.25rem;
+  background: var(--legal-callout);
+  border-left: 4px solid var(--legal-moss);
+  border-radius: 0 0.6rem 0.6rem 0;
+  color: var(--legal-ink);
+  line-height: 1.65;
+}
+.legal-page .legal-section {
+  padding: 1.75rem 0 0.5rem;
+  border-top: 1px solid var(--legal-line);
+  margin-top: 1.75rem;
+  scroll-margin-top: 1rem;
+}
+.legal-page .legal-section:first-of-type {
+  margin-top: 0.5rem;
+}
+.legal-page .legal-section h2 {
+  margin: 0 0 0.9rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  font-size: 1.55rem;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  scroll-margin-top: 1rem;
+}
+.legal-page .legal-article a {
+  color: var(--legal-moss);
+  text-underline-offset: 3px;
+}
+.legal-page .legal-article a:hover {
+  color: var(--legal-moss-dark);
+  text-decoration-thickness: 2px;
+}
+.legal-page .legal-article code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  background: #F1EEE3;
+  border: 1px solid var(--legal-line);
+  border-radius: 0.35rem;
+  padding: 0.08em 0.35em;
+  overflow-wrap: anywhere;
+}
+
+/* Aside and return navigation */
+.legal-page .legal-aside {
+  margin: 2.25rem 0 0;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--legal-line);
+  border-radius: 0.75rem;
+  background: var(--legal-card);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.legal-page .legal-aside strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+.legal-page .legal-aside a {
+  color: var(--legal-moss);
+  text-underline-offset: 3px;
+}
+.legal-page .legal-back {
+  margin: 2rem 0 0;
+  font-size: 0.95rem;
+}
+.legal-page .legal-back a {
+  color: var(--legal-moss);
+  text-underline-offset: 3px;
+}
+
+/* Footer chrome stays global. Legal pages keep the shared footer as is. */
+
+/* Focus that survives the coming style.css replacement */
+.legal-page a:focus-visible,
+.legal-page .skip-link:focus-visible {
+  outline: 3px solid var(--legal-focus);
+  outline-offset: 3px;
+  border-radius: 0.25rem;
+}
+
+/* Narrow screens, down to 320px */
+@media (max-width: 56rem) {
+  .legal-page .legal-layout {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  .legal-page .legal-toc {
+    position: static;
+  }
+  .legal-page .legal-hero {
+    padding-top: 2rem;
+  }
+}
+@media (max-width: 30rem) {
+  .legal-page .site-header-inner {
+    gap: 2px 16px;
+  }
+  .legal-page .site-nav {
+    gap: 2px 12px;
+    font-size: 0.85rem;
+  }
+  .legal-page .legal-article {
+    font-size: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legal-page html,
+  html:has(.legal-page) {
+    scroll-behavior: auto;
+  }
+  .legal-page *,
+  .legal-page *::before,
+  .legal-page *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media print {
+  .legal-page {
+    background: #fff;
+  }
+  .legal-page .site-header .site-nav,
+  .legal-page .legal-toc,
+  .legal-page .legal-back,
+  .legal-page .site-footer {
+    display: none;
+  }
+  .legal-page .legal-layout {
+    display: block;
+  }
+  .legal-page .legal-article {
+    max-width: none;
+  }
+}
