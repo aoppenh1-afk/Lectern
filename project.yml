@@ -60,6 +60,11 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # GitHub "owner/repo" the in-app updater polls for releases.
         LecternUpdateRepository: aoppenh1-afk/Lectern
+        # Baked-in dev identity for the dev update channel. Stable builds leave
+        # both empty; scripts/release-dev.sh stamps the dev tag and commit SHA
+        # so dev installs can tell whether a newer dev prerelease exists.
+        LecternDevTag: $(LECTERN_DEV_TAG)
+        LecternDevSHA: $(LECTERN_DEV_SHA)
         LecternGoogleOAuthClientID: $(LECTERN_GOOGLE_CLIENT_ID)
         LecternGoogleOAuthClientSecret: $(LECTERN_GOOGLE_CLIENT_SECRET)
         LSApplicationCategoryType: public.app-category.productivity

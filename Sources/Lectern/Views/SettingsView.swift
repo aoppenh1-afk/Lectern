@@ -285,6 +285,7 @@ private struct GeneralPane: View {
     @Environment(\.openWindow) private var openWindow
 
     @State private var autoCheck = true
+    @State private var channel: UpdateChannel = .stable
 
     private var build: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
@@ -293,8 +294,8 @@ private struct GeneralPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsCard {
-                SettingsRow(title: "Lectern \(updater.currentVersion)",
-                            caption: "Build \(build). Updates are published as GitHub releases.") {
+                SettingsRow(title: "Lectern \(updater.displayVersion)",
+                            caption: "Build \(build). Stable releases are published when ready; dev builds track every commit.") {
                     HStack(spacing: 8) {
                         if updater.phase == .checking {
                             ProgressView().controlSize(.small)
@@ -314,6 +315,24 @@ private struct GeneralPane: View {
                         .controlSize(.small)
                         .labelsHidden()
                         .onChange(of: autoCheck) { _, value in updater.autoCheckEnabled = value }
+                }
+
+                SettingsRow(title: "Update channel",
+                            caption: channel == .dev
+                                ? "Dev builds track every commit on main. Expect breakage."
+                                : "Tested releases only. Nothing changes until a new release is published.") {
+                    Picker("", selection: $channel) {
+                        Text("Stable").tag(UpdateChannel.stable)
+                        Text("Dev").tag(UpdateChannel.dev)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 150)
+                    .labelsHidden()
+                    .disabled(updater.phase == .checking)
+                    .onChange(of: channel) { _, value in
+                        updater.channel = value
+                        Task { await updater.checkNow() }
+                    }
                 }
 
                 SettingsRow(title: "Status", caption: statusCaption, showsDivider: updater.releasesPageURL != nil) {
@@ -343,14 +362,17 @@ private struct GeneralPane: View {
                 }
             }
         }
-        .onAppear { autoCheck = updater.autoCheckEnabled }
+        .onAppear {
+            autoCheck = updater.autoCheckEnabled
+            channel = updater.channel
+        }
     }
 
     private var statusCaption: String {
         switch updater.phase {
         case .idle: return "Not checked yet this session."
         case .checking: return "Contacting GitHub…"
-        case .upToDate: return "You are on the latest release."
+        case .upToDate: return updater.channel == .dev ? "You are on the latest dev build." : "You are on the latest release."
         case .available: return "Version \(updater.pendingPrompt?.version ?? updater.availableRelease?.version ?? "") is ready to install."
         case .downloading(let fraction): return "Downloading… \(Int(fraction * 100))%"
         case .installing: return "Installing…"

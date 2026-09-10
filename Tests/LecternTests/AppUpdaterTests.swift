@@ -50,6 +50,131 @@ final class AppUpdaterTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         XCTAssertEqual(AppUpdater.findAppBundle(in: root)?.lastPathComponent, "Lectern.app")
     }
+
+    func testDevTagDetection() {
+        XCTAssertTrue(AppUpdater.isDevTag("v2.3-dev.20260910-143000-a1b2c3d"))
+        XCTAssertTrue(AppUpdater.isDevTag("dev-20260910-a1b2c3d"))
+        XCTAssertFalse(AppUpdater.isDevTag("v2.3"))
+        XCTAssertFalse(AppUpdater.isDevTag("v1.2.0"))
+    }
+
+    func testParseReleaseMarksDevAndKeepsFullTag() throws {
+        let json = """
+        {
+          "tag_name": "v2.3-dev.20260910-143000-a1b2c3d",
+          "name": "Lectern Dev 20260910-143000 (a1b2c3d)",
+          "body": "Dev notes",
+          "html_url": "https://github.com/o/r/releases/tag/v2.3-dev.20260910-143000-a1b2c3d",
+          "prerelease": true,
+          "published_at": "2026-09-10T14:30:00Z",
+          "assets": [
+            {"name": "Lectern-v2.3-dev.20260910-143000-a1b2c3d.zip", "url": "https://api.github.com/repos/o/r/releases/assets/2"},
+            {"name": "Lectern-v2.3-dev.20260910-143000-a1b2c3d.zip.sha256", "url": "https://api.github.com/repos/o/r/releases/assets/3"}
+          ]
+        }
+        """
+        let release = try AppUpdater.parseRelease(Data(json.utf8))
+        XCTAssertTrue(release.isDev)
+        XCTAssertEqual(release.tag, "v2.3-dev.20260910-143000-a1b2c3d")
+        XCTAssertEqual(release.version, "2.3-dev.20260910-143000-a1b2c3d")
+        XCTAssertEqual(release.assetName, "Lectern-v2.3-dev.20260910-143000-a1b2c3d.zip")
+    }
+
+    func testParseReleaseMarksStable() throws {
+        let json = """
+        {
+          "tag_name": "v1.2.0",
+          "name": "Lectern 1.2.0",
+          "body": "Stable notes",
+          "html_url": "https://github.com/o/r/releases/tag/v1.2.0",
+          "prerelease": false,
+          "published_at": "2026-09-09T10:00:00Z",
+          "assets": [
+            {"name": "Lectern-1.2.0.zip", "url": "https://api.github.com/repos/o/r/releases/assets/2"}
+          ]
+        }
+        """
+        let release = try AppUpdater.parseRelease(Data(json.utf8))
+        XCTAssertFalse(release.isDev)
+        XCTAssertEqual(release.tag, "v1.2.0")
+        XCTAssertEqual(release.version, "1.2.0")
+    }
+
+    func testParseNewestDevReleasePicksNewestPrerelease() throws {
+        let json = """
+        [
+          {
+            "tag_name": "v2.3",
+            "name": "Lectern 2.3",
+            "body": "Stable",
+            "html_url": "https://github.com/o/r/releases/tag/v2.3",
+            "prerelease": false,
+            "published_at": "2026-09-10T15:00:00Z",
+            "assets": [
+              {"name": "Lectern-2.3.zip", "url": "https://api.github.com/repos/o/r/releases/assets/1"}
+            ]
+          },
+          {
+            "tag_name": "v2.3-dev.20260910-120000-older01",
+            "name": "Lectern Dev older",
+            "body": "Older dev",
+            "html_url": "https://github.com/o/r/releases/tag/v2.3-dev.20260910-120000-older01",
+            "prerelease": true,
+            "published_at": "2026-09-10T12:00:00Z",
+            "assets": [
+              {"name": "Lectern-v2.3-dev.20260910-120000-older01.zip", "url": "https://api.github.com/repos/o/r/releases/assets/2"}
+            ]
+          },
+          {
+            "tag_name": "v2.3-dev.20260910-143000-newer01",
+            "name": "Lectern Dev newer",
+            "body": "Newer dev",
+            "html_url": "https://github.com/o/r/releases/tag/v2.3-dev.20260910-143000-newer01",
+            "prerelease": true,
+            "published_at": "2026-09-10T14:30:00Z",
+            "assets": [
+              {"name": "Lectern-v2.3-dev.20260910-143000-newer01.zip", "url": "https://api.github.com/repos/o/r/releases/assets/3"}
+            ]
+          },
+          {
+            "tag_name": "v2.3-rc.1",
+            "name": "Not a dev tag",
+            "body": "A non-dev prerelease must be ignored",
+            "html_url": "https://github.com/o/r/releases/tag/v2.3-rc.1",
+            "prerelease": true,
+            "published_at": "2026-09-10T16:00:00Z",
+            "assets": []
+          }
+        ]
+        """
+        let newest = try AppUpdater.parseNewestDevRelease(Data(json.utf8))
+        XCTAssertEqual(newest?.tag, "v2.3-dev.20260910-143000-newer01")
+        XCTAssertEqual(newest?.isDev, true)
+    }
+
+    func testParseNewestDevReleaseReturnsNilWithoutDev() throws {
+        let json = """
+        [
+          {
+            "tag_name": "v2.3",
+            "name": "Lectern 2.3",
+            "body": "Stable only",
+            "html_url": "https://github.com/o/r/releases/tag/v2.3",
+            "prerelease": false,
+            "published_at": "2026-09-10T15:00:00Z",
+            "assets": [
+              {"name": "Lectern-2.3.zip", "url": "https://api.github.com/repos/o/r/releases/assets/1"}
+            ]
+          }
+        ]
+        """
+        XCTAssertNil(try AppUpdater.parseNewestDevRelease(Data(json.utf8)))
+    }
+
+    func testSkippedKeysDifferPerChannel() {
+        XCTAssertEqual(AppUpdater.skippedKey(for: .stable), AppUpdater.skippedVersionKey)
+        XCTAssertNotEqual(AppUpdater.skippedKey(for: .stable), AppUpdater.skippedKey(for: .dev))
+    }
 }
 
 final class AgentDetectorTests: XCTestCase {

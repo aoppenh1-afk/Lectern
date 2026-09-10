@@ -1,0 +1,58 @@
+name: Dev builds
+
+# Every commit on main ships a dev-channel prerelease (stable releases are
+# still cut by hand with scripts/release.sh and are the only thing the
+# stable update channel sees). The version-bump commit that release.sh
+# pushes back to main is skipped here so a stable release does not
+# immediately spawn a duplicate dev build of the same code.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: dev-release
+  cancel-in-progress: false
+
+jobs:
+  publish-dev:
+    # Stable release commits ("Release x.y.z") are excluded; manual runs
+    # always publish.
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Release ')
+    name: Publish dev prerelease
+    runs-on: macos-26
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Optional: the shared desktop OAuth client from README.md so dev builds
+      # keep Google Docs working. These are plain variables, NOT secrets: the
+      # same values already ship in every stable build's Info.plist and are
+      # extractable from the app, so there is nothing confidential to protect.
+      # Without them dev builds report Google Docs as unavailable.
+      LECTERN_GOOGLE_CLIENT_ID: ${{ vars.LECTERN_GOOGLE_CLIENT_ID }}
+      LECTERN_GOOGLE_CLIENT_SECRET: ${{ vars.LECTERN_GOOGLE_CLIENT_SECRET }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Show macOS / Xcode / SDK
+        run: |
+          set -euo pipefail
+          sw_vers
+          xcodebuild -version
+          git log --oneline -3
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Publish dev prerelease
+        run: |
+          set -euo pipefail
+          scripts/release-dev.sh
