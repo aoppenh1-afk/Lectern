@@ -473,6 +473,15 @@ enum EventReminderScheduler {
         guard let minutes = event.reminderMinutesBefore else { return }
         let fireDate = event.startAt.addingTimeInterval(TimeInterval(minutes * -60))
         guard fireDate > Date() else { return }
+        // Hoist every read off the non-Sendable model: the Task below must
+        // only capture Sendable values under Swift 6 concurrency.
+        let title = event.title
+        var parts: [String] = []
+        if let course = event.courseName, !course.isEmpty { parts.append(course) }
+        parts.append(event.startAt.formatted(date: .omitted, time: .shortened))
+        if let location = event.locationName, !location.isEmpty { parts.append(location) }
+        let body = parts.joined(separator: " · ")
+        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
         Task {
             if await center.notificationSettings().authorizationStatus == .notDetermined {
                 _ = try? await center.requestAuthorization(options: [.alert, .sound])
@@ -480,14 +489,9 @@ enum EventReminderScheduler {
             let status = await center.notificationSettings().authorizationStatus
             guard status == .authorized || status == .provisional else { return }
             let content = UNMutableNotificationContent()
-            content.title = event.title
-            var parts: [String] = []
-            if let course = event.courseName, !course.isEmpty { parts.append(course) }
-            parts.append(event.startAt.formatted(date: .omitted, time: .shortened))
-            if let location = event.locationName, !location.isEmpty { parts.append(location) }
-            content.body = parts.joined(separator: " · ")
+            content.title = title
+            content.body = body
             content.sound = .default
-            let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
             try? await center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
         }
