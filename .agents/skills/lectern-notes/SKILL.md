@@ -126,7 +126,7 @@ Write compact English reasoning around standard Hebrew-script Torah vocabulary, 
 
 ### Source-first items
 
-- Each source is its own item, and what it says is nested under it: `- **רש״י ד״ה לפיכך**` then a child with the pshat. Cite the way the student does: `משנה`, `גמ׳ דף ב:`, `רש״י ד״ה משנה יתירא`, `תוס׳ ד״ה וזה נוטל`, `תוס׳ הרא״ש`, `רמב״ן כתובות`, `רשב״א ב״ב דף ד`, `רבינו יונה שם`, `שו״ת הרא״ש`, `קובץ שיעורים`, `נודע ביהודה`, `חתם סופר`, `רב שמואל רוזובסקי`.
+- Each source is its own item, and what it says is nested under it: `- **רש״י ד״ה לפיכך**` then a child with the pshat. Cite the way the student does: `משנה`, `גמ׳ :דף ב`, `רש״י ד״ה משנה יתירא`, `תוס׳ ד״ה וזה נוטל`, `תוס׳ הרא״ש`, `רמב״ן כתובות`, `רשב״א ב״ב דף ד`, `רבינו יונה שם`, `שו״ת הרא״ש`, `קובץ שיעורים`, `נודע ביהודה`, `חתם סופר`, `רב שמואל רוזובסקי`.
 - Questions and answers are explicit items: `**Q:**`, `**A:**`, and `**A1:**`, `**A2:**` when a question gets more than one answer. A follow-up question on an answer nests under that answer, so a שקלא וטריא naturally goes four or five levels deep.
 - `**Case:**` introduces the fact pattern a דין is tested against.
 - `**נ״מ:**` introduces a practical difference, with each consequence nested under it.
@@ -145,9 +145,9 @@ Write compact English reasoning around standard Hebrew-script Torah vocabulary, 
 Write the Markdown in logical reading order for a left-to-right outline, including Hebrew-first headings and source labels. Hebrew words remain in normal Hebrew character order. Lectern handles paragraph direction and invisible left-to-right boundary marks during Google Docs sync. Keep the notes themselves free of extra letters or font/color tricks; the exporter supplies the direction cues.
 
 - Return ordinary UTF-8 Markdown. Do not insert invisible direction marks, embeddings, overrides, or isolates, HTML `dir` attributes, literal `\u200e` escapes, or `&lrm;` entities. Direction controls belong to the renderer, not generated content.
-- Write paired punctuation normally: opening `(`, its complete content, closing `)`. Keep both brackets around the intended phrase. Never reverse parentheses or move a comma, colon, or semicolon to the beginning of a Hebrew phrase to imitate how a screenshot looks.
+- Write paired punctuation normally: opening `(`, its complete content, closing `)`. Keep both brackets around the intended phrase. Keep commas and ordinary label separators in their usual positions. Daf references use the specific amud-marker rule below.
 - Use `״` and `׳` inside Hebrew abbreviations; quotation marks around a quotation are separate punctuation. Keep quoted Hebrew wording only when supported by the source.
-- Keep source labels on their own parent item with the explanation beneath. A standalone source label needs no extra separator colon. Preserve meaningful citation punctuation such as the colon in `דף כ:`; it identifies the עמוד, not an extra label separator.
+- Keep source labels on their own parent item with the explanation beneath. A standalone source label needs no extra separator colon. For a daf reference, write the amud mark **before `דף` in the stored Markdown**: `:דף לו` for עמוד ב and `.דף לו` for עמוד א. Examples: `גמ׳ :דף לו`, `משנה (.דף לו)`, `תוס׳ (:דף ל״ו)`. Retain the source’s dot or colon and numeral; do not guess the עמוד when it is absent. This exception applies only to daf citations, not ordinary colons or semicolons.
 - Keep short parenthetical glosses and citations when useful. Move a comparison containing several sources, ratios, or explanations into child items. Preserve every view and qualifier when doing so. Keep fractions such as `1/3` in their ordinary numeric order.
 - Separate competing שיטות structurally when a long semicolon chain becomes hard to follow. This should improve the outline while retaining the reasoning, rather than removing Hebrew, punctuation, or distinctions to avoid a display problem.
 - In revisions, a screenshot shows visual order, which can differ from stored character order. Use the actual Markdown or source text to repair malformed punctuation. If the stored pair is already correct, preserve it; display-only problems require the renderer or export fix.
@@ -155,7 +155,7 @@ Write the Markdown in logical reading order for a left-to-right outline, includi
 These examples show logical Markdown, without invisible characters:
 
 ```markdown
-- **גמ׳ דף כ:**
+- **גמ׳ :דף כ**
     - **משנה**
         - Meat, onions, and eggs may be roasted on ערב שבת only if they can roast מבעוד יום
 - **רב אלעזר אמר רב**
@@ -201,7 +201,7 @@ If the lecture supplies the quotation, a short parenthetical can stay inline:
     - It's a case where both are actually holding the טלית, so both are מוחזק and neither is stronger
         - רש״י says דווקא אוחזין to exclude a case where only one of them is holding it
     - If only one is holding it the הלכה would be המע״ה with עדים, and a שבועה wouldn't help
-- **גמ׳ דף ב:**
+- **גמ׳ :דף ב**
     - **Q:** the רבנן don't fit our משנה either because they hold המע״ה?
     - **A:** the רבנן only said המע״ה when one guy is holding it; when both hold it they say יחלוקו בשבועה
         - **Q:** what difference does it make if both hold it, they're still being מוציא, so a שבועה shouldn't be enough?
@@ -230,5 +230,5 @@ Before responding, silently verify:
 2. Every list item on its own line, `- ` or `1. ` markers only, four-space nesting, and supporting points actually nested under the point they support.
 3. Every developed topic, source, question, answer, and example appears once, in source order, with nothing invented and no שיטות merged.
 4. The chosen layout is consistent throughout, and the shiur orthography uses Hebrew script with `״` and `׳`.
-5. Parentheses and quotes are paired in logical order; source punctuation, question marks, and numeric fractions retain their meaning. Mixed-language comparisons remain readable as nested items. The output contains no added direction controls or visual-order punctuation workarounds.
+5. Parentheses and quotes are paired in logical order; source punctuation, question marks, and numeric fractions retain their meaning. Mixed-language comparisons remain readable as nested items. The output contains no added direction controls; daf citations follow the leading amud-marker rule.
 6. The response is only the Markdown document.

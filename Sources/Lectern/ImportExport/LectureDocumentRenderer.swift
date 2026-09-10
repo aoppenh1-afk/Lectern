@@ -1,5 +1,4 @@
 import AppKit
-import CoreText
 import Foundation
 import UniformTypeIdentifiers
 
@@ -43,11 +42,13 @@ enum LectureShareFormat: String, CaseIterable, Identifiable, Sendable {
 @MainActor
 enum LectureDocumentRenderer {
     enum RenderError: LocalizedError {
+        case wordFailed
         case pdfFailed
         case unsupportedFormat
 
         var errorDescription: String? {
             switch self {
+            case .wordFailed: return "Lectern could not render the Word document."
             case .pdfFailed: return "Lectern could not render the PDF."
             case .unsupportedFormat: return "This document format is not supported."
             }
@@ -57,16 +58,11 @@ enum LectureDocumentRenderer {
     static func write(markdown: String, to destination: URL, format: LectureShareFormat) throws {
         switch format {
         case .markdown:
-            try Data(markdown.utf8).write(to: destination, options: .atomic)
+            try Data(NotesDafCitation.normalize(markdown).utf8).write(to: destination, options: .atomic)
         case .pdf:
             try writePDF(attributedDocument(from: markdown), to: destination)
         case .docx:
-            let document = attributedDocument(from: markdown)
-            let data = try document.data(
-                from: NSRange(location: 0, length: document.length),
-                documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML]
-            )
-            try data.write(to: destination, options: .atomic)
+            try writeWord(attributedDocument(from: markdown), to: destination)
         case .lectern:
             throw RenderError.unsupportedFormat
         }
@@ -97,7 +93,7 @@ enum LectureDocumentRenderer {
                        font: NSFont.monospacedSystemFont(ofSize: 9.5, weight: .regular),
                        color: NSColor(calibratedWhite: 0.22, alpha: 1),
                        before: 0, after: 0, lineHeight: 1.15,
-                       background: NSColor(calibratedWhite: 0.95, alpha: 1))
+                       background: NSColor(calibratedWhite: 0.95, alpha: 1), literal: true)
                 continue
             }
 
@@ -106,43 +102,43 @@ enum LectureDocumentRenderer {
             // flush-left paragraphs end the current outline.
             let listItem = lists.scan(line)
             if trimmed.isEmpty {
-                output.append(NSAttributedString(string: "\n"))
+                continue
             } else if let item = listItem {
                 let marker: String
                 switch item.marker {
                 case .bullet: marker = bulletGlyph(depth: item.depth)
                 case .ordered: marker = item.orderedLabel
                 }
-                let indent = CGFloat(min(item.depth, 7)) * 18
-                append(marker + " " + stripInlineMarkdown(item.content) + "\n", to: output,
-                       font: NSFont.systemFont(ofSize: 11), color: .textColor,
-                       before: 0, after: 4, lineHeight: 1.25, firstLineIndent: indent,
+                let indent = CGFloat(min(item.depth, 7)) * 36 + 18
+                append(item.content + "\n", to: output,
+                       font: documentFont(size: 12), color: .black,
+                       before: 0, after: 0, lineHeight: 1.15, prefix: marker + "\t", firstLineIndent: indent,
                        headIndent: indent + 18)
             } else if trimmed.hasPrefix("# ") {
                 append(String(trimmed.dropFirst(2)) + "\n", to: output,
-                       font: NSFont.systemFont(ofSize: 26, weight: .bold),
-                       color: NSColor(calibratedRed: 0.08, green: 0.14, blue: 0.22, alpha: 1),
-                       before: 0, after: 8, lineHeight: 1.05)
+                       font: documentFont(size: 20, bold: true),
+                       color: .black,
+                       before: 20, after: 6, lineHeight: 1.15, underline: true)
             } else if trimmed.hasPrefix("## ") {
                 append(String(trimmed.dropFirst(3)) + "\n", to: output,
-                       font: NSFont.systemFont(ofSize: 16, weight: .semibold),
-                       color: NSColor(calibratedRed: 0.18, green: 0.45, blue: 0.71, alpha: 1),
-                       before: 18, after: 10, lineHeight: 1.1)
+                       font: documentFont(size: 16, bold: true),
+                       color: .black,
+                       before: 18, after: 6, lineHeight: 1.15)
             } else if trimmed.hasPrefix("### ") {
                 append(String(trimmed.dropFirst(4)) + "\n", to: output,
-                       font: NSFont.systemFont(ofSize: 13, weight: .semibold),
-                       color: NSColor(calibratedRed: 0.12, green: 0.30, blue: 0.47, alpha: 1),
+                       font: documentFont(size: 16, bold: true),
+                       color: .black,
                        before: 12, after: 6, lineHeight: 1.15)
             } else if trimmed.hasPrefix("> ") {
-                append(stripInlineMarkdown(String(trimmed.dropFirst(2))) + "\n", to: output,
-                       font: NSFont.systemFont(ofSize: 11),
-                       color: NSColor(calibratedWhite: 0.35, alpha: 1),
+                append(String(trimmed.dropFirst(2)) + "\n", to: output,
+                       font: documentFont(size: 12),
+                       color: .black,
                        before: 2, after: 6, lineHeight: 1.25, firstLineIndent: 14,
                        headIndent: 14)
             } else {
-                append(stripInlineMarkdown(trimmed) + "\n", to: output,
-                       font: NSFont.systemFont(ofSize: 11), color: .textColor,
-                       before: 0, after: 6, lineHeight: 1.25)
+                append(trimmed + "\n", to: output,
+                       font: documentFont(size: 12), color: .black,
+                       before: 0, after: 0, lineHeight: 1.15)
             }
         }
         return output
@@ -156,6 +152,9 @@ enum LectureDocumentRenderer {
                                after: CGFloat,
                                lineHeight: CGFloat,
                                background: NSColor? = nil,
+                               prefix: String = "",
+                               underline: Bool = false,
+                               literal: Bool = false,
                                firstLineIndent: CGFloat = 0,
                                headIndent: CGFloat = 0) {
         let paragraph = NSMutableParagraphStyle()
@@ -164,6 +163,9 @@ enum LectureDocumentRenderer {
         paragraph.lineHeightMultiple = lineHeight
         paragraph.firstLineHeadIndent = firstLineIndent
         paragraph.headIndent = headIndent
+        if headIndent > firstLineIndent {
+            paragraph.tabStops = [NSTextTab(textAlignment: .left, location: headIndent)]
+        }
         // Mixed English-Hebrew lines must keep English reading order even
         // when the first word is Hebrew.
         paragraph.baseWritingDirection = .leftToRight
@@ -174,7 +176,21 @@ enum LectureDocumentRenderer {
             .paragraphStyle: paragraph,
         ]
         if let background { attributes[.backgroundColor] = background }
-        output.append(NSAttributedString(string: text, attributes: attributes))
+        if underline { attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue }
+        // Consume the tested Hebrew boundary and bold ranges without changing
+        // the Google Docs converter or its requests.
+        // A disposable plain prefix prevents list-like inline content such as
+        // "1. example" from being interpreted as another structural list.
+        let plan = NotesMarkdownConverter.plan(markdown: "x " + text)
+        let rendered = literal ? text : prefix + String(plan.text.dropFirst(2)) + "\n"
+        let paragraphText = NSMutableAttributedString(string: rendered, attributes: attributes)
+        if !literal {
+            for bold in plan.boldRanges where bold.end > bold.start {
+                paragraphText.addAttribute(.font, value: documentFont(size: font.pointSize, bold: true),
+                    range: NSRange(location: prefix.utf16.count + bold.start - 3, length: bold.end - bold.start))
+            }
+        }
+        output.append(paragraphText)
     }
 
     private static func imageAttachment(from line: String) -> NSAttributedString? {
@@ -203,43 +219,129 @@ enum LectureDocumentRenderer {
         }
     }
 
-    private static func stripInlineMarkdown(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: #"\[([^\]]+)\]\([^)]+\)"#, with: "$1", options: .regularExpression)
-            .replacingOccurrences(of: #"[*_`]"#, with: "", options: .regularExpression)
+    private static func documentFont(size: CGFloat, bold: Bool = false) -> NSFont {
+        NSFont(name: bold ? "TimesNewRomanPS-BoldMT" : "TimesNewRomanPSMT", size: size)
+            ?? NSFont.systemFont(ofSize: size, weight: bold ? .bold : .regular)
+    }
+
+    /// AppKit's DOCX writer emits legacy names (first-line, sz-cs) and omits
+    /// paragraph direction/tab stops. Normalize the package for Word readers.
+    private static func writeWord(_ document: NSAttributedString, to destination: URL) throws {
+        let data = try document.data(from: NSRange(location: 0, length: document.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML])
+        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        let archive = temporary.appendingPathComponent("original.docx")
+        let package = temporary.appendingPathComponent("package")
+        try data.write(to: archive)
+        try runArchiveTool(["-x", "-k", archive.path, package.path])
+        let xmlURL = package.appendingPathComponent("word/document.xml")
+        let xml = try XMLDocument(contentsOf: xmlURL)
+        func element(_ name: String, _ attributes: [String: String] = [:]) -> XMLElement {
+            let node = XMLElement(name: "w:" + name)
+            for (key, value) in attributes {
+                node.addAttribute(XMLNode.attribute(withName: "w:" + key, stringValue: value) as! XMLNode)
+            }
+            return node
+        }
+        for case let node as XMLElement in try xml.nodes(forXPath: "//w:sz-cs") {
+            node.name = "w:szCs"
+        }
+        for case let props as XMLElement in try xml.nodes(forXPath: "//w:rPr") {
+            if props.elements(forName: "w:b").first != nil { props.addChild(element("bCs")) }
+        }
+        for case let paragraph as XMLElement in try xml.nodes(forXPath: "//w:p") {
+            let props = paragraph.elements(forName: "w:pPr").first ?? element("pPr")
+            if props.parent == nil { paragraph.insertChild(props, at: 0) }
+            for name in ["w:bidi", "w:jc"] {
+                props.elements(forName: name).forEach { $0.detach() }
+            }
+            // Explicit LTR plus Unicode LRM boundaries preserves mixed text.
+            props.addChild(element("bidi", ["val": "0"]))
+            props.addChild(element("jc", ["val": "left"]))
+            let spacing = props.elements(forName: "w:spacing").first ?? element("spacing")
+            if spacing.parent == nil { props.addChild(spacing) }
+            spacing.addAttribute(XMLNode.attribute(withName: "w:line", stringValue: "276") as! XMLNode)
+            spacing.addAttribute(XMLNode.attribute(withName: "w:lineRule", stringValue: "auto") as! XMLNode)
+            if let indent = props.elements(forName: "w:ind").first {
+                if let old = indent.attribute(forName: "w:first-line"), let value = Int(old.stringValue ?? "") {
+                    indent.removeAttribute(forName: "w:first-line")
+                    indent.addAttribute(XMLNode.attribute(withName: value < 0 ? "w:hanging" : "w:firstLine",
+                        stringValue: String(abs(value))) as! XMLNode)
+                }
+                if let left = indent.attribute(forName: "w:left")?.stringValue {
+                    let tabs = element("tabs")
+                    tabs.addChild(element("tab", ["val": "left", "pos": left]))
+                    props.addChild(tabs)
+                }
+            }
+            if let size = (try paragraph.nodes(forXPath: "w:r/w:rPr/w:sz/@w:val").first)?.stringValue,
+               (Int(size) ?? 0) >= 32 {
+                props.addChild(element("keepNext"))
+                props.addChild(element("keepLines"))
+            }
+            // CT_PPr uses schema order, even though some readers tolerate more.
+            let order = ["pStyle", "keepNext", "keepLines", "pageBreakBefore", "numPr", "tabs",
+                         "bidi", "spacing", "ind", "jc", "rPr", "sectPr"]
+            let children = props.children ?? []
+            let sorted = children.enumerated().sorted {
+                let lhs = order.firstIndex(of: $0.element.localName ?? "") ?? 10
+                let rhs = order.firstIndex(of: $1.element.localName ?? "") ?? 10
+                return lhs == rhs ? $0.offset < $1.offset : lhs < rhs
+            }
+            children.forEach { $0.detach() }
+            sorted.forEach { props.addChild($0.element) }
+        }
+        try xml.xmlData.write(to: xmlURL)
+        let result = temporary.appendingPathComponent("result.docx")
+        try runArchiveTool(["-c", "-k", package.path, result.path])
+        try Data(contentsOf: result).write(to: destination, options: .atomic)
+    }
+
+    private static func runArchiveTool(_ arguments: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        process.arguments = arguments
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { throw RenderError.wordFailed }
     }
 
     private static func writePDF(_ document: NSAttributedString, to destination: URL) throws {
         var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
-        let contentBox = CGRect(x: 54, y: 54, width: 504, height: 684)
+        let contentBox = CGRect(x: 72, y: 72, width: 468, height: 648)
         guard let consumer = CGDataConsumer(url: destination as CFURL),
               let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
             throw RenderError.pdfFailed
         }
 
-        let framesetter = CTFramesetterCreateWithAttributedString(document)
-        let pagePath = CGPath(rect: contentBox, transform: nil)
+        // TextKit applies Cocoa's bidi layout and draws attachments. Drawing
+        // this NSAttributedString directly with CTFrameDraw reverses Hebrew runs.
+        let storage = NSTextStorage(attributedString: document)
+        let layout = NSLayoutManager()
+        storage.addLayoutManager(layout)
         var location = 0
         repeat {
+            let container = NSTextContainer(containerSize: contentBox.size)
+            container.lineFragmentPadding = 0
+            layout.addTextContainer(container)
+            layout.ensureLayout(for: container)
+            let glyphs = layout.glyphRange(for: container)
+            guard glyphs.length > 0 || document.length == 0 else { throw RenderError.pdfFailed }
             context.beginPDFPage(nil)
             context.saveGState()
-            context.textMatrix = .identity
-            let frame = CTFramesetterCreateFrame(
-                framesetter,
-                CFRange(location: location, length: 0),
-                pagePath,
-                nil
-            )
-            CTFrameDraw(frame, context)
+            context.translateBy(x: 0, y: mediaBox.height)
+            context.scaleBy(x: 1, y: -1)
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
+            layout.drawBackground(forGlyphRange: glyphs, at: contentBox.origin)
+            layout.drawGlyphs(forGlyphRange: glyphs, at: contentBox.origin)
+            NSGraphicsContext.restoreGraphicsState()
             context.restoreGState()
             context.endPDFPage()
-
-            let visible = CTFrameGetVisibleStringRange(frame)
-            guard visible.length > 0 || document.length == 0 else {
-                throw RenderError.pdfFailed
-            }
-            location += visible.length
-        } while location < document.length
+            location = NSMaxRange(glyphs)
+        } while location < layout.numberOfGlyphs
 
         context.closePDF()
         let resourceValues = try? destination.resourceValues(forKeys: [.fileSizeKey])

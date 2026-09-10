@@ -8,7 +8,7 @@ import Foundation
 /// tabs to choose the nesting level for `createParagraphBullets` and then
 /// strips them.
 enum NotesMarkdownConverter {
-    static let formatVersion = "v8"
+    static let formatVersion = "v9"
 
     struct WritePlan {
         let text: String
@@ -125,7 +125,7 @@ enum NotesMarkdownConverter {
     static let numberedPreset = "NUMBERED_DECIMAL_ALPHA_ROMAN"
 
     static func plan(markdown: String) -> WritePlan {
-        let items = parse(replaceFences(removingDirectionControls(markdown)))
+        let items = parse(NotesDafCitation.normalize(replaceFences(removingDirectionControls(markdown))))
         var headingRanges: [(Int, Int, Int)] = []
         var listParas: [(start: Int, end: Int, preset: String)] = []
         var boldRanges: [(Int, Int)] = []
