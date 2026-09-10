@@ -118,7 +118,7 @@ struct CanvasCalendarView: View {
 
     var body: some View {
         StudioPage(title: "Calendar", subtitle: "Your Fall 2026 schedule, Canvas deadlines, and personal events") {
-            HStack(spacing: 10, alignment: .top) {
+            HStack(alignment: .top, spacing: 10) {
                 HStack(spacing: 10) {
                     Button { move(-1) } label: { Image(systemName: "chevron.left") }
                     Button { move(1) } label: { Image(systemName: "chevron.right") }
