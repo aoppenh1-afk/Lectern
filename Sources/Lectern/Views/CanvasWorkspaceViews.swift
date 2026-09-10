@@ -502,6 +502,82 @@ enum EventReminderScheduler {
     }
 }
 
+// MARK: - Manual assignment categories and reminders
+
+enum AssignmentCategory: String, CaseIterable, Identifiable {
+    case homework, essay, labReport, quiz, personal
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .homework: "Homework"
+        case .essay: "Essay"
+        case .labReport: "Lab Report"
+        case .quiz: "Quiz"
+        case .personal: "Personal"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .homework: "book.closed"
+        case .essay: "doc.text"
+        case .labReport: "flask.conical"
+        case .quiz: "questionmark.circle"
+        case .personal: "person"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .homework: LecternTheme.accent
+        case .essay: .blue
+        case .labReport: .orange
+        case .quiz: LecternTheme.recordTint
+        case .personal: .secondary
+        }
+    }
+}
+
+enum AssignmentReminderScheduler {
+    static func notificationID(for assignment: CanvasAssignment) -> String { "lectern-assignment-\(assignment.canvasID)" }
+
+    static func schedule(for assignment: CanvasAssignment) {
+        let center = UNUserNotificationCenter.current()
+        let id = notificationID(for: assignment)
+        center.removePendingNotificationRequests(withIdentifiers: [id])
+        guard let due = assignment.dueAt, let minutes = assignment.reminderMinutesBefore else { return }
+        let fireDate = due.addingTimeInterval(TimeInterval(minutes * -60))
+        guard fireDate > Date() else { return }
+        // Hoist every read off the non-Sendable model: the Task below must
+        // only capture Sendable values under Swift 6 concurrency.
+        let title = assignment.title
+        var parts: [String] = []
+        if assignment.courseName != "Personal" { parts.append(assignment.courseName) }
+        parts.append("Due \(due.formatted(date: .abbreviated, time: .shortened))")
+        let body = parts.joined(separator: " · ")
+        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        Task {
+            if await center.notificationSettings().authorizationStatus == .notDetermined {
+                _ = try? await center.requestAuthorization(options: [.alert, .sound])
+            }
+            let status = await center.notificationSettings().authorizationStatus
+            guard status == .authorized || status == .provisional else { return }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            try? await center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
+        }
+    }
+
+    static func cancel(for assignment: CanvasAssignment) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [notificationID(for: assignment)])
+    }
+}
+
 // MARK: - Sheet field styling (matches the Studio dropdown language)
 
 /// Small semibold label used above sheet inputs.
@@ -1120,13 +1196,14 @@ struct ManualAssignmentSheet: View {
 
     @State private var title = ""
     @State private var selectedCourseID: PersistentIdentifier?
+    @State private var assignmentCategory: AssignmentCategory = .homework
     @State private var dueDate = Date()
     @State private var dueTime = Date()
     @State private var pointsText = ""
+    @State private var reminder: EventReminder = .oneDay
     @State private var notes = ""
     @State private var isComplete = false
     @State private var showingDeleteConfirm = false
-    @FocusState private var titleFocused: Bool
 
     private var isEditing: Bool { editing != nil }
     private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -1137,22 +1214,38 @@ struct ManualAssignmentSheet: View {
         return courses.first { $0.persistentModelID == id }
     }
 
+    private var courseOptions: [PersistentIdentifier?] {
+        [nil] + courses.map { Optional($0.persistentModelID) }
+    }
+
+    private func courseName(for id: PersistentIdentifier?) -> String {
+        guard let id, let course = courses.first(where: { $0.persistentModelID == id }) else { return "Personal" }
+        return course.name
+    }
+
     private var dueSummary: String {
         let day = dueDate.formatted(date: .complete, time: .omitted)
-        return "\(day) · \(dueTime.formatted(date: .omitted, time: .shortened))"
+        return "Due \(day) · \(dueTime.formatted(date: .omitted, time: .shortened))"
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            header
-            detailsCard
-            scheduleCard
-            notesCard
-            if isEditing { statusCard }
-            footer
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                header
+                quickAddSection
+                titleSection
+                courseRow
+                pointsSection
+                dueRow
+                reminderSection
+                summaryStrip
+                notesSection
+                if isEditing { statusRow }
+                footer
+            }
+            .padding(24)
         }
-        .padding(24)
-        .frame(width: 500)
+        .frame(width: 640)
         .background(LecternTheme.paper)
         .onAppear(perform: populate)
         .alert("Delete this assignment?", isPresented: $showingDeleteConfirm) {
@@ -1166,6 +1259,8 @@ struct ManualAssignmentSheet: View {
     private func populate() {
         if let editing {
             title = editing.title
+            assignmentCategory = editing.assignmentCategory
+            reminder = EventReminder(minutes: editing.reminderMinutesBefore)
             if let due = editing.dueAt {
                 dueDate = due
                 dueTime = due
@@ -1188,147 +1283,221 @@ struct ManualAssignmentSheet: View {
             dueDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
             dueTime = Calendar.current.date(bySettingHour: 23, minute: 59, second: 0, of: Date()) ?? Date()
         }
-        titleFocused = true
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(isEditing ? "Edit Assignment" : "New Assignment")
-                .font(.system(size: 20, weight: .bold, design: .serif))
-                .foregroundStyle(LecternTheme.ink)
-            Text("Personal assignments live alongside Canvas work. Canvas items stay read-only.")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(isEditing ? "Edit Assignment" : "New Assignment")
+                    .font(.system(size: 22, weight: .bold, design: .serif))
+                    .foregroundStyle(LecternTheme.ink)
+                Text(isEditing
+                     ? "Update your personal assignment. Canvas items stay read-only."
+                     : "Personal assignments live alongside Canvas work. Canvas items stay read-only.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(6)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 
-    private var detailsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                SettingsFieldLabel(title: "Title")
-                SettingsTextField(placeholder: "Problem set 4, essay draft, lab report…", text: $title)
-                    .focused($titleFocused)
-                    .onSubmit(saveIfValid)
-            }
-            Divider()
-            HStack {
-                SettingsFieldLabel(title: "Course")
-                Spacer()
-                Picker("Course", selection: $selectedCourseID) {
-                    Text("Personal").tag(PersistentIdentifier?.none)
-                    if !courses.isEmpty {
-                        Divider()
-                        ForEach(courses) { course in
-                            Text(course.name).tag(PersistentIdentifier?.some(course.persistentModelID))
+    private var quickAddSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SheetFieldLabel(title: "Quick Add")
+            HStack(spacing: 8) {
+                ForEach(AssignmentCategory.allCases) { category in
+                    let selected = category == assignmentCategory
+                    Button { assignmentCategory = category } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: category.icon)
+                                .font(.system(size: 11, weight: .medium))
+                            Text(category.title)
+                                .font(.system(size: 12, weight: .medium))
                         }
+                        .foregroundStyle(selected ? LecternTheme.accent : LecternTheme.ink)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            (selected ? LecternTheme.accent.opacity(0.12) : LecternTheme.canvasCard),
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(selected ? LecternTheme.accent.opacity(0.35) : LecternTheme.hairline)
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var titleSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SheetFieldLabel(title: "Title")
+            SheetTextField(
+                placeholder: "e.g. Problem set 4, essay draft, lab report…",
+                text: $title,
+                autofocus: !isEditing,
+                onSubmit: saveIfValid
+            )
+        }
+    }
+
+    private var courseRow: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                SheetFieldLabel(title: "Course")
+                SheetDropdown(label: "Course", selection: $selectedCourseID, options: courseOptions) { id in
+                    Text(courseName(for: id))
+                        .font(.system(size: 13))
+                        .lineLimit(1)
+                } row: { id in
+                    Text(courseName(for: id))
+                        .font(.system(size: 12.5))
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 6) {
+                SheetFieldLabel(title: "Assignment Category")
+                SheetDropdown(label: "Assignment category", selection: $assignmentCategory, options: AssignmentCategory.allCases) { category in
+                    Text(category.title).font(.system(size: 13)).lineLimit(1)
+                } row: { category in
+                    HStack(spacing: 7) {
+                        Image(systemName: category.icon)
+                            .font(.system(size: 11))
+                            .foregroundStyle(category.color)
+                            .frame(width: 16)
+                        Text(category.title).font(.system(size: 12.5)).lineLimit(1)
                     }
                 }
-                .labelsHidden()
-                .frame(width: 220)
             }
-            if let course = selectedCourse {
-                HStack(spacing: 8) {
-                    CourseBadge(colorHex: course.colorHex, initial: String(course.name.prefix(1)), size: 20)
-                    Text(course.courseCode ?? course.termName ?? "Linked course")
-                        .font(.system(size: 11)).foregroundStyle(.secondary)
-                    Spacer()
-                }
-            }
-            Divider()
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    SettingsFieldLabel(title: "Points possible")
-                    Text("Optional").font(.system(size: 10.5)).foregroundStyle(.secondary)
-                }
-                Spacer()
-                TextField("e.g. 100", text: $pointsText)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 120)
-                    .multilineTextAlignment(.trailing)
-            }
+            .frame(maxWidth: .infinity)
         }
-        .padding(14)
-        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
     }
 
-    private var scheduleCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                SettingsFieldLabel(title: "Due date")
-                Spacer()
-                DatePicker("Due date", selection: $dueDate, displayedComponents: .date)
-                    .labelsHidden()
-            }
-            Divider()
-            HStack {
-                SettingsFieldLabel(title: "Due time")
-                Spacer()
-                DatePicker("Due time", selection: $dueTime, displayedComponents: .hourAndMinute)
-                    .labelsHidden()
-            }
-            Divider()
-            HStack(spacing: 8) {
-                Image(systemName: "checklist")
-                    .font(.system(size: 11))
-                    .foregroundStyle(LecternTheme.accent)
-                Text("Due \(dueSummary)")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(LecternTheme.ink)
-                Spacer()
-            }
-        }
-        .padding(14)
-        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
-    }
-
-    private var notesCard: some View {
+    private var pointsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SettingsFieldLabel(title: "Notes")
-            TextEditor(text: $notes)
-                .font(.system(size: 12.5))
-                .foregroundStyle(LecternTheme.ink)
-                .frame(minHeight: 64, maxHeight: 110)
-                .scrollContentBackground(.hidden)
-                .padding(8)
-                .background(LecternTheme.surfaceFill, in: RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous).stroke(LecternTheme.hairline))
+            SheetFieldLabel(title: "Points possible")
+            SheetTextField(placeholder: "e.g. 100", text: $pointsText)
         }
-        .padding(14)
-        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
     }
 
-    private var statusCard: some View {
+    private var dueRow: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                SheetFieldLabel(title: "Due date")
+                SheetDateField(label: "Due date", date: $dueDate, components: .date, icon: "calendar")
+            }
+            .frame(maxWidth: .infinity)
+            VStack(alignment: .leading, spacing: 6) {
+                SheetFieldLabel(title: "Due time")
+                SheetDateField(label: "Due time", date: $dueTime, components: .hourAndMinute, icon: "clock")
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var reminderSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SheetFieldLabel(title: "Reminder")
+            SheetDropdown(label: "Reminder", selection: $reminder, options: EventReminder.allCases, icon: "bell") { choice in
+                Text(choice.title).font(.system(size: 13)).lineLimit(1)
+            } row: { choice in
+                Text(choice.title).font(.system(size: 12.5)).lineLimit(1)
+            }
+        }
+    }
+
+    private var summaryStrip: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "list.bullet")
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(.secondary)
+            Text(dueSummary)
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(LecternTheme.ink)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(LecternTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SheetFieldLabel(title: "Notes")
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $notes)
+                    .font(.system(size: 13))
+                    .foregroundStyle(LecternTheme.ink)
+                    .frame(minHeight: 72, maxHeight: 120)
+                    .scrollContentBackground(.hidden)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 9)
+                if notes.isEmpty {
+                    Text("Add notes, instructions, links, or submission details…")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 17)
+                        .allowsHitTesting(false)
+                }
+            }
+            .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
+        }
+    }
+
+    private var statusRow: some View {
         Toggle(isOn: $isComplete) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Completed").font(.system(size: 12.5, weight: .medium))
-                Text("Finished work moves to Submitted").font(.system(size: 10.5)).foregroundStyle(.secondary)
+                Text("Completed").font(.system(size: 13, weight: .medium))
+                Text("Finished work moves to Submitted").font(.system(size: 11)).foregroundStyle(.secondary)
             }
         }
         .toggleStyle(.switch)
-        .padding(14)
-        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
     }
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 10) {
             if isEditing {
                 Button(role: .destructive) { showingDeleteConfirm = true } label: {
                     Label("Delete", systemImage: "trash")
+                        .font(.system(size: 13, weight: .medium))
                 }
             }
             Spacer()
             Button("Cancel", role: .cancel) { dismiss() }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(LecternTheme.ink)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .buttonStyle(.plain)
                 .keyboardShortcut(.cancelAction)
-            Button(isEditing ? "Save Changes" : "Add Assignment", action: saveIfValid)
+            Button(isEditing ? "Save Changes" : "Create Assignment", action: saveIfValid)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .buttonStyle(.plain)
                 .keyboardShortcut(.defaultAction)
-                .prominentAction()
-                .tint(LecternTheme.accent)
                 .disabled(!canSave)
+                .opacity(canSave ? 1 : 0.5)
         }
+        .padding(.top, 4)
     }
 
     private func saveIfValid() {
@@ -1353,8 +1522,10 @@ struct ManualAssignmentSheet: View {
         let due = combinedDue()
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let points = Double(pointsText.trimmingCharacters(in: .whitespacesAndNewlines))
+        let minutes = reminder.minutes
         if let editing {
             editing.title = trimmedTitle
+            editing.assignmentCategory = assignmentCategory
             editing.dueAt = due
             editing.pointsPossible = points
             editing.detailsHTML = trimmedNotes.isEmpty ? nil : trimmedNotes
@@ -1362,7 +1533,10 @@ struct ManualAssignmentSheet: View {
             editing.courseName = selectedCourse?.name ?? "Personal"
             editing.courseCode = selectedCourse?.courseCode
             editing.submissionState = isComplete ? "submitted" : nil
+            editing.reminderMinutesBefore = minutes
             editing.syncedAt = Date()
+            try? modelContext.save()
+            AssignmentReminderScheduler.schedule(for: editing)
         } else {
             let assignment = CanvasAssignment(
                 canvasID: CanvasAssignment.makeLocalID(),
@@ -1370,18 +1544,22 @@ struct ManualAssignmentSheet: View {
                 courseName: selectedCourse?.name ?? "Personal",
                 title: trimmedTitle
             )
+            assignment.assignmentCategory = assignmentCategory
             assignment.dueAt = due
             assignment.pointsPossible = points
             assignment.detailsHTML = trimmedNotes.isEmpty ? nil : trimmedNotes
             assignment.courseCode = selectedCourse?.courseCode
+            assignment.reminderMinutesBefore = minutes
             modelContext.insert(assignment)
+            try? modelContext.save()
+            AssignmentReminderScheduler.schedule(for: assignment)
         }
-        try? modelContext.save()
         dismiss()
     }
 
     private func delete() {
         if let editing {
+            AssignmentReminderScheduler.cancel(for: editing)
             modelContext.delete(editing)
             try? modelContext.save()
         }
@@ -1467,7 +1645,7 @@ struct CanvasAssignmentsView: View {
             Button { editingAssignment = assignment } label: {
                 HStack(spacing: 14) {
                     Image(systemName: assignment.isComplete ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 18)).foregroundStyle(assignment.isComplete ? LecternTheme.successTint : .secondary)
+                        .font(.system(size: 18)).foregroundStyle(assignment.isComplete ? LecternTheme.successTint : assignment.assignmentCategory.color)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack { Text(assignment.title).font(.system(size: 13.5, weight: .semibold)); StatusChip("Personal", LecternTheme.accent) }
                         Text("\(assignment.courseCode ?? assignment.courseName) · \(assignmentDetail(assignment))").font(.system(size: 11)).foregroundStyle(.secondary)
