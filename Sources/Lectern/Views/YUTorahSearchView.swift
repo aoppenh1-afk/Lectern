@@ -564,16 +564,9 @@ struct YUTorahSearchView: View {
                 Text("Recommended teachers for your next shiur.")
                     .font(.system(size: 13)).foregroundStyle(.secondary)
             }
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 12) {
-                    ForEach(YUTorahRecommendedTeacher.all) { teacher in
-                        recommendationCard(teacher).frame(width: 200)
-                    }
-                }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 12)], spacing: 12) {
-                    ForEach(YUTorahRecommendedTeacher.all) { teacher in
-                        recommendationCard(teacher)
-                    }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 12)], spacing: 12) {
+                ForEach(YUTorahRecommendedTeacher.all) { teacher in
+                    recommendationCard(teacher)
                 }
             }
         }
@@ -607,6 +600,7 @@ struct YUTorahSearchView: View {
             .font(.system(size: 12, weight: .medium)).buttonStyle(.plain)
         }
         .padding(14)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(LecternTheme.hairline))
     }
