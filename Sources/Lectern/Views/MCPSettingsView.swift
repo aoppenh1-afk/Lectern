@@ -223,12 +223,51 @@ struct MCPSettingsPane: View {
         return sharing.sharedCourseIDs.contains(id)
     }
 
+    private var shouldShowUnfiledToggle: Bool {
+        let matchesSemester: Bool
+        switch selectedSemester {
+        case .all, .unassigned:
+            matchesSemester = true
+        case .semester:
+            matchesSemester = false
+        }
+        let matchesSearch = search.isEmpty || "unfiled lectures".localizedStandardContains(search)
+        let isExpandedOrSmall = showsAllCourses || filteredCourses.count <= 6
+        return matchesSemester && matchesSearch && isExpandedOrSmall
+    }
+
+    private func toggleAllFiltered(selectAll: Bool) {
+        var updated = sharing.sharedCourseIDs
+        for course in filteredCourses {
+            guard let id = try? LecternCloudSharing.id(for: course.persistentModelID) else { continue }
+            if selectAll {
+                updated.insert(id)
+            } else {
+                updated.remove(id)
+            }
+        }
+        sharing.sharedCourseIDs = updated
+    }
+
     private var coursesCard: some View {
         card {
             cardHeading("book", "Choose courses to share", "Select which courses your AI can access. Only course names, lecture titles, dates, notes and transcripts are shared.", smallCaption: true)
                 .overlay(alignment: .topTrailing) {
-                    Text("\(courses.filter { isSelected($0) }.count) of \(courses.count) selected")
-                        .foregroundStyle(muted).font(.system(size: 12.5))
+                    HStack(spacing: 8) {
+                        Text("\(courses.filter { isSelected($0) }.count) of \(courses.count) selected")
+                            .foregroundStyle(muted).font(.system(size: 12.5))
+                        if !filteredCourses.isEmpty {
+                            Text("·").foregroundStyle(muted).font(.system(size: 12.5))
+                            let allFilteredSelected = filteredCourses.allSatisfy { isSelected($0) }
+                            Button(allFilteredSelected ? "Clear" : "Select all") {
+                                toggleAllFiltered(selectAll: !allFilteredSelected)
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(green)
+                            .disabled(sharing.isBusy)
+                        }
+                    }
                 }
             HStack(spacing: 8) {
                 HStack(spacing: 8) {
@@ -270,7 +309,7 @@ struct MCPSettingsPane: View {
                     .font(.system(size: 12.5))
                     .foregroundStyle(muted).padding(.vertical, 16).frame(maxWidth: .infinity)
             }
-            if showsAllCourses {
+            if shouldShowUnfiledToggle {
                 Toggle("Unfiled lectures", isOn: Binding(get: { sharing.shareUnfiled }, set: { sharing.shareUnfiled = $0 }))
                     .font(.system(size: 12.5))
                     .toggleStyle(.checkbox).disabled(sharing.isBusy)
