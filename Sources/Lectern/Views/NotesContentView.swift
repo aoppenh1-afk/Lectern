@@ -103,7 +103,7 @@ enum NoteBlockParser {
             pattern.firstMatch(in: line, range: NSRange(line.startIndex..., in: line))
         }
 
-        let lines = text.components(separatedBy: "\n")
+        let lines = NotesDafCitation.normalize(text).components(separatedBy: "\n")
         var index = 0
         while index < lines.count {
             let rawLine = lines[index]

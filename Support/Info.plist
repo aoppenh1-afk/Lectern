@@ -37,6 +37,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
+	<key>LecternDevSHA</key>
+	<string>$(LECTERN_DEV_SHA)</string>
+	<key>LecternDevTag</key>
+	<string>$(LECTERN_DEV_TAG)</string>
 	<key>LecternGoogleOAuthClientID</key>
 	<string>$(LECTERN_GOOGLE_CLIENT_ID)</string>
 	<key>LecternGoogleOAuthClientSecret</key>

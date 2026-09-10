@@ -29,6 +29,14 @@ if [[ -n "${LECTERN_GOOGLE_CLIENT_ID:-}" ]]; then
   GOOGLE_BUILD_SETTINGS+=("LECTERN_GOOGLE_CLIENT_ID=$LECTERN_GOOGLE_CLIENT_ID")
   GOOGLE_BUILD_SETTINGS+=("LECTERN_GOOGLE_CLIENT_SECRET=${LECTERN_GOOGLE_CLIENT_SECRET:-}")
 fi
+# Dev-channel identity stamped by scripts/release-dev.sh. Empty for stable
+# builds; surfaces as LecternDevTag/LecternDevSHA in Info.plist.
+if [[ -n "${LECTERN_DEV_TAG:-}" ]]; then
+  GOOGLE_BUILD_SETTINGS+=("LECTERN_DEV_TAG=$LECTERN_DEV_TAG")
+fi
+if [[ -n "${LECTERN_DEV_SHA:-}" ]]; then
+  GOOGLE_BUILD_SETTINGS+=("LECTERN_DEV_SHA=$LECTERN_DEV_SHA")
+fi
 
 xcodebuild \
   -scheme Lectern \

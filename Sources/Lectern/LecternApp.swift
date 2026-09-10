@@ -249,6 +249,10 @@ struct LecternApp: App {
                 .disabled(appUpdater.repository == nil)
             }
 
+            CommandGroup(replacing: .appSettings) {
+                OpenSettingsCommand()
+            }
+
             CommandMenu("Capture") {
                 Button(captureController.phase.isLive ? "Stop Recording" : surfacePreferences.captureSource.recordButtonTitle) {
                     captureController.toggle()
@@ -271,19 +275,19 @@ struct LecternApp: App {
                 .disabled(!captureController.phase.isLive)
             }
         }
+    }
+}
 
-        Settings {
-            SettingsView()
-                .preferredColorScheme(surfacePreferences.appearance.colorScheme)
-                .environment(surfacePreferences)
-                .environment(googleDocsAuth)
-                .environment(transcriptionPreferences)
-                .environment(canvasConnection)
-                .environment(canvasSync)
-                .environment(appUpdater)
-                .environment(onboardingState)
-                .environment(notificationPreferences)
+/// ⌘, now that Settings lives in the main window instead of a separate
+/// Settings scene. Opens (or focuses) the main window, then navigates it
+/// to the Settings section.
+private struct OpenSettingsCommand: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Settings…") {
+            SettingsNavigator.openInMainWindow(openWindow: openWindow)
         }
-        .modelContainer(container)
+        .keyboardShortcut(",", modifiers: .command)
     }
 }

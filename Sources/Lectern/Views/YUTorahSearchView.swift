@@ -6,6 +6,8 @@ struct YUTorahSearchView: View {
     let onSelectCollection: (Int, String, [RemoteShiurItem]) -> Void
     let onSelectShiur: (RemoteShiurItem) -> Void
 
+    var subscriptionsContent: () -> AnyView = { AnyView(EmptyView()) }
+
     @State private var query = ""
     @State private var isSearching = false
     @State private var searchResults: YUTorahSearchResults = .empty
@@ -37,7 +39,7 @@ struct YUTorahSearchView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 24) {
             searchBar
 
             if activeTeacher != nil || activeSubcategory != nil {
@@ -54,8 +56,24 @@ struct YUTorahSearchView: View {
                             .disabled(isSearching)
                     }
                 }
-                tabBar
-                tabContent
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack {
+                        Text(activeTeacher == nil ? "Search YU Torah" : "Explore this teacher")
+                            .font(.system(size: 23, weight: .semibold, design: .serif))
+                        Spacer()
+                        if isSearching {
+                            Text("Searching…").foregroundStyle(.secondary)
+                        } else {
+                            Text("\(searchResults.totalShiurim.formatted()) shiurim")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    tabBar
+                    tabContent
+                }
+            } else {
+                subscriptionsContent()
+                discoverySection
             }
         }
     }
@@ -69,17 +87,17 @@ struct YUTorahSearchView: View {
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 21, weight: .regular))
                 .foregroundStyle(.secondary)
 
             TextField(
                 activeTeacher == nil
-                    ? "Search YU Torah: teachers, shiurim, collections, series..."
+                    ? "Search teachers, series, collections, or shiurim…"
                     : "Search within \(activeTeacher!.displayName)...",
                 text: $query
             )
             .textFieldStyle(.plain)
-            .font(.system(size: 14))
+            .font(.system(size: 16))
             .onChange(of: query) { _, newQuery in
                 performDebouncedSearch(newQuery)
             }
@@ -102,15 +120,15 @@ struct YUTorahSearchView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.primary.opacity(0.04))
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(LecternTheme.cardFill)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(LecternTheme.hairline, lineWidth: 1)
         )
     }
 
@@ -120,14 +138,7 @@ struct YUTorahSearchView: View {
     private var activeFilterBanner: some View {
         HStack(spacing: 12) {
             if let teacher = activeTeacher {
-                ZStack {
-                    Circle()
-                        .fill(Color.blue.opacity(0.15))
-                        .frame(width: 34, height: 34)
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.blue)
-                }
+                YUTorahSourcePortrait(teacherID: teacher.id, size: 56)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -135,7 +146,7 @@ struct YUTorahSearchView: View {
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(LecternTheme.ink)
 
-                        Text("\(teacher.shiurCount.formatted()) Shiurim")
+                        Text("\(searchResults.activeTeacher?.shiurCount ?? teacher.shiurCount) shiurim")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.blue)
                             .padding(.horizontal, 6)
@@ -199,7 +210,7 @@ struct YUTorahSearchView: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.primary.opacity(0.03))
@@ -309,7 +320,7 @@ struct YUTorahSearchView: View {
                     topicsView
                 }
             }
-            .frame(maxHeight: 480)
+            .frame(height: 540)
         }
     }
 
@@ -332,7 +343,7 @@ struct YUTorahSearchView: View {
                 if activeTeacher == nil && !searchResults.teachers.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("Matching Speakers")
+                            Text("Matching teachers")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(LecternTheme.ink)
                             Spacer()
@@ -347,7 +358,7 @@ struct YUTorahSearchView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 10) {
                                 ForEach(searchResults.teachers.prefix(6)) { teacher in
-                                    teacherCard(teacher)
+                                    teacherCard(teacher).frame(width: 290)
                                 }
                             }
                         }
@@ -495,9 +506,9 @@ struct YUTorahSearchView: View {
 
     private var teachersView: some View {
         ScrollView {
-            LazyVStack(spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 14)], spacing: 14) {
                 ForEach(searchResults.teachers) { teacher in
-                    teacherListRow(teacher)
+                    teacherCard(teacher)
                 }
             }
             .padding(.vertical, 4)
@@ -544,123 +555,93 @@ struct YUTorahSearchView: View {
 
     // MARK: - Row & Card Views
 
-    private func teacherCard(_ teacher: YUTorahFacetTeacher) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .fill(Color.blue.opacity(0.12))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "person.crop.circle")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.blue)
-                }
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(teacher.displayName)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(LecternTheme.ink)
-                        .lineLimit(1)
-
-                    Text("\(teacher.shiurCount.formatted()) Shiurim")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
+    private var discoverySection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Discover on YU Torah")
+                    .font(.system(size: 23, weight: .semibold, design: .serif))
+                    .foregroundStyle(LecternTheme.ink)
+                Text("Recommended teachers for your next shiur.")
+                    .font(.system(size: 13)).foregroundStyle(.secondary)
             }
-
-            HStack(spacing: 6) {
-                Button {
-                    performTeacherSearch(teacher)
-                } label: {
-                    Text("Browse")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(LecternTheme.ink)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.primary.opacity(0.06), in: Capsule())
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 12)], spacing: 12) {
+                ForEach(YUTorahRecommendedTeacher.all) { teacher in
+                    recommendationCard(teacher)
                 }
-                .buttonStyle(.plain)
-
-                Button {
-                    onSelectTeacher(teacher.id, teacher.displayName, searchResults.shiurim)
-                } label: {
-                    Text("Subscribe")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(LecternTheme.accent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(LecternTheme.accent.opacity(0.10), in: Capsule())
-                }
-                .buttonStyle(.plain)
             }
         }
-        .padding(10)
-        .frame(width: 210)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.primary.opacity(0.02))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
+        .padding(.top, 6)
     }
 
-    private func teacherListRow(_ teacher: YUTorahFacetTeacher) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.blue.opacity(0.12))
-                    .frame(width: 34, height: 34)
-                Image(systemName: "person.crop.circle")
-                    .font(.system(size: 18))
-                    .foregroundStyle(.blue)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(teacher.displayName)
-                    .font(.system(size: 13, weight: .medium))
+    private func recommendationCard(_ teacher: YUTorahRecommendedTeacher) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                YUTorahSourcePortrait(teacherID: teacher.id, size: 54)
+                Text(teacher.name)
+                    .font(.system(size: 14, weight: .semibold, design: .serif))
                     .foregroundStyle(LecternTheme.ink)
-
-                Text("\(teacher.shiurCount.formatted()) Shiurim on YU Torah")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
             }
-
-            Spacer()
-
             HStack(spacing: 8) {
-                Button {
-                    performTeacherSearch(teacher)
-                } label: {
-                    Text("Browse All Shiurim & Collections")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(LecternTheme.ink)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+                Button("Browse") {
+                    performTeacherSearch(YUTorahFacetTeacher(id: teacher.id, rawName: teacher.name,
+                                                            lastName: nil, shiurCount: 0))
                 }
-                .buttonStyle(.plain)
-
+                .foregroundStyle(.secondary)
                 Button {
-                    onSelectTeacher(teacher.id, teacher.displayName, searchResults.shiurim)
+                    onSelectTeacher(teacher.id, teacher.name, [])
+                } label: {
+                    Text("Subscribe").frame(maxWidth: .infinity).padding(.vertical, 7)
+                        .foregroundStyle(LecternTheme.accent)
+                        .background(LecternTheme.accent.opacity(0.09), in: Capsule())
+                }
+            }
+            .font(.system(size: 12, weight: .medium)).buttonStyle(.plain)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(LecternTheme.hairline))
+    }
+
+    private func teacherCard(_ teacher: YUTorahFacetTeacher) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                YUTorahSourcePortrait(teacherID: teacher.id, size: 60)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(teacher.displayName)
+                        .font(.system(size: 16, weight: .semibold, design: .serif))
+                        .foregroundStyle(LecternTheme.ink)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("\(teacher.shiurCount.formatted()) shiurim")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                }
+            }
+            HStack(spacing: 8) {
+                Button { performTeacherSearch(teacher) } label: {
+                    Text("Browse shiurim")
+                        .frame(maxWidth: .infinity).padding(.vertical, 9)
+                        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 9))
+                }
+                Button {
+                    // General search results can include unrelated speakers.
+                    onSelectTeacher(teacher.id, teacher.displayName, [])
                 } label: {
                     Text("Subscribe")
-                        .font(.system(size: 11, weight: .semibold))
+                        .frame(maxWidth: .infinity).padding(.vertical, 9)
                         .foregroundStyle(LecternTheme.accent)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(LecternTheme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+                        .background(LecternTheme.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 9))
                 }
-                .buttonStyle(.plain)
             }
+            .font(.system(size: 12, weight: .medium)).buttonStyle(.plain)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(0.02))
-        )
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(LecternTheme.hairline))
     }
 
     private func collectionRow(_ collection: YUTorahFacetCollection) -> some View {
@@ -677,7 +658,7 @@ struct YUTorahSearchView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(collection.title)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 15, weight: .medium, design: .serif))
                         .foregroundStyle(LecternTheme.ink)
                         .lineLimit(1)
 
@@ -737,10 +718,10 @@ struct YUTorahSearchView: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(0.02))
+                .fill(LecternTheme.cardFill)
         )
     }
 
@@ -757,7 +738,7 @@ struct YUTorahSearchView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(series.title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 15, weight: .medium, design: .serif))
                     .foregroundStyle(LecternTheme.ink)
                     .lineLimit(1)
 
@@ -781,10 +762,10 @@ struct YUTorahSearchView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(0.02))
+                .fill(LecternTheme.cardFill)
         )
     }
 
@@ -801,7 +782,7 @@ struct YUTorahSearchView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 15, weight: .medium, design: .serif))
                     .foregroundStyle(LecternTheme.ink)
                     .lineLimit(1)
 
@@ -840,10 +821,10 @@ struct YUTorahSearchView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color.primary.opacity(0.015))
+                .fill(LecternTheme.cardFill)
         )
     }
 
@@ -1029,6 +1010,110 @@ struct FlowLayout: Layout {
             subview.place(at: CGPoint(x: currentX, y: currentY), proposal: ProposedViewSize(size))
             maxHeightInRow = max(maxHeightInRow, size.height)
             currentX += size.width + spacing
+        }
+    }
+}
+
+/// IDs and portrait filenames supplied by YU Torah's teacher catalog.
+struct YUTorahRecommendedTeacher: Identifiable {
+    let id: Int
+    let name: String
+    let photo: String
+
+    static let all: [Self] = [
+        .init(id: 80153, name: "Rabbi Hershel Schachter", photo: "hershel_schachter_o.jpg"),
+        .init(id: 80146, name: "Rabbi Michael Rosensweig", photo: "michael_rosensweig_o.jpg"),
+        .init(id: 80215, name: "Rabbi Mordechai Willig", photo: "mordechai_i._willig_o.jpg"),
+        .init(id: 80182, name: "Rabbi Zvi Sobolofsky", photo: "zvi_sobolofsky_o.jpg"),
+        .init(id: 80177, name: "Rabbi Eli Baruch Shulman", photo: "eliyahu_shulman_o.jpg")
+    ]
+}
+
+struct YUTorahSourcePortrait: View {
+    let teacherID: Int?
+    var symbol = "person.fill"
+    var size: CGFloat = 60
+    @State private var resolvedURL: URL?
+
+    private var portraitURL: URL? {
+        if let teacher = YUTorahRecommendedTeacher.all.first(where: { $0.id == teacherID }) {
+            return YUTorahPortraitLoader.imageURL(filename: teacher.photo)
+        }
+        return resolvedURL
+    }
+
+    var body: some View {
+        AsyncImage(url: portraitURL) { phase in
+            if let image = phase.image {
+                image.resizable().scaledToFill()
+            } else {
+                ZStack {
+                    LinearGradient(colors: [LecternTheme.accent.opacity(0.06), LecternTheme.accent.opacity(0.18)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                    Image(systemName: symbol)
+                        .font(.system(size: size * 0.4, weight: .light))
+                        .foregroundStyle(LecternTheme.accent)
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 11))
+        .accessibilityHidden(true)
+        .task(id: teacherID) {
+            resolvedURL = nil
+            guard let teacherID,
+                  !YUTorahRecommendedTeacher.all.contains(where: { $0.id == teacherID }) else { return }
+            let url = await YUTorahPortraitLoader.shared.portrait(for: teacherID)
+            guard !Task.isCancelled else { return }
+            resolvedURL = url
+        }
+    }
+}
+
+actor YUTorahPortraitLoader {
+    static let shared = YUTorahPortraitLoader()
+    private var cachedURLs: [Int: URL] = [:]
+    private var requests: [Int: Task<URL?, Never>] = [:]
+
+    nonisolated static func imageURL(filename: String) -> URL? {
+        guard !filename.isEmpty, filename != "_default.jpg",
+              !filename.contains("/"), !filename.contains("..") else { return nil }
+        return URL(string: "https://cdnyutorah.cachefly.net/_images/roshei_yeshiva/")?
+            .appendingPathComponent(filename)
+    }
+
+    func portrait(for teacherID: Int) async -> URL? {
+        if let url = cachedURLs[teacherID] { return url }
+        if let request = requests[teacherID] { return await request.value }
+        let request = Task<URL?, Never> {
+            guard let url = URL(string: "https://api.yutorah.org/search?teacherID=\(teacherID)&start=1") else { return nil }
+            do {
+                var request = URLRequest(url: url)
+                request.timeoutInterval = 15
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+                let result = try JSONDecoder().decode(PortraitResponse.self, from: data)
+                guard let photo = result.response.docs.first(where: { $0.teacherid == teacherID })?.PHOTO else { return nil }
+                return Self.imageURL(filename: photo)
+            } catch {
+                return nil
+            }
+        }
+        requests[teacherID] = request
+        let url = await request.value
+        cachedURLs[teacherID] = url
+        requests[teacherID] = nil
+        return url
+    }
+
+    private struct PortraitResponse: Decodable {
+        let response: Response
+        struct Response: Decodable {
+            let docs: [Document]
+        }
+        struct Document: Decodable {
+            let teacherid: Int?
+            let PHOTO: String?
         }
     }
 }

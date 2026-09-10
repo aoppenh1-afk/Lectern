@@ -3,6 +3,8 @@ import SwiftUI
 
 /// Paper-styled settings: sidebar sections on the left, one focused pane on
 /// the right, matching the main window's design language.
+/// Embedded in the main window (Command Studio sidebar › Settings), so the
+/// layout is flexible and type is sized for the larger workspace card.
 struct SettingsView: View {
     @State private var section: Section = .general
 
@@ -40,6 +42,21 @@ struct SettingsView: View {
             case .agents: return "cpu"
             }
         }
+
+        var subtitle: String {
+            switch self {
+            case .general: return "Version, updates, and the setup assistant."
+            case .notifications: return "Decide when Lectern may notify you."
+            case .appearance: return "Theme and accent across the whole app."
+            case .recording: return "Capture source, hotkey, and menu surfaces."
+            case .transcription: return "Where new recordings are transcribed."
+            case .retention: return "How long lecture audio is kept."
+            case .canvas: return "Pull courses, deadlines, and announcements."
+            case .anki: return "Sync flashcards through AnkiConnect."
+            case .googleDocs: return "Push notes into one doc per course."
+            case .agents: return "Runtimes and accounts that generate study material."
+            }
+        }
     }
 
     var body: some View {
@@ -49,25 +66,25 @@ struct SettingsView: View {
             content
         }
         .background(LecternTheme.paper)
-        .frame(width: 820, height: 640)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Sidebar
 
     private var sidebar: some View {
         VStack(spacing: 2) {
-            HStack(spacing: 7) {
+            HStack(spacing: 8) {
                 Circle()
                     .fill(LecternTheme.accent)
-                    .frame(width: 7, height: 7)
+                    .frame(width: 8, height: 8)
                 Text("Settings")
-                    .font(.system(size: 14, weight: .bold, design: .serif))
+                    .font(.system(size: 16, weight: .bold, design: .serif))
                     .foregroundStyle(LecternTheme.ink)
                 Spacer()
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
+            .padding(.horizontal, 16)
+            .padding(.top, 28)
+            .padding(.bottom, 16)
 
             ForEach(Section.allCases) { item in
                 sectionRow(item)
@@ -75,7 +92,7 @@ struct SettingsView: View {
 
             Spacer()
         }
-        .frame(width: 176)
+        .frame(width: 216)
         .background(LecternTheme.paperDeep)
     }
 
@@ -84,23 +101,23 @@ struct SettingsView: View {
         return Button {
             section = item
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 11) {
                 Image(systemName: item.icon)
-                    .font(.system(size: 12))
+                    .font(.system(size: 14))
                     .foregroundStyle(isSelected ? LecternTheme.accent : .secondary)
-                    .frame(width: 18)
+                    .frame(width: 20)
                 Text(item.title)
-                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 13.5, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(LecternTheme.ink)
                 Spacer()
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(isSelected ? LecternTheme.accent.opacity(0.10) : Color.clear)
             )
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 10)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -111,10 +128,15 @@ struct SettingsView: View {
     @ViewBuilder
     private var content: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(section.title)
-                    .font(.system(size: 22, weight: .bold, design: .serif))
-                    .foregroundStyle(LecternTheme.ink)
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(section.title)
+                        .font(.system(size: 28, weight: .bold, design: .serif))
+                        .foregroundStyle(LecternTheme.ink)
+                    Text(section.subtitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
 
                 switch section {
                 case .general: GeneralPane()
@@ -129,7 +151,8 @@ struct SettingsView: View {
                 case .agents: AgentsPane()
                 }
             }
-            .padding(22)
+            .padding(.horizontal, 40)
+            .padding(.vertical, 32)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -250,29 +273,29 @@ private struct SettingsRow<Control: View>: View {
     @ViewBuilder let control: Control
 
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .center, spacing: 18) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(LecternTheme.ink)
                 if let caption {
                     Text(caption)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer()
             control
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
 
         if showsDivider {
             Rectangle()
                 .fill(Color.primary.opacity(0.07))
                 .frame(height: 1)
-                .padding(.leading, 16)
+                .padding(.leading, 18)
         }
     }
 }
@@ -285,6 +308,7 @@ private struct GeneralPane: View {
     @Environment(\.openWindow) private var openWindow
 
     @State private var autoCheck = true
+    @State private var channel: UpdateChannel = .stable
 
     private var build: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
@@ -293,8 +317,8 @@ private struct GeneralPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsCard {
-                SettingsRow(title: "Lectern \(updater.currentVersion)",
-                            caption: "Build \(build). Updates are published as GitHub releases.") {
+                SettingsRow(title: "Lectern \(updater.displayVersion)",
+                            caption: "Build \(build). Stable releases are published when ready; dev builds track every commit.") {
                     HStack(spacing: 8) {
                         if updater.phase == .checking {
                             ProgressView().controlSize(.small)
@@ -314,6 +338,24 @@ private struct GeneralPane: View {
                         .controlSize(.small)
                         .labelsHidden()
                         .onChange(of: autoCheck) { _, value in updater.autoCheckEnabled = value }
+                }
+
+                SettingsRow(title: "Update channel",
+                            caption: channel == .dev
+                                ? "Dev builds track every commit on main. Expect breakage."
+                                : "Tested releases only. Nothing changes until a new release is published.") {
+                    Picker("", selection: $channel) {
+                        Text("Stable").tag(UpdateChannel.stable)
+                        Text("Dev").tag(UpdateChannel.dev)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 150)
+                    .labelsHidden()
+                    .disabled(updater.phase == .checking)
+                    .onChange(of: channel) { _, value in
+                        updater.channel = value
+                        Task { await updater.checkNow() }
+                    }
                 }
 
                 SettingsRow(title: "Status", caption: statusCaption, showsDivider: updater.releasesPageURL != nil) {
@@ -343,14 +385,17 @@ private struct GeneralPane: View {
                 }
             }
         }
-        .onAppear { autoCheck = updater.autoCheckEnabled }
+        .onAppear {
+            autoCheck = updater.autoCheckEnabled
+            channel = updater.channel
+        }
     }
 
     private var statusCaption: String {
         switch updater.phase {
         case .idle: return "Not checked yet this session."
         case .checking: return "Contacting GitHub…"
-        case .upToDate: return "You are on the latest release."
+        case .upToDate: return updater.channel == .dev ? "You are on the latest dev build." : "You are on the latest release."
         case .available: return "Version \(updater.pendingPrompt?.version ?? updater.availableRelease?.version ?? "") is ready to install."
         case .downloading(let fraction): return "Downloading… \(Int(fraction * 100))%"
         case .installing: return "Installing…"

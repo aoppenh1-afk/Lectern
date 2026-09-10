@@ -5,7 +5,6 @@ struct MenuBarPopoverView: View {
     @Environment(CaptureController.self) private var capture
     @Environment(SurfacePreferences.self) private var surfacePreferences
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
     @Query(sort: \Course.name) private var courses: [Course]
 
     @State private var selectedCourse: Course?
@@ -131,7 +130,7 @@ struct MenuBarPopoverView: View {
                 openWindow(id: "main")
             }
             popoverLink("Settings…", systemImage: "gearshape") {
-                openSettings()
+                SettingsNavigator.openInMainWindow(openWindow: openWindow)
             }
             popoverLink("Quit Lectern", systemImage: "power", role: .destructive) {
                 NSApplication.shared.terminate(nil)

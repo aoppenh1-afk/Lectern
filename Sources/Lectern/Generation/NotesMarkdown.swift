@@ -177,8 +177,8 @@ struct NotesListScanner {
 }
 
 /// Rewrites model-generated notes into Lectern's canonical Markdown before
-/// validation, storage, and rendering. The rewrite is structural only: text
-/// content, headings, and fenced blocks are preserved verbatim.
+/// validation, storage, and rendering. Canonicalizes list structure and daf
+/// amud-marker placement while preserving fenced blocks.
 enum NotesMarkdownNormalizer {
     static func normalize(_ markdown: String) -> String {
         var text = markdown.replacingOccurrences(of: "\r\n", with: "\n")
@@ -202,7 +202,7 @@ enum NotesMarkdownNormalizer {
                 continue
             }
 
-            for piece in splitInlineBullets(line) {
+            for piece in splitInlineBullets(NotesDafCitation.normalize(line)) {
                 if let item = scanner.scan(piece) {
                     output.append(item.canonicalMarkdown)
                 } else {
@@ -244,5 +244,56 @@ enum NotesMarkdownNormalizer {
             .filter { !$0.isEmpty }
         guard parts.count > 1 else { return [line] }
         return parts.map { "\(leading)- \($0)" }
+    }
+}
+
+/// The student's LTR citation convention puts the amud mark before "דף".
+/// Restrict repairs to explicit daf + canonical Hebrew numeral + dot/colon.
+enum NotesDafCitation {
+    private static let citation = try! NSRegularExpression(
+        pattern: #"(?<![א-ת.:])דף[ \t]+([א-ת״׳"']{1,8})([.:])(?![.:])"#)
+    private static let numerals: Set<String> = Set((1...999).map { number in
+        var remaining = number
+        var result = ""
+        for (value, letter) in [(400, "ת"), (300, "ש"), (200, "ר"), (100, "ק")] {
+            while remaining >= value { result += letter; remaining -= value }
+        }
+        if remaining == 15 { return result + "טו" }
+        if remaining == 16 { return result + "טז" }
+        for (value, letter) in [(90, "צ"), (80, "פ"), (70, "ע"), (60, "ס"), (50, "נ"),
+                                (40, "מ"), (30, "ל"), (20, "כ"), (10, "י"), (9, "ט"),
+                                (8, "ח"), (7, "ז"), (6, "ו"), (5, "ה"), (4, "ד"),
+                                (3, "ג"), (2, "ב"), (1, "א")] {
+            if remaining >= value { result += letter; remaining -= value }
+        }
+        return result
+    })
+
+    static func normalize(_ text: String) -> String {
+        var inFence = false
+        return text.components(separatedBy: "\n").map { line in
+            if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
+                inFence.toggle()
+                return line
+            }
+            if inFence { return line }
+            return line.components(separatedBy: "`").enumerated().map {
+                $0.offset.isMultiple(of: 2) ? normalizeLine($0.element) : $0.element
+            }.joined(separator: "`")
+        }.joined(separator: "\n")
+    }
+
+    private static func normalizeLine(_ text: String) -> String {
+        let source = text as NSString
+        var result = text
+        for match in citation.matches(in: text, range: NSRange(location: 0, length: source.length)).reversed() {
+            let numeral = source.substring(with: match.range(at: 1))
+                .filter { ("א"..."ת").contains($0) }
+            guard numerals.contains(numeral), let range = Range(match.range, in: result) else { continue }
+            let mark = source.substring(with: match.range(at: 2))
+            let reference = source.substring(with: NSRange(location: match.range.location, length: match.range.length - 1))
+            result.replaceSubrange(range, with: mark + reference)
+        }
+        return result
     }
 }

@@ -67,6 +67,8 @@ Do not commit tokens, `.env` files, or Keychain material. Do not change `git con
 
 Lectern checks this repository's GitHub Releases about once a day and offers to install a newer build in place (**Settings › General › Check for updates**, or Lectern menu › Check for Updates…). It downloads the zip, verifies the checksum, swaps the app, and relaunches.
 
+**Settings › General › Update channel** switches tracks: **Stable** follows tested releases, published only when a new release is cut; **Dev** follows every commit on main via prereleases and may break. Switching back to Stable offers the latest stable release as the way out.
+
 You can also download any version from the [Releases page](https://github.com/aoppenh1-afk/Lectern/releases).
 
 ## Other agents

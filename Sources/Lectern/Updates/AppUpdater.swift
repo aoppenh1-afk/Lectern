@@ -6,6 +6,11 @@ import Observation
 /// A published GitHub release that is newer than the running app.
 struct AppRelease: Identifiable, Hashable, Sendable {
     let version: String
+    /// Full Git tag (dev tags keep their timestamp/SHA suffix; stable tags
+    /// equal the version with a `v` prefix).
+    let tag: String
+    /// True for dev-channel prereleases (`v2.3-dev.…` / `dev-…` tags).
+    let isDev: Bool
     let name: String
     let notes: String
     let htmlURL: URL
@@ -15,6 +20,14 @@ struct AppRelease: Identifiable, Hashable, Sendable {
     let checksumAPIURL: URL?
 
     var id: String { version }
+}
+
+/// Update track. Stable follows tested GitHub releases, published only when
+/// the maintainer cuts one. Dev follows every commit on main via dev
+/// prereleases and may break.
+enum UpdateChannel: String, Sendable, CaseIterable {
+    case stable
+    case dev
 }
 
 /// Dotted numeric version compare ("1.2" < "1.2.1" < "1.10").
@@ -109,7 +122,10 @@ final class AppUpdater {
     static let repositoryInfoKey = "LecternUpdateRepository"
     static let autoCheckKey = "updates.autoCheck"
     static let lastCheckKey = "updates.lastCheck"
-    static let skippedVersionKey = "updates.skippedVersion"
+    // Immutable keys: safe to read from nonisolated helpers like skippedKey.
+    nonisolated static let skippedVersionKey = "updates.skippedVersion"
+    nonisolated static let skippedDevVersionKey = "updates.skippedVersion.dev"
+    static let channelKey = "updates.channel"
 
     private(set) var phase: Phase = .idle
     private(set) var availableRelease: AppRelease?
@@ -147,6 +163,57 @@ final class AppUpdater {
         set { userDefaults.set(newValue, forKey: Self.autoCheckKey) }
     }
 
+    /// Selected update track. Switching tracks clears the current result so
+    /// the next check starts fresh; per-track skips are kept separately.
+    var channel: UpdateChannel {
+        get {
+            if let raw = userDefaults.string(forKey: Self.channelKey),
+               let parsed = UpdateChannel(rawValue: raw) {
+                return parsed
+            }
+            return .stable
+        }
+        set {
+            userDefaults.set(newValue.rawValue, forKey: Self.channelKey)
+            phase = .idle
+            availableRelease = nil
+            pendingPrompt = nil
+        }
+    }
+
+    /// Full dev tag baked in at build time by scripts/release-dev.sh.
+    /// Nil for stable builds (and local builds, which carry no dev stamp).
+    /// An unresolved `$(…)` placeholder — what Xcode leaves when the build
+    /// setting is undefined — counts as missing, mirroring
+    /// GoogleOAuthConfiguration.
+    var currentDevTag: String? {
+        let raw = devInfoValue("LecternDevTag")
+        return raw.isEmpty ? nil : raw
+    }
+
+    var isDevBuild: Bool { currentDevTag != nil }
+
+    /// Human-readable version including the dev stamp when present.
+    var displayVersion: String {
+        guard isDevBuild else { return currentVersion }
+        let sha = devInfoValue("LecternDevSHA")
+        guard !sha.isEmpty else { return "\(currentVersion)-dev" }
+        return "\(currentVersion)-dev \(String(sha.prefix(7)))"
+    }
+
+    private nonisolated func devInfoValue(_ key: String) -> String {
+        let raw = (Bundle.main.object(forInfoDictionaryKey: key) as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return raw.contains("$(") ? "" : raw
+    }
+
+    nonisolated static func skippedKey(for channel: UpdateChannel) -> String {
+        switch channel {
+        case .stable: return skippedVersionKey
+        case .dev: return skippedDevVersionKey
+        }
+    }
+
     // MARK: Checking
 
     /// Unconditional silent check run every time the app launches. Records the
@@ -157,7 +224,7 @@ final class AppUpdater {
         guard autoCheckEnabled, repository != nil else { return }
         do {
             if let release = try await fetchNewerRelease() {
-                if userDefaults.string(forKey: Self.skippedVersionKey) != release.version {
+                if userDefaults.string(forKey: Self.skippedKey(for: channel)) != release.version {
                     pendingPrompt = release
                 }
             }
@@ -174,7 +241,7 @@ final class AppUpdater {
         guard now.timeIntervalSince(last) > 60 * 60 * 20 else { return }
         do {
             if let release = try await fetchNewerRelease() {
-                if userDefaults.string(forKey: Self.skippedVersionKey) != release.version {
+                if userDefaults.string(forKey: Self.skippedKey(for: channel)) != release.version {
                     pendingPrompt = release
                 }
             }
@@ -198,40 +265,110 @@ final class AppUpdater {
     }
 
     func skip(_ release: AppRelease) {
-        userDefaults.set(release.version, forKey: Self.skippedVersionKey)
+        userDefaults.set(release.version, forKey: Self.skippedKey(for: release.isDev ? .dev : .stable))
         pendingPrompt = nil
     }
 
     func fetchNewerRelease() async throws -> AppRelease? {
         guard let repository else { throw AppUpdaterError.repositoryNotConfigured }
-        let url = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
-        let data = try await get(url, accept: "application/vnd.github+json")
-        let release = try Self.parseRelease(data)
-        userDefaults.set(Date(), forKey: Self.lastCheckKey)
-        availableRelease = release
-        guard let remote = AppVersion(release.version), let local = AppVersion(currentVersion) else {
-            return nil
+        switch channel {
+        case .stable:
+            let url = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
+            let data = try await get(url, accept: "application/vnd.github+json")
+            let release = try Self.parseRelease(data)
+            userDefaults.set(Date(), forKey: Self.lastCheckKey)
+            availableRelease = release
+            // A dev build that switches back to stable is always offered the
+            // latest stable release as its exit ramp, even when the dotted
+            // versions compare equal (dev builds share the base version).
+            if isDevBuild {
+                return release.assetAPIURL == nil ? nil : release
+            }
+            guard let remote = AppVersion(release.version), let local = AppVersion(currentVersion) else {
+                return nil
+            }
+            return remote > local ? release : nil
+        case .dev:
+            let url = URL(string: "https://api.github.com/repos/\(repository)/releases?per_page=30")!
+            let data = try await get(url, accept: "application/vnd.github+json")
+            guard let release = try Self.parseNewestDevRelease(data) else {
+                userDefaults.set(Date(), forKey: Self.lastCheckKey)
+                return nil
+            }
+            userDefaults.set(Date(), forKey: Self.lastCheckKey)
+            availableRelease = release
+            // Dev builds are ordered by publish time, not by dotted version:
+            // every dev tag shares the base marketing version.
+            if let current = currentDevTag, current == release.tag {
+                return nil
+            }
+            return release
         }
-        return remote > local ? release : nil
     }
 
     nonisolated static func parseRelease(_ data: Data) throws -> AppRelease {
-        struct Asset: Decodable { let name: String; let url: URL }
-        struct Payload: Decodable {
-            let tag_name: String
-            let name: String?
-            let body: String?
-            let html_url: URL
-            let assets: [Asset]
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let payload = try decoder.decode(ReleasePayload.self, from: data)
+        return makeRelease(from: payload)
+    }
+
+    /// Picks the newest dev-channel prerelease from a `GET /releases` list.
+    /// Dev tags look like `v2.3-dev.20260910-143000-a1b2c3d` (or `dev-…`);
+    /// ordering is by publish date, falling back to tag order since tags
+    /// embed a UTC timestamp.
+    nonisolated static func parseNewestDevRelease(_ data: Data) throws -> AppRelease? {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let payloads = try decoder.decode([ReleasePayload].self, from: data)
+        let devs = payloads.filter { ($0.prerelease ?? false) && isDevTag($0.tag_name) }
+        let sorted = devs.sorted {
+            switch ($0.published_at, $1.published_at) {
+            case let (a?, b?): return a > b
+            case (_?, nil): return true
+            case (nil, _?): return false
+            default: return $0.tag_name > $1.tag_name
+            }
         }
-        let payload = try JSONDecoder().decode(Payload.self, from: data)
+        guard let newest = sorted.first else { return nil }
+        return makeRelease(from: newest)
+    }
+
+    /// Dev prerelease tags published by scripts/release-dev.sh.
+    nonisolated static func isDevTag(_ tag: String) -> Bool {
+        tag.hasPrefix("dev-") || tag.contains("-dev.")
+    }
+
+    private struct ReleasePayload: Decodable {
+        let tag_name: String
+        let name: String?
+        let body: String?
+        let html_url: URL
+        let assets: [ReleaseAsset]
+        let prerelease: Bool?
+        let published_at: Date?
+    }
+
+    private struct ReleaseAsset: Decodable {
+        let name: String
+        let url: URL
+    }
+
+    private nonisolated static func makeRelease(from payload: ReleasePayload) -> AppRelease {
         let zip = payload.assets.first { $0.name.lowercased().hasSuffix(".zip") && $0.name.lowercased().contains("lectern") }
             ?? payload.assets.first { $0.name.lowercased().hasSuffix(".zip") }
         let checksum = zip.flatMap { zipAsset in
             payload.assets.first { $0.name == zipAsset.name + ".sha256" }
         }
+        let stripped = payload.tag_name.hasPrefix("v") || payload.tag_name.hasPrefix("V")
+            ? String(payload.tag_name.dropFirst()) : payload.tag_name
+        let dev = isDevTag(payload.tag_name)
         return AppRelease(
-            version: AppVersion(payload.tag_name)?.description ?? payload.tag_name,
+            // Stable keeps the normalized dotted version so version compares
+            // keep working; dev keeps the full tag so every commit is unique.
+            version: dev ? stripped : (AppVersion(payload.tag_name)?.description ?? stripped),
+            tag: payload.tag_name,
+            isDev: dev,
             name: payload.name ?? payload.tag_name,
             notes: payload.body ?? "",
             htmlURL: payload.html_url,

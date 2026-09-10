@@ -34,6 +34,8 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--focus);outline-offs
 .button:hover{background:var(--moss-ink)}
 .button-secondary{display:inline-block;min-height:44px;line-height:1.2;padding:13px 24px;background:transparent;color:var(--moss);border-radius:10px;text-decoration:none;font-weight:650;border:1px solid var(--moss)}
 .button-secondary:hover{background:var(--sage)}
+.hero-note{font-size:.92rem;margin:14px auto 0;max-width:460px}
+.hero-note a{color:inherit}
 .meta{font-size:.86rem;color:var(--muted);margin-bottom:0}
 .tour{position:relative;overflow:clip;background:var(--paper);border-top:1px solid var(--line)}
 .tour-scene{position:absolute;top:0;left:0;right:0;height:700px;pointer-events:none;z-index:0;overflow:hidden}
@@ -127,5 +129,14 @@ h1{font-size:clamp(2.4rem,11vw,3.2rem)}
 .trust{padding-bottom:52px}
 .demo-buttons button{flex:1 1 44%}
 }
+.dl-backdrop{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,28,22,.55)}
+.dl-backdrop[hidden]{display:none}
+.dl-modal{position:relative;max-width:560px;width:100%;max-height:min(90vh,640px);overflow:auto;background:var(--card,#fff);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 30px 80px rgba(15,25,18,.35)}
+.dl-modal h2{font-size:clamp(1.5rem,3vw,1.9rem);margin:6px 0 12px}
+.dl-modal ol{margin:0 0 1rem;padding-left:1.4rem;display:grid;gap:8px}
+.dl-actions{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0 12px}
+.dl-modal .meta{margin-bottom:0}
+.dl-x{position:absolute;top:10px;right:12px;min-width:44px;min-height:44px;border:1px solid transparent;background:transparent;color:var(--muted);font-size:1.6rem;line-height:1;border-radius:10px;cursor:pointer}
+.dl-x:hover{background:var(--sage,#E1ECE0);color:var(--ink)}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
-@media print{.site-header,.site-footer,.actions,.demo-toolbar,.demo-stage{display:none}body{background:#fff}.legal{max-width:none;margin:0}}
+@media print{.site-header,.site-footer,.actions,.demo-toolbar,.demo-stage,.dl-backdrop{display:none}body{background:#fff}.legal{max-width:none;margin:0}}

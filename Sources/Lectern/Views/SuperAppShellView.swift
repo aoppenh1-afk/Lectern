@@ -1,8 +1,49 @@
 import SwiftData
 import SwiftUI
 
+extension Notification.Name {
+    static let lecternOpenSettings = Notification.Name("lectern.open-settings")
+}
+
+enum SettingsNavigator {
+    private static let pendingKey = "lectern.openSettingsPending"
+
+    /// Request the main window's Settings section. Works whether the main
+    /// window is already open (live notification) or still opening
+    /// (pending flag consumed on appear).
+    static func open() {
+        UserDefaults.standard.set(true, forKey: pendingKey)
+        NotificationCenter.default.post(name: .lecternOpenSettings, object: nil)
+    }
+
+    static func consumePending() -> Bool {
+        guard UserDefaults.standard.bool(forKey: pendingKey) else { return false }
+        UserDefaults.standard.set(false, forKey: pendingKey)
+        return true
+    }
+
+    /// Focus the existing main window (or open one if none exists) and show
+    /// Settings in it. Must not call openWindow unconditionally: WindowGroup
+    /// spawns a brand-new window on every call. The notch pill is a
+    /// borderless panel, so any titled window is a main window.
+    @MainActor
+    static func openInMainWindow(openWindow: OpenWindowAction) {
+        open()
+        let app = NSApplication.shared
+        if let main = app.windows.first(where: { $0.styleMask.contains(.titled) && $0.isVisible }) {
+            main.makeKeyAndOrderFront(nil)
+        } else if let hidden = app.windows.first(where: { $0.styleMask.contains(.titled) }) {
+            hidden.deminiaturize(nil)
+            hidden.makeKeyAndOrderFront(nil)
+        } else {
+            openWindow(id: "main")
+        }
+        app.activate(ignoringOtherApps: true)
+    }
+}
+
 enum CommandStudioSection: String, CaseIterable, Identifiable {
-    case overview, calendar, assignments, courses, subscriptions, grades, resources, announcements, aiChat
+    case overview, calendar, assignments, courses, subscriptions, grades, resources, announcements, aiChat, settings
 
     var id: String { rawValue }
     var title: String {
@@ -16,6 +57,7 @@ enum CommandStudioSection: String, CaseIterable, Identifiable {
         case .resources: "Resources"
         case .announcements: "Announcements"
         case .aiChat: "AI Chat"
+        case .settings: "Settings"
         }
     }
     var icon: String {
@@ -29,6 +71,7 @@ enum CommandStudioSection: String, CaseIterable, Identifiable {
         case .resources: "folder"
         case .announcements: "megaphone"
         case .aiChat: "sparkles"
+        case .settings: "gearshape"
         }
     }
 }
@@ -130,7 +173,16 @@ struct SuperAppShellView: View {
         )) { release in
             UpdatePromptView(release: release)
         }
-        .onAppear(perform: resolvePreferredTerm)
+        .onAppear {
+            resolvePreferredTerm()
+            if SettingsNavigator.consumePending() {
+                selection = .settings
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .lecternOpenSettings)) { _ in
+            selection = .settings
+            _ = SettingsNavigator.consumePending()
+        }
         .onChange(of: courses.count) { _, _ in resolvePreferredTerm() }
         .alert("Canvas sync failed", isPresented: .init(
             get: { canvasSync.errorMessage != nil },
@@ -171,14 +223,16 @@ struct SuperAppShellView: View {
             .padding(.bottom, 34)
 
             VStack(spacing: 4) {
-                ForEach(CommandStudioSection.allCases) { section in
+                ForEach(CommandStudioSection.allCases.filter { $0 != .settings }) { section in
                     sidebarButton(section)
                 }
             }
             .padding(.horizontal, 12)
 
             Spacer()
-            SettingsLink {
+            Button {
+                selection = .settings
+            } label: {
                 Label("Settings", systemImage: "gearshape")
                     .font(.system(size: 13))
             }
@@ -252,6 +306,7 @@ struct SuperAppShellView: View {
         case .resources: CanvasResourcesView(courses: scopedCourses, allowedCourseIDs: scopedCanvasIDs)
         case .announcements: CanvasAnnouncementsView(courses: scopedCourses, allowedCourseIDs: scopedCanvasIDs)
         case .aiChat: CommandStudioAIView(courses: scopedCourses)
+        case .settings: SettingsView()
         }
     }
 

@@ -1,6 +1,25 @@
 import XCTest
 
 final class NotesMarkdownTests: XCTestCase {
+    func testDafReferencesUseLeadingAmudMarks() {
+        let input = "- **גמ׳ דף לו:** on שבת (דף ל״ו.) and דף קיט:; רש״י: explanation"
+        let expected = "- **גמ׳ :דף לו** on שבת (.דף ל״ו) and :דף קיט; רש״י: explanation"
+        XCTAssertEqual(NotesDafCitation.normalize(input), expected)
+        XCTAssertEqual(NotesMarkdownNormalizer.normalize(input), expected)
+        XCTAssertEqual(NotesDafCitation.normalize(expected), expected)
+        let plan = NotesMarkdownConverter.plan(markdown: input)
+        XCTAssertEqual(Self.visible(plan.text), "גמ׳ :דף לו on שבת (.דף ל״ו) and :דף קיט; רש״י: explanation")
+        XCTAssertTrue(plan.text.contains(":\u{200E}דף לו\u{200E}"))
+        let bold = plan.boldRanges[0]
+        XCTAssertEqual(Self.visible((plan.text as NSString).substring(with:
+            NSRange(location: bold.start - 1, length: bold.end - bold.start))), "גמ׳ :דף לו")
+    }
+
+    func testDafFormattingLeavesOtherPunctuationAndCodeAlone() {
+        let text = "דף הבא: explanation; דף לו; רש״י: 1/3; דף לו ע״ב; (:דף לו)\n`דף לו:`\n```\nדף לו.\n```"
+        XCTAssertEqual(NotesDafCitation.normalize(text), text)
+    }
+
     // MARK: - Depth resolution
 
     func testScannerResolvesFourSpaceNesting() {
@@ -192,7 +211,7 @@ final class NotesMarkdownTests: XCTestCase {
 
         XCTAssertEqual(
             lines[1],
-            "\u{200E}משנה\u{200E}: \u{200E}בפרק במה טומנין\u{200E} (\u{200E}דף מז\u{200E}:): Distinguishes between two classes."
+            "\u{200E}משנה\u{200E}: \u{200E}בפרק במה טומנין\u{200E} (:\u{200E}דף מז\u{200E}): Distinguishes between two classes."
         )
         XCTAssertEqual(lines[2], "\t\u{200E}גזירה שמא ירתיח\u{200E} (\u{200E}שבת\u{200E})")
         XCTAssertEqual(
@@ -280,7 +299,7 @@ final class NotesMarkdownTests: XCTestCase {
             "רבא (מימרא 1): הטמנה on שבת itself",
             "Q: why did חז״ל say אין טומנין on ערב שבת?",
             "On שבת (\"ולא חיישינן אם מתבשל והולך בשבת\")",
-            "ברייתא (חנניה [דף כ:])",
+            "ברייתא (חנניה [:דף כ])",
             "רש\"י, תוס' (ד\"ה במה): 1/3",
         ]
         for example in examples {
@@ -430,7 +449,7 @@ final class NotesMarkdownTests: XCTestCase {
             ("**חנניה:** נותנים means חזרה", "\u{200E}חנניה\u{200E}: \u{200E}נותנים\u{200E} means \u{200E}חזרה\u{200E}"),
             ("חנניה; חכמים", "\u{200E}חנניה\u{200E}; \u{200E}חכמים\u{200E}"),
             ("**גירסא 1 (רש״י ורוב ראשונים)**", "\u{200E}גירסא\u{200E} 1 (\u{200E}רש״י ורוב ראשונים\u{200E})"),
-            ("**משנה (דף ל״ו:)**", "\u{200E}משנה\u{200E} (\u{200E}דף ל״ו\u{200E}:)"),
+            ("**משנה (דף ל״ו:)**", "\u{200E}משנה\u{200E} (:\u{200E}דף ל״ו\u{200E})"),
             ("**רמב״ם (פירוש המשניות):** in the printed version", "\u{200E}רמב״ם\u{200E} (\u{200E}פירוש המשניות\u{200E}): in the printed version"),
         ]
         for (markdown, expected) in examples {
