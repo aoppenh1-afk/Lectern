@@ -125,6 +125,16 @@ final class LecternCloudSharing {
         }
     }
 
+    /// Disconnect this Mac without deleting the hosted library or AI connections.
+    func disconnect() {
+        guard !isBusy else { return }
+        sharingEnabled = false
+        defaults.set(false, forKey: "hostedSharing.enabled")
+        auth.forget()
+        email = nil
+        status = "This Mac is disconnected. Your hosted library is still available to connected apps."
+    }
+
     func shutdown() {
         timer?.cancel()
         timer = nil

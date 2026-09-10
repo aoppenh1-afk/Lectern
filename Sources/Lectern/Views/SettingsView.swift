@@ -132,13 +132,15 @@ struct SettingsView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(section.title)
-                        .font(.system(size: 28, weight: .bold, design: .serif))
-                        .foregroundStyle(LecternTheme.ink)
-                    Text(section.subtitle)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                if section != .mcp {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(section.title)
+                            .font(.system(size: 28, weight: .bold, design: .serif))
+                            .foregroundStyle(LecternTheme.ink)
+                        Text(section.subtitle)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 switch section {
@@ -155,8 +157,8 @@ struct SettingsView: View {
                 case .agents: AgentsPane()
                 }
             }
-            .padding(.horizontal, 40)
-            .padding(.vertical, 32)
+            .padding(.horizontal, section == .mcp ? 24 : 40)
+            .padding(.vertical, section == .mcp ? 24 : 32)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
