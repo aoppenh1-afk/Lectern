@@ -80,7 +80,7 @@ listener exists only during native sign-in, not as an MCP server.
 - Each account owns one hosted selection. Uploads contain only the Codable
   `LecternCloudSnapshot` fields. Recordings, attachments, chats, quiz content,
   provider credentials and Google Docs content are not read by this connection.
-- The app checks/syncs every 30 seconds while open, and when a course selection
+- The app checks/syncs every 10 minutes while open, and when a course selection
   changes. A successful sync atomically replaces the hosted snapshot. Deselected
   or deleted lectures disappear only after that successful sync. The last copy
   remains available offline and its timestamp is returned with every tool result.

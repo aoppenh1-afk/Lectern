@@ -175,7 +175,7 @@ Releases publish a drag-to-Applications DMG for new installs and keep the ZIP pl
 Open **Settings → ChatGPT & Claude**, sign in with Google, select courses, and
 click **Start sharing**. Lectern uploads only course names, lecture titles/dates,
 notes, and raw/cleaned transcripts to your hosted account. Changes sync about every
-30 seconds while the app is open. The last synced copy remains readable when the
+10 minutes while the app is open. The last synced copy remains readable when the
 Mac is closed. Removing a course takes effect after a successful sync.
 
 Add `https://lectern-app.vercel.app/mcp` as a custom MCP connection in ChatGPT or

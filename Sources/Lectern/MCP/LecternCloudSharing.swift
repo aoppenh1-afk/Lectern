@@ -40,7 +40,7 @@ final class LecternCloudSharing {
         timer = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 await self?.syncIfNeeded()
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .seconds(10 * 60))
             }
         }
     }
