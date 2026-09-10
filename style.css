@@ -34,8 +34,6 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--focus);outline-offs
 .button:hover{background:var(--moss-ink)}
 .button-secondary{display:inline-block;min-height:44px;line-height:1.2;padding:13px 24px;background:transparent;color:var(--moss);border-radius:10px;text-decoration:none;font-weight:650;border:1px solid var(--moss)}
 .button-secondary:hover{background:var(--sage)}
-.hero-note{font-size:.92rem;margin:14px auto 0;max-width:460px}
-.hero-note a{color:inherit}
 .meta{font-size:.86rem;color:var(--muted);margin-bottom:0}
 .tour{position:relative;overflow:clip;background:var(--paper);border-top:1px solid var(--line)}
 .tour-scene{position:absolute;top:0;left:0;right:0;height:700px;pointer-events:none;z-index:0;overflow:hidden}
