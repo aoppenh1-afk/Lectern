@@ -9,7 +9,7 @@ struct SettingsView: View {
     @State private var section: Section = .general
 
     enum Section: String, CaseIterable, Identifiable {
-        case general, notifications, appearance, recording, transcription, retention, canvas, anki, googleDocs, agents
+        case general, notifications, appearance, recording, transcription, retention, canvas, anki, googleDocs, mcp, agents
 
         var id: String { rawValue }
 
@@ -24,6 +24,7 @@ struct SettingsView: View {
             case .canvas: return "Canvas"
             case .anki: return "Anki"
             case .googleDocs: return "Google Docs"
+            case .mcp: return "ChatGPT & Claude"
             case .agents: return "Agents"
             }
         }
@@ -39,6 +40,7 @@ struct SettingsView: View {
             case .canvas: return "building.columns"
             case .anki: return "rectangle.on.rectangle.angled"
             case .googleDocs: return "doc.richtext"
+            case .mcp: return "network"
             case .agents: return "cpu"
             }
         }
@@ -54,6 +56,7 @@ struct SettingsView: View {
             case .canvas: return "Pull courses, deadlines, and announcements."
             case .anki: return "Sync flashcards through AnkiConnect."
             case .googleDocs: return "Push notes into one doc per course."
+            case .mcp: return "Share selected lectures through MCP."
             case .agents: return "Runtimes and accounts that generate study material."
             }
         }
@@ -148,6 +151,7 @@ struct SettingsView: View {
                 case .canvas: CanvasSettingsPane()
                 case .anki: AnkiPane()
                 case .googleDocs: GoogleDocsPane()
+                case .mcp: MCPSettingsPane()
                 case .agents: AgentsPane()
                 }
             }

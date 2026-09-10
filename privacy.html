@@ -28,7 +28,7 @@
 <p class="legal-eyebrow">Lectern / Privacy</p>
 <h1 class="legal-title">Privacy policy</h1>
 <p class="legal-meta">Effective September 8, 2026</p>
-<p class="legal-lede">Lectern is an open-source macOS study app. This policy describes the app and its GitHub Pages website.</p>
+<p class="legal-lede">Lectern is an open-source macOS study app. This policy describes the app and its website.</p>
 <hr class="legal-hero-rule">
 </div>
 <div class="legal-layout">
@@ -39,6 +39,7 @@
 <li><a href="#local-storage">Local storage and credentials</a></li>
 <li><a href="#google">Google Docs access</a></li>
 <li><a href="#transcription">Transcription, AI, and other connections</a></li>
+<li><a href="#hosted-sharing">Hosted AI sharing</a></li>
 <li><a href="#retention">Retention, deletion, and disconnecting</a></li>
 <li><a href="#website">Website</a></li>
 </ol>
@@ -48,7 +49,7 @@
 <section class="legal-section" aria-labelledby="information">
 <h2 id="information">Information Lectern handles</h2>
 <p>Lectern handles recordings and imported audio, lecture and course titles, transcripts, notes, flashcards, quizzes, and other study content you create or import. Connected features can also handle Canvas course information and credentials for the services you enable.</p>
-<p>These materials are used to record, transcribe, organize, generate study materials, and perform the exports you request. Lectern does not operate a developer-hosted server for your lecture library.</p>
+<p>These materials are used to record, transcribe, organize, generate study materials, and perform the exports you request. Hosted AI sharing is optional. If you enable it, Lectern stores a copy of your selected courses’ notes and transcripts in the hosted account described below.</p>
 </section>
 <section class="legal-section" aria-labelledby="local-storage">
 <h2 id="local-storage">Local storage and credentials</h2>
@@ -67,6 +68,13 @@
 <p>When you request AI generation or chat, prompts, transcripts, and relevant attachments or audio can be sent through your configured agent and its provider. Supported options include Antigravity, Codex, and OpenCode. Those services’ terms, privacy policies, and your account settings govern their processing and retention. Google Docs authorization is separate from Antigravity sign-in.</p>
 <p>If you connect Canvas, Lectern requests course and related academic information from your school’s Canvas service. If you export to Anki, the selected study content is sent to your local AnkiConnect service. Downloads and update checks contact the relevant hosting services, including GitHub, which receive normal network request information such as your IP address.</p>
 </section>
+<section class="legal-section" aria-labelledby="hosted-sharing">
+<h2 id="hosted-sharing">Hosted AI sharing</h2>
+<p>When you sign in for ChatGPT and Claude sharing, Google provides an account identifier and verified email address. This sign-in is separate from Google Docs export and requests only OpenID and email access. The hosted service stores your account identity, session information, and connection permissions.</p>
+<p>When you start sharing in Lectern, the app uploads the selected course names, lecture titles and dates, notes, and raw or cleaned transcripts. Recordings, attachments, chats, flashcards, quizzes, and other service credentials are not included. Lectern serves the hosted connection through Vercel and stores the shared data in its configured Postgres database. These hosting providers process the data needed to operate the service.</p>
+<p>AI apps you approve can search and read your hosted library. They cannot change it. The last synced copy remains available when your Mac is closed. Removing a course takes effect after the Mac successfully syncs; disconnecting an AI app revokes its future access. Use the connection management page or the Mac app to delete the hosted library and revoke all connections. Local originals are retained. Account identity remains for sign-in, and hosting backups may retain deleted data according to the hosting provider’s retention settings.</p>
+<p>Connected AI services may retain material they have already retrieved under their own terms and account settings. Lectern does not log transcript content or access tokens in application logs. Necessary login cookies protect browser sessions; access and refresh token values are stored as hashes on the server and in Keychain on the Mac.</p>
+</section>
 <section class="legal-section" aria-labelledby="retention">
 <h2 id="retention">Retention, deletion, and disconnecting</h2>
 <p>Local study content remains on your Mac until removed. Recording retention follows your Lectern settings; transcripts and generated materials can remain after audio is removed. Local backups and external agents may retain additional copies.</p>
@@ -74,7 +82,7 @@
 </section>
 <section class="legal-section" aria-labelledby="website">
 <h2 id="website">Website</h2>
-<p>This website contains no analytics scripts, advertising trackers, forms, or embedded third-party media. It does not set application cookies. GitHub Pages hosts it and may process visitor network information under the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a>. Following external links takes you to those services.</p>
+<p>The public information pages contain no advertising or analytics scripts. The hosted connection pages use sign-in and consent forms and essential, secure session cookies. Vercel hosts the site and may process network request information under its <a href="https://vercel.com/legal/privacy-policy">Privacy Policy</a>. Static copies may also be published on GitHub Pages. Following external links takes you to those services.</p>
 </section>
 <aside class="legal-aside" aria-label="Related pages">
 <strong>Keep reading</strong>

@@ -27,3 +27,9 @@ plan.md
 # Generated Vercel website output and local project settings
 .vercel-site/
 .vercel/
+
+# Hosted connector dependencies and credentials
+node_modules/
+.env
+.env.*
+!.env.example
