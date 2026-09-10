@@ -478,7 +478,7 @@ enum EventReminderScheduler {
                 _ = try? await center.requestAuthorization(options: [.alert, .sound])
             }
             let status = await center.notificationSettings().authorizationStatus
-            guard status == .authorized || status == .provisional || status == .ephemeral else { return }
+            guard status == .authorized || status == .provisional else { return }
             let content = UNMutableNotificationContent()
             content.title = event.title
             var parts: [String] = []
