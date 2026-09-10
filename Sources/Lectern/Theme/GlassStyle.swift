@@ -13,19 +13,24 @@ enum LecternTheme {
     // MARK: Accent (switchable brand accent, tuned per appearance)
 
     static var accent: Color {
-        switch UserDefaults.standard.string(forKey: "appearance.accent") ?? "moss" {
+        let (light, dark) = accentNSColors(for: UserDefaults.standard.string(forKey: "appearance.accent") ?? "moss")
+        return adaptive(light: light, dark: dark)
+    }
+
+    private static func accentNSColors(for id: String) -> (light: NSColor, dark: NSColor) {
+        switch id {
         case "blue":
-            return adaptive(light: NSColor(srgbRed: 0.184, green: 0.420, blue: 0.929, alpha: 1),   // #2F6BED
-                            dark: NSColor(srgbRed: 0.424, green: 0.620, blue: 1.000, alpha: 1))    // #6C9EFF
+            return (NSColor(srgbRed: 0.184, green: 0.420, blue: 0.929, alpha: 1),   // #2F6BED
+                    NSColor(srgbRed: 0.424, green: 0.620, blue: 1.000, alpha: 1))    // #6C9EFF
         case "plum":
-            return adaptive(light: NSColor(srgbRed: 0.486, green: 0.290, blue: 0.451, alpha: 1),   // #7C4A73
-                            dark: NSColor(srgbRed: 0.788, green: 0.576, blue: 0.753, alpha: 1))    // #C993C0
+            return (NSColor(srgbRed: 0.486, green: 0.290, blue: 0.451, alpha: 1),   // #7C4A73
+                    NSColor(srgbRed: 0.788, green: 0.576, blue: 0.753, alpha: 1))    // #C993C0
         case "graphite":
-            return adaptive(light: NSColor(srgbRed: 0.290, green: 0.300, blue: 0.320, alpha: 1),   // #4A4D52
-                            dark: NSColor(srgbRed: 0.780, green: 0.790, blue: 0.810, alpha: 1))    // #C7C9CF
+            return (NSColor(srgbRed: 0.290, green: 0.300, blue: 0.320, alpha: 1),   // #4A4D52
+                    NSColor(srgbRed: 0.780, green: 0.790, blue: 0.810, alpha: 1))    // #C7C9CF
         default: // moss / forest green matching design mockup
-            return adaptive(light: NSColor(srgbRed: 0.102, green: 0.325, blue: 0.212, alpha: 1),   // #1A5336
-                            dark: NSColor(srgbRed: 0.408, green: 0.729, blue: 0.565, alpha: 1))    // #68BA90
+            return (NSColor(srgbRed: 0.102, green: 0.325, blue: 0.212, alpha: 1),   // #1A5336
+                    NSColor(srgbRed: 0.408, green: 0.729, blue: 0.565, alpha: 1))    // #68BA90
         }
     }
 
@@ -64,10 +69,14 @@ enum LecternTheme {
                   dark: NSColor(srgbRed: 1.000, green: 1.000, blue: 1.000, alpha: 0.08))
     }
 
-    /// Delicate pale sage fill for active sidebar navigation pill.
+    /// Tinted fill for active sidebar navigation pill. Derived from the
+    /// current accent so theme changes recolor both text and highlight.
     static var sidebarSelectedFill: Color {
-        adaptive(light: NSColor(srgbRed: 0.882, green: 0.925, blue: 0.878, alpha: 1),   // #E1ECE0
-                  dark: NSColor(srgbRed: 0.110, green: 0.227, blue: 0.157, alpha: 0.65)) // OLED deep green
+        let (light, dark) = accentNSColors(for: UserDefaults.standard.string(forKey: "appearance.accent") ?? "moss")
+        return adaptive(
+            light: light.withAlphaComponent(0.12),
+            dark: dark.withAlphaComponent(0.20)
+        )
     }
 
     /// Deep botanical green for active sidebar navigation text & icon.
