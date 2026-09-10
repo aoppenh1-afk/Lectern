@@ -130,9 +130,7 @@ struct MenuBarPopoverView: View {
                 openWindow(id: "main")
             }
             popoverLink("Settings…", systemImage: "gearshape") {
-                SettingsNavigator.open()
-                openWindow(id: "main")
-                NSApplication.shared.activate(ignoringOtherApps: true)
+                SettingsNavigator.openInMainWindow(openWindow: openWindow)
             }
             popoverLink("Quit Lectern", systemImage: "power", role: .destructive) {
                 NSApplication.shared.terminate(nil)

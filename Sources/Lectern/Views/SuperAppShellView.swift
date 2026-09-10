@@ -21,6 +21,25 @@ enum SettingsNavigator {
         UserDefaults.standard.set(false, forKey: pendingKey)
         return true
     }
+
+    /// Focus the existing main window (or open one if none exists) and show
+    /// Settings in it. Must not call openWindow unconditionally: WindowGroup
+    /// spawns a brand-new window on every call. The notch pill is a
+    /// borderless panel, so any titled window is a main window.
+    @MainActor
+    static func openInMainWindow(openWindow: OpenWindowAction) {
+        open()
+        let app = NSApplication.shared
+        if let main = app.windows.first(where: { $0.styleMask.contains(.titled) && $0.isVisible }) {
+            main.makeKeyAndOrderFront(nil)
+        } else if let hidden = app.windows.first(where: { $0.styleMask.contains(.titled) }) {
+            hidden.deminiaturize(nil)
+            hidden.makeKeyAndOrderFront(nil)
+        } else {
+            openWindow(id: "main")
+        }
+        app.activate(ignoringOtherApps: true)
+    }
 }
 
 enum CommandStudioSection: String, CaseIterable, Identifiable {
@@ -211,10 +230,15 @@ struct SuperAppShellView: View {
             .padding(.horizontal, 12)
 
             Spacer()
-            VStack(spacing: 4) {
-                sidebarButton(.settings)
+            Button {
+                selection = .settings
+            } label: {
+                Label("Settings", systemImage: "gearshape")
+                    .font(.system(size: 13))
             }
-            .padding(.horizontal, 12)
+            .buttonStyle(.plain)
+            .foregroundStyle(LecternTheme.ink)
+            .padding(.horizontal, 20)
             .padding(.bottom, 26)
         }
         .frame(width: 260)
