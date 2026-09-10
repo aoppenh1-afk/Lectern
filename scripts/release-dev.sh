@@ -23,8 +23,16 @@ cd "$ROOT"
 KEEP_DEV_RELEASES="${KEEP_DEV_RELEASES:-20}"
 
 if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Working tree is not clean. Commit or stash first." >&2
-  exit 1
+  # xcodegen regenerates Lectern.xcodeproj/ and Support/Info.plist from
+  # project.yml, so drift there is allowed (build-app.sh regenerates them
+  # again before building). Anything else must be committed so the dev tag
+  # points at exactly the code that was built.
+  DIRTY="$(git status --porcelain | grep -v ' Lectern.xcodeproj/' | grep -v ' Support/Info.plist' || true)"
+  if [[ -n "$DIRTY" ]]; then
+    echo "Working tree has uncommitted source changes. Commit or stash first:" >&2
+    echo "$DIRTY" >&2
+    exit 1
+  fi
 fi
 
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"

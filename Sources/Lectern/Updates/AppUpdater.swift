@@ -122,8 +122,9 @@ final class AppUpdater {
     static let repositoryInfoKey = "LecternUpdateRepository"
     static let autoCheckKey = "updates.autoCheck"
     static let lastCheckKey = "updates.lastCheck"
-    static let skippedVersionKey = "updates.skippedVersion"
-    static let skippedDevVersionKey = "updates.skippedVersion.dev"
+    // Immutable keys: safe to read from nonisolated helpers like skippedKey.
+    nonisolated static let skippedVersionKey = "updates.skippedVersion"
+    nonisolated static let skippedDevVersionKey = "updates.skippedVersion.dev"
     static let channelKey = "updates.channel"
 
     private(set) var phase: Phase = .idle
