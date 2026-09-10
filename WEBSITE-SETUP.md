@@ -1,6 +1,11 @@
 # Publish Lectern's website
 
-The `website/` folder contains a complete static site. No package installation,
+For the Vercel-hosted ChatGPT/Claude connection, follow
+[Hosted MCP deployment](docs/hosted-mcp.md). It requires a Postgres database and
+Google Web OAuth credentials. The static-only instructions below do not enable
+that connection.
+
+The `website/` folder contains a complete static site. For that static-only distribution, no package installation,
 build command, database, analytics, or OAuth credentials are needed. The files are
 also packaged in `dist/Lectern-website.zip`, with `index.html` at the archive root.
 The site is not live until you publish it.

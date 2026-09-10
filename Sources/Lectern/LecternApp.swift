@@ -110,6 +110,7 @@ struct LecternApp: App {
     private let transcriptionService: TranscriptionService
     private let generationService: GenerationService
     private let lectureChatService: LectureChatService
+    private let cloudSharing: LecternCloudSharing
     private let courseSynthesisService: CourseSynthesisService
     private let cardSyncService: CardSyncService
     private let googleDocsAuth: GoogleDocsAuth
@@ -148,6 +149,7 @@ struct LecternApp: App {
         } catch {
             fatalError("Failed to create Lectern data store: \(error)")
         }
+        cloudSharing = LecternCloudSharing(container: container)
         captureController = CaptureController(modelContainer: container)
         transcriptionPreferences = TranscriptionPreferences()
         transcriptionService = TranscriptionService(
@@ -220,6 +222,7 @@ struct LecternApp: App {
                 .environment(generationService)
                 .environment(lectureChatService)
                 .environment(courseSynthesisService)
+                .environment(cloudSharing)
                 .environment(cardSyncService)
                 .environment(googleDocsAuth)
                 .environment(googleDocsSync)
@@ -237,6 +240,7 @@ struct LecternApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                     transcriptionService.cancelAll()
                     automationScheduler.stop()
+                    cloudSharing.shutdown()
                 }
         }
         .modelContainer(container)

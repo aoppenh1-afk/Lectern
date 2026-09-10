@@ -1,7 +1,104 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "",
+  "installCommand": "npm ci --ignore-scripts",
   "buildCommand": "node scripts/build-website.mjs",
-  "outputDirectory": ".vercel-site"
+  "outputDirectory": ".vercel-site",
+  "functions": {
+    "api/hosted.mjs": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/mcp",
+      "destination": "/api/hosted?__route=mcp"
+    },
+    {
+      "source": "/connect",
+      "destination": "/api/hosted?__route=connect"
+    },
+    {
+      "source": "/connect/revoke",
+      "destination": "/api/hosted?__route=connect/revoke"
+    },
+    {
+      "source": "/connect/erase",
+      "destination": "/api/hosted?__route=connect/erase"
+    },
+    {
+      "source": "/auth/google",
+      "destination": "/api/hosted?__route=auth/google"
+    },
+    {
+      "source": "/auth/callback",
+      "destination": "/api/hosted?__route=auth/callback"
+    },
+    {
+      "source": "/auth/logout",
+      "destination": "/api/hosted?__route=auth/logout"
+    },
+    {
+      "source": "/oauth/authorize",
+      "destination": "/api/hosted?__route=oauth/authorize"
+    },
+    {
+      "source": "/oauth/consent",
+      "destination": "/api/hosted?__route=oauth/consent"
+    },
+    {
+      "source": "/oauth/token",
+      "destination": "/api/hosted?__route=oauth/token"
+    },
+    {
+      "source": "/oauth/register",
+      "destination": "/api/hosted?__route=oauth/register"
+    },
+    {
+      "source": "/oauth/revoke",
+      "destination": "/api/hosted?__route=oauth/revoke"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource",
+      "destination": "/api/hosted?__route=.well-known/oauth-protected-resource"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource/mcp",
+      "destination": "/api/hosted?__route=.well-known/oauth-protected-resource/mcp"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "destination": "/api/hosted?__route=.well-known/oauth-authorization-server"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server/mcp",
+      "destination": "/api/hosted?__route=.well-known/oauth-authorization-server/mcp"
+    },
+    {
+      "source": "/api/library",
+      "destination": "/api/hosted?__route=api/library"
+    },
+    {
+      "source": "/api/library/uploads",
+      "destination": "/api/hosted?__route=api/library/uploads"
+    },
+    {
+      "source": "/api/library/uploads/:id",
+      "destination": "/api/hosted?__route=api/library/uploads/:id"
+    },
+    {
+      "source": "/api/library/uploads/:id/commit",
+      "destination": "/api/hosted?__route=api/library/uploads/:id/commit"
+    },
+    {
+      "source": "/api/cleanup",
+      "destination": "/api/hosted?__route=api/cleanup"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cleanup",
+      "schedule": "0 4 * * *"
+    }
+  ]
 }

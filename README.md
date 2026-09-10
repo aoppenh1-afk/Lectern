@@ -169,3 +169,33 @@ in 2026, so this is not a promise of unlimited free use. See [Docs scopes](https
 ### DMG packaging
 
 Releases publish a drag-to-Applications DMG for new installs and keep the ZIP plus checksum for in-app updates. `scripts/package-dmg.sh /path/to/Lectern.app /path/to/Lectern-version.dmg` packages an existing signed app without rebuilding it. It requires macOS and Python 3 with venv support, and installs the pinned packaging dependencies from `scripts/dmg-requirements.txt` into the ignored `dist/.dmg-tools` environment.
+
+### Read lectures from ChatGPT or Claude (MCP)
+
+Open **Settings → ChatGPT & Claude**, sign in with Google, select courses, and
+click **Start sharing**. Lectern uploads only course names, lecture titles/dates,
+notes, and raw/cleaned transcripts to your hosted account. Changes sync about every
+30 seconds while the app is open. The last synced copy remains readable when the
+Mac is closed. Removing a course takes effect after a successful sync.
+
+Add `https://lectern-app.vercel.app/mcp` as a custom MCP connection in ChatGPT or
+Claude, choose OAuth authentication, and sign in with the same Google account.
+Enable Lectern in your conversation. The AI can browse courses, search lectures
+(including Hebrew), and read paged notes/transcripts with source line numbers.
+Account and workspace settings in the AI product may restrict custom connectors.
+
+The **Manage connections and shared data** link opens `/connect` on the website.
+Disconnect individual apps there, or use **Delete hosted library and disconnect
+all apps** to delete the hosted copy and revoke access. Your Mac's original library
+is kept. Copies already retrieved by an AI service are governed by that service.
+Deleting from the Mac requires an online confirmation; a failed request does not
+claim that cloud access was revoked.
+
+This replaces the former local server and private tunnel URLs. No tunnel or
+terminal setup is required for students. The site maintainer must provision the
+backend once before the connection works: see [Hosted MCP deployment](docs/hosted-mcp.md).
+
+Run `npm run test:hosted` for the hosted database/OAuth/MCP integration tests and the
+normal Xcode scheme for native app checks. The hosted tests use an isolated
+embedded Postgres database and a fake Google identity provider; they do not upload
+real lecture content or substitute for testing real Google/ChatGPT/Claude accounts.
