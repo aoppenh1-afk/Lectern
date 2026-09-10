@@ -67,7 +67,7 @@ struct SuperAppShellView: View {
     }
     private var upcomingCount: Int {
         assignments.lazy.filter {
-            scopedCanvasIDs.contains($0.courseCanvasID) && !$0.isComplete && ($0.dueAt ?? .distantFuture) >= Date()
+            ($0.isManual || scopedCanvasIDs.contains($0.courseCanvasID)) && !$0.isComplete && ($0.dueAt ?? .distantFuture) >= Date()
         }.count
     }
     private var announcementCount: Int {
@@ -318,8 +318,13 @@ struct OverviewDashboardView: View {
     let navigate: (CommandStudioSection) -> Void
 
     private var scopedCourses: [Course] { courses.filter { $0.canvasID.map(allowedCourseIDs.contains) ?? false } }
-    private var scopedAssignments: [CanvasAssignment] { assignments.filter { allowedCourseIDs.contains($0.courseCanvasID) } }
-    private var scopedEvents: [CanvasEvent] { events.filter { $0.courseCanvasID.map(allowedCourseIDs.contains) ?? false } }
+    private var scopedAssignments: [CanvasAssignment] {
+        assignments.filter { $0.isManual || allowedCourseIDs.contains($0.courseCanvasID) }
+    }
+    private var scopedEvents: [CanvasEvent] {
+        events.filter { $0.isManual || ($0.courseCanvasID.map(allowedCourseIDs.contains) ?? false) }
+            .sorted { $0.startAt < $1.startAt }
+    }
     private var scopedAnnouncements: [CanvasAnnouncement] { announcements.filter { allowedCourseIDs.contains($0.courseCanvasID) } }
 
     private var upcomingAssignments: [CanvasAssignment] {

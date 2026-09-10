@@ -97,25 +97,55 @@ struct CanvasCalendarView: View {
     enum Mode: String, CaseIterable, Identifiable { case day = "Day", week = "Week", month = "Month"; var id: String { rawValue } }
     @Query(sort: \CanvasEvent.startAt) private var events: [CanvasEvent]
     @Query(sort: \CanvasAssignment.dueAt) private var assignments: [CanvasAssignment]
+    @Query(sort: \Course.name) private var courses: [Course]
     let allowedCourseIDs: Set<Int64>
     @State private var anchorDate = Date()
     @State private var mode: Mode = .month
+    @State private var showingEventSheet = false
+    @State private var sheetInitialDate = Date()
+    @State private var editingEvent: CanvasEvent?
 
-    private var scopedEvents: [CanvasEvent] { events.filter { $0.courseCanvasID.map(allowedCourseIDs.contains) ?? false } }
+    private var scopedEvents: [CanvasEvent] {
+        events.filter { event in
+            // Manual events are the student's own and always stay visible,
+            // regardless of the selected academic term.
+            if event.isManual { return true }
+            return event.courseCanvasID.map(allowedCourseIDs.contains) ?? false
+        }
+        .sorted { $0.startAt < $1.startAt }
+    }
     private var scopedAssignments: [CanvasAssignment] { assignments.filter { allowedCourseIDs.contains($0.courseCanvasID) } }
 
     var body: some View {
-        StudioPage(title: "Calendar", subtitle: "Your Fall 2026 schedule and Canvas deadlines") {
-            HStack(spacing: 10) {
-                Button { move(-1) } label: { Image(systemName: "chevron.left") }
-                Button { move(1) } label: { Image(systemName: "chevron.right") }
-                Button("Today") { anchorDate = Date() }
-                Text(calendarTitle).font(.system(size: 20, weight: .semibold, design: .serif)).padding(.leading, 8)
+        StudioPage(title: "Calendar", subtitle: "Your Fall 2026 schedule, Canvas deadlines, and personal events") {
+            HStack(spacing: 10, alignment: .top) {
+                HStack(spacing: 10) {
+                    Button { move(-1) } label: { Image(systemName: "chevron.left") }
+                    Button { move(1) } label: { Image(systemName: "chevron.right") }
+                    Button("Today") { anchorDate = Date() }
+                    Text(calendarTitle).font(.system(size: 20, weight: .semibold, design: .serif)).padding(.leading, 8)
+                }
+                .buttonStyle(.bordered)
+                .padding(.top, 26)
                 Spacer()
-                Picker("View", selection: $mode) { ForEach(Mode.allCases) { Text($0.rawValue).tag($0) } }
-                    .pickerStyle(.segmented).frame(width: 250)
+                VStack(alignment: .trailing, spacing: 8) {
+                    Button {
+                        sheetInitialDate = anchorDate
+                        showingEventSheet = true
+                    } label: {
+                        Label("Add Event", systemImage: "plus")
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Add a personal event to your calendar")
+                    Picker("View", selection: $mode) { ForEach(Mode.allCases) { Text($0.rawValue).tag($0) } }
+                        .pickerStyle(.segmented).frame(width: 250)
+                }
             }
-            .buttonStyle(.bordered)
             Group {
                 switch mode {
                 case .day: dayView(anchorDate)
@@ -124,6 +154,12 @@ struct CanvasCalendarView: View {
                 }
             }
             .studioPanel()
+        }
+        .sheet(isPresented: $showingEventSheet) {
+            ManualEventSheet(initialDate: sheetInitialDate, courses: courses)
+        }
+        .sheet(item: $editingEvent) { event in
+            ManualEventSheet(editing: event, courses: courses)
         }
     }
 
@@ -164,6 +200,18 @@ struct CanvasCalendarView: View {
         }
     }
 
+    private func manualEventColor(_ event: CanvasEvent) -> Color {
+        if let courseID = event.courseCanvasID,
+           let course = courses.first(where: { $0.canvasID == courseID }) {
+            return Color(hex: course.colorHex)
+        }
+        if let name = event.courseName,
+           let course = courses.first(where: { $0.name == name }) {
+            return Color(hex: course.colorHex)
+        }
+        return LecternTheme.accent
+    }
+
     private func monthCell(_ day: Date) -> some View {
         let dayEvents = scopedEvents.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
         let dayAssignments = scopedAssignments.filter { $0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
@@ -172,7 +220,16 @@ struct CanvasCalendarView: View {
                 .foregroundStyle(Calendar.current.isDate(day, equalTo: anchorDate, toGranularity: .month) ? LecternTheme.ink : Color.secondary.opacity(0.45))
                 .padding(5)
                 .background(Calendar.current.isDateInToday(day) ? LecternTheme.accent.opacity(0.14) : .clear, in: Circle())
-            ForEach(dayEvents.prefix(2)) { event in calendarChip(event.title, color: LecternTheme.accent) }
+            ForEach(dayEvents.prefix(2)) { event in
+                if event.isManual {
+                    Button { editingEvent = event } label: {
+                        calendarChip(event.title, color: manualEventColor(event), icon: "person.fill")
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    calendarChip(event.title, color: LecternTheme.accent)
+                }
+            }
             ForEach(dayAssignments.prefix(max(0, 3 - dayEvents.count))) { assignment in calendarChip(assignment.title, color: LecternTheme.warningTint) }
             if dayEvents.count + dayAssignments.count > 3 { Text("+\(dayEvents.count + dayAssignments.count - 3) more").font(.system(size: 9)).foregroundStyle(.secondary) }
             Spacer(minLength: 0)
@@ -187,12 +244,27 @@ struct CanvasCalendarView: View {
             HStack(alignment: .top, spacing: 0) {
                 ForEach(weekDates, id: \.self) { day in
                     VStack(spacing: 0) {
-                        VStack(spacing: 3) { Text(day.formatted(.dateTime.weekday(.abbreviated))).font(.system(size: 10, weight: .semibold)); Text(day.formatted(.dateTime.day())).font(.system(size: 18, design: .serif)) }.padding(10)
+                        HStack(spacing: 6) {
+                            VStack(spacing: 3) { Text(day.formatted(.dateTime.weekday(.abbreviated))).font(.system(size: 10, weight: .semibold)); Text(day.formatted(.dateTime.day())).font(.system(size: 18, design: .serif)) }
+                            Spacer()
+                            Button {
+                                sheetInitialDate = day
+                                showingEventSheet = true
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(5)
+                                    .background(Color.primary.opacity(0.05), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .help("Add an event on \(day.formatted(date: .abbreviated, time: .omitted))")
+                        }.padding(10)
                         Divider()
                         let dayEvents = scopedEvents.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
                         let dayAssignments = scopedAssignments.filter { $0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
                         VStack(spacing: 8) {
-                            ForEach(dayEvents) { EventAgendaRow(event: $0) }
+                            ForEach(dayEvents) { eventRow($0) }
                             ForEach(dayAssignments) { AssignmentAgendaRow(assignment: $0) }
                             if dayEvents.isEmpty && dayAssignments.isEmpty { Text("No events").font(.system(size: 10)).foregroundStyle(.tertiary).padding(.top, 30) }
                         }.padding(8)
@@ -209,12 +281,29 @@ struct CanvasCalendarView: View {
         let dayAssignments = scopedAssignments.filter { $0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
         return ScrollView {
             VStack(spacing: 0) {
+                HStack {
+                    Text(day.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                        .font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        sheetInitialDate = day
+                        showingEventSheet = true
+                    } label: {
+                        Label("Add event", systemImage: "plus")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(LecternTheme.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
                 ForEach(0..<24, id: \.self) { hour in
                     HStack(alignment: .top, spacing: 16) {
                         Text(Calendar.current.date(from: DateComponents(hour: hour))?.formatted(date: .omitted, time: .shortened) ?? "")
                             .font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary).frame(width: 64, alignment: .trailing)
                         VStack(spacing: 6) {
-                            ForEach(dayEvents.filter { Calendar.current.component(.hour, from: $0.startAt) == hour }) { EventAgendaRow(event: $0) }
+                            ForEach(dayEvents.filter { Calendar.current.component(.hour, from: $0.startAt) == hour }) { eventRow($0) }
                             ForEach(dayAssignments.filter { ($0.dueAt.map { Calendar.current.component(.hour, from: $0) } ?? -1) == hour }) { AssignmentAgendaRow(assignment: $0) }
                             Divider()
                         }.frame(maxWidth: .infinity, minHeight: 54, alignment: .top)
@@ -224,9 +313,626 @@ struct CanvasCalendarView: View {
         }
     }
 
-    private func calendarChip(_ title: String, color: Color) -> some View {
-        Text(title).font(.system(size: 9.5, weight: .medium)).lineLimit(1).padding(.horizontal, 5).padding(.vertical, 3)
-            .frame(maxWidth: .infinity, alignment: .leading).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 4)).foregroundStyle(color)
+    @ViewBuilder
+    private func eventRow(_ event: CanvasEvent) -> some View {
+        if event.isManual {
+            Button { editingEvent = event } label: {
+                EventAgendaRow(event: event, tint: manualEventColor(event), showsPersonalBadge: true)
+            }
+            .buttonStyle(.plain)
+            .help("Edit personal event")
+        } else {
+            EventAgendaRow(event: event)
+        }
+    }
+
+    private func calendarChip(_ title: String, color: Color, icon: String? = nil) -> some View {
+        HStack(spacing: 4) {
+            if let icon {
+                Image(systemName: icon).font(.system(size: 8, weight: .semibold))
+            }
+            Text(title).font(.system(size: 9.5, weight: .medium)).lineLimit(1)
+        }
+        .padding(.horizontal, 5).padding(.vertical, 3)
+        .frame(maxWidth: .infinity, alignment: .leading).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 4)).foregroundStyle(color)
+    }
+}
+
+struct ManualEventSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    let editing: CanvasEvent?
+    let initialDate: Date
+    let courses: [Course]
+
+    init(initialDate: Date = Date(), courses: [Course] = []) {
+        self.editing = nil
+        self.initialDate = initialDate
+        self.courses = courses
+    }
+
+    init(editing: CanvasEvent, courses: [Course] = []) {
+        self.editing = editing
+        self.initialDate = editing.startAt
+        self.courses = courses
+    }
+
+    @State private var title = ""
+    @State private var selectedCourseID: PersistentIdentifier?
+    @State private var eventDate = Date()
+    @State private var isAllDay = false
+    @State private var startsAt = Date()
+    @State private var endsAt = Date()
+    @State private var location = ""
+    @State private var notes = ""
+    @State private var showingDeleteConfirm = false
+    @FocusState private var titleFocused: Bool
+
+    private var isEditing: Bool { editing != nil }
+    private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var endsBeforeStart: Bool { !isAllDay && endsAt < startsAt }
+    private var canSave: Bool { !trimmedTitle.isEmpty && !endsBeforeStart }
+
+    private var selectedCourse: Course? {
+        guard let id = selectedCourseID else { return nil }
+        return courses.first { $0.persistentModelID == id }
+    }
+
+    private var scheduleSummary: String {
+        if isAllDay {
+            return "\(eventDate.formatted(date: .complete, time: .omitted)) · All day"
+        }
+        let day = eventDate.formatted(date: .complete, time: .omitted)
+        return "\(day) · \(startsAt.formatted(date: .omitted, time: .shortened)) – \(endsAt.formatted(date: .omitted, time: .shortened))"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            header
+            detailsCard
+            scheduleCard
+            notesCard
+            footer
+        }
+        .padding(24)
+        .frame(width: 500)
+        .background(LecternTheme.paper)
+        .onAppear(perform: populate)
+        .alert("Delete this event?", isPresented: $showingDeleteConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive, action: delete)
+        } message: {
+            Text("This personal event will be removed from your calendar. Canvas deadlines are never affected.")
+        }
+    }
+
+    private func populate() {
+        if let editing {
+            title = editing.title
+            eventDate = editing.startAt
+            location = editing.locationName ?? ""
+            notes = editing.detailsHTML ?? ""
+            let components = Calendar.current.dateComponents([.hour, .minute], from: editing.startAt)
+            if editing.endAt == nil && components.hour == 0 && components.minute == 0 {
+                isAllDay = true
+                startsAt = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: editing.startAt) ?? editing.startAt
+                endsAt = Calendar.current.date(bySettingHour: 10, minute: 0, second: 0, of: editing.startAt) ?? editing.startAt
+            } else {
+                isAllDay = false
+                startsAt = editing.startAt
+                endsAt = editing.endAt ?? Calendar.current.date(byAdding: .hour, value: 1, to: editing.startAt) ?? editing.startAt
+            }
+            if let canvasID = editing.courseCanvasID {
+                selectedCourseID = courses.first(where: { $0.canvasID == canvasID })?.persistentModelID
+                    ?? courses.first(where: { $0.name == editing.courseName })?.persistentModelID
+            } else if let name = editing.courseName {
+                selectedCourseID = courses.first(where: { $0.name == name })?.persistentModelID
+            }
+        } else {
+            let start = Self.roundedUpToHour(initialDate)
+            eventDate = initialDate
+            startsAt = start
+            endsAt = Calendar.current.date(byAdding: .hour, value: 1, to: start) ?? start
+        }
+        titleFocused = true
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(isEditing ? "Edit Event" : "New Event")
+                .font(.system(size: 20, weight: .bold, design: .serif))
+                .foregroundStyle(LecternTheme.ink)
+            Text("Personal events live alongside Canvas deadlines. Canvas items stay read-only.")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var detailsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                SettingsFieldLabel(title: "Title")
+                SettingsTextField(placeholder: "Study group, dentist, review session…", text: $title)
+                    .focused($titleFocused)
+                    .onSubmit(saveIfValid)
+            }
+            Divider()
+            HStack {
+                SettingsFieldLabel(title: "Course")
+                Spacer()
+                Picker("Course", selection: $selectedCourseID) {
+                    Text("Personal").tag(PersistentIdentifier?.none)
+                    if !courses.isEmpty {
+                        Divider()
+                        ForEach(courses) { course in
+                            Text(course.name).tag(PersistentIdentifier?.some(course.persistentModelID))
+                        }
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 220)
+            }
+            if let course = selectedCourse {
+                HStack(spacing: 8) {
+                    CourseBadge(colorHex: course.colorHex, initial: String(course.name.prefix(1)), size: 20)
+                    Text(course.courseCode ?? course.termName ?? "Linked course")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                    Spacer()
+                }
+            }
+            Divider()
+            VStack(alignment: .leading, spacing: 6) {
+                SettingsFieldLabel(title: "Location")
+                SettingsTextField(placeholder: "Library room 3, Zoom, home…", text: $location)
+            }
+        }
+        .padding(14)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
+    }
+
+    private var scheduleCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                SettingsFieldLabel(title: "Date")
+                Spacer()
+                DatePicker("Date", selection: $eventDate, displayedComponents: .date)
+                    .labelsHidden()
+            }
+            Divider()
+            Toggle(isOn: $isAllDay) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("All day").font(.system(size: 12.5, weight: .medium))
+                    Text("No start or end time").font(.system(size: 10.5)).foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            if !isAllDay {
+                Divider()
+                HStack {
+                    SettingsFieldLabel(title: "Starts")
+                    Spacer()
+                    DatePicker("Starts", selection: $startsAt, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                }
+                HStack {
+                    SettingsFieldLabel(title: "Ends")
+                    Spacer()
+                    DatePicker("Ends", selection: $endsAt, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                }
+                if endsBeforeStart {
+                    Label("End time is before the start time.", systemImage: "exclamationmark.triangle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(LecternTheme.warningTint)
+                }
+            }
+            Divider()
+            HStack(spacing: 8) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 11))
+                    .foregroundStyle(LecternTheme.accent)
+                Text(scheduleSummary)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(LecternTheme.ink)
+                Spacer()
+            }
+        }
+        .padding(14)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
+    }
+
+    private var notesCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SettingsFieldLabel(title: "Notes")
+            TextEditor(text: $notes)
+                .font(.system(size: 12.5))
+                .foregroundStyle(LecternTheme.ink)
+                .frame(minHeight: 64, maxHeight: 110)
+                .scrollContentBackground(.hidden)
+                .padding(8)
+                .background(LecternTheme.surfaceFill, in: RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous).stroke(LecternTheme.hairline))
+        }
+        .padding(14)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
+    }
+
+    private var footer: some View {
+        HStack {
+            if isEditing {
+                Button(role: .destructive) { showingDeleteConfirm = true } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+            Spacer()
+            Button("Cancel", role: .cancel) { dismiss() }
+                .keyboardShortcut(.cancelAction)
+            Button(isEditing ? "Save Changes" : "Add Event", action: saveIfValid)
+                .keyboardShortcut(.defaultAction)
+                .prominentAction()
+                .tint(LecternTheme.accent)
+                .disabled(!canSave)
+        }
+    }
+
+    private func saveIfValid() {
+        guard canSave else { return }
+        save()
+    }
+
+    private static func roundedUpToHour(_ date: Date) -> Date {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        guard let hour = components.hour else { return date }
+        if (components.minute ?? 0) == 0 { return calendar.date(bySetting: .second, value: 0, of: date) ?? date }
+        return calendar.date(bySettingHour: hour + 1, minute: 0, second: 0, of: date) ?? date
+    }
+
+    private func combinedDate(day: Date, time: Date) -> Date {
+        let calendar = Calendar.current
+        let dayParts = calendar.dateComponents([.year, .month, .day], from: day)
+        let timeParts = calendar.dateComponents([.hour, .minute], from: time)
+        var merged = DateComponents()
+        merged.year = dayParts.year
+        merged.month = dayParts.month
+        merged.day = dayParts.day
+        merged.hour = timeParts.hour
+        merged.minute = timeParts.minute
+        return calendar.date(from: merged) ?? day
+    }
+
+    private func save() {
+        let start: Date
+        let end: Date?
+        if isAllDay {
+            start = Calendar.current.startOfDay(for: eventDate)
+            end = nil
+        } else {
+            start = combinedDate(day: eventDate, time: startsAt)
+            end = combinedDate(day: eventDate, time: endsAt)
+        }
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedLocation = location.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let editing {
+            editing.title = trimmedTitle
+            editing.startAt = start
+            editing.endAt = end
+            editing.locationName = trimmedLocation.isEmpty ? nil : trimmedLocation
+            editing.detailsHTML = trimmedNotes.isEmpty ? nil : trimmedNotes
+            editing.courseCanvasID = selectedCourse?.canvasID
+            editing.courseName = selectedCourse?.name
+            editing.syncedAt = Date()
+        } else {
+            let event = CanvasEvent(canvasID: CanvasEvent.makeLocalID(), title: trimmedTitle, startAt: start)
+            event.endAt = end
+            event.locationName = trimmedLocation.isEmpty ? nil : trimmedLocation
+            event.detailsHTML = trimmedNotes.isEmpty ? nil : trimmedNotes
+            event.courseCanvasID = selectedCourse?.canvasID
+            event.courseName = selectedCourse?.name
+            modelContext.insert(event)
+        }
+        try? modelContext.save()
+        dismiss()
+    }
+
+    private func delete() {
+        if let editing {
+            modelContext.delete(editing)
+            try? modelContext.save()
+        }
+        dismiss()
+    }
+}
+
+struct ManualAssignmentSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    let editing: CanvasAssignment?
+    let courses: [Course]
+
+    init(courses: [Course] = []) {
+        self.editing = nil
+        self.courses = courses
+    }
+
+    init(editing: CanvasAssignment, courses: [Course] = []) {
+        self.editing = editing
+        self.courses = courses
+    }
+
+    @State private var title = ""
+    @State private var selectedCourseID: PersistentIdentifier?
+    @State private var dueDate = Date()
+    @State private var dueTime = Date()
+    @State private var pointsText = ""
+    @State private var notes = ""
+    @State private var isComplete = false
+    @State private var showingDeleteConfirm = false
+    @FocusState private var titleFocused: Bool
+
+    private var isEditing: Bool { editing != nil }
+    private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canSave: Bool { !trimmedTitle.isEmpty }
+
+    private var selectedCourse: Course? {
+        guard let id = selectedCourseID else { return nil }
+        return courses.first { $0.persistentModelID == id }
+    }
+
+    private var dueSummary: String {
+        let day = dueDate.formatted(date: .complete, time: .omitted)
+        return "\(day) · \(dueTime.formatted(date: .omitted, time: .shortened))"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            header
+            detailsCard
+            scheduleCard
+            notesCard
+            if isEditing { statusCard }
+            footer
+        }
+        .padding(24)
+        .frame(width: 500)
+        .background(LecternTheme.paper)
+        .onAppear(perform: populate)
+        .alert("Delete this assignment?", isPresented: $showingDeleteConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive, action: delete)
+        } message: {
+            Text("This personal assignment will be removed. Canvas assignments are never affected.")
+        }
+    }
+
+    private func populate() {
+        if let editing {
+            title = editing.title
+            if let due = editing.dueAt {
+                dueDate = due
+                dueTime = due
+            } else {
+                dueDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+                dueTime = Calendar.current.date(bySettingHour: 23, minute: 59, second: 0, of: Date()) ?? Date()
+            }
+            if let points = editing.pointsPossible {
+                pointsText = points.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(points)) : String(points)
+            }
+            notes = editing.detailsHTML ?? ""
+            isComplete = editing.isComplete
+            if editing.courseCanvasID != 0 {
+                selectedCourseID = courses.first(where: { $0.canvasID == editing.courseCanvasID })?.persistentModelID
+                    ?? courses.first(where: { $0.name == editing.courseName })?.persistentModelID
+            } else if editing.courseName != "Personal" {
+                selectedCourseID = courses.first(where: { $0.name == editing.courseName })?.persistentModelID
+            }
+        } else {
+            dueDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+            dueTime = Calendar.current.date(bySettingHour: 23, minute: 59, second: 0, of: Date()) ?? Date()
+        }
+        titleFocused = true
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(isEditing ? "Edit Assignment" : "New Assignment")
+                .font(.system(size: 20, weight: .bold, design: .serif))
+                .foregroundStyle(LecternTheme.ink)
+            Text("Personal assignments live alongside Canvas work. Canvas items stay read-only.")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var detailsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                SettingsFieldLabel(title: "Title")
+                SettingsTextField(placeholder: "Problem set 4, essay draft, lab report…", text: $title)
+                    .focused($titleFocused)
+                    .onSubmit(saveIfValid)
+            }
+            Divider()
+            HStack {
+                SettingsFieldLabel(title: "Course")
+                Spacer()
+                Picker("Course", selection: $selectedCourseID) {
+                    Text("Personal").tag(PersistentIdentifier?.none)
+                    if !courses.isEmpty {
+                        Divider()
+                        ForEach(courses) { course in
+                            Text(course.name).tag(PersistentIdentifier?.some(course.persistentModelID))
+                        }
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 220)
+            }
+            if let course = selectedCourse {
+                HStack(spacing: 8) {
+                    CourseBadge(colorHex: course.colorHex, initial: String(course.name.prefix(1)), size: 20)
+                    Text(course.courseCode ?? course.termName ?? "Linked course")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                    Spacer()
+                }
+            }
+            Divider()
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    SettingsFieldLabel(title: "Points possible")
+                    Text("Optional").font(.system(size: 10.5)).foregroundStyle(.secondary)
+                }
+                Spacer()
+                TextField("e.g. 100", text: $pointsText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 120)
+                    .multilineTextAlignment(.trailing)
+            }
+        }
+        .padding(14)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
+    }
+
+    private var scheduleCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                SettingsFieldLabel(title: "Due date")
+                Spacer()
+                DatePicker("Due date", selection: $dueDate, displayedComponents: .date)
+                    .labelsHidden()
+            }
+            Divider()
+            HStack {
+                SettingsFieldLabel(title: "Due time")
+                Spacer()
+                DatePicker("Due time", selection: $dueTime, displayedComponents: .hourAndMinute)
+                    .labelsHidden()
+            }
+            Divider()
+            HStack(spacing: 8) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 11))
+                    .foregroundStyle(LecternTheme.accent)
+                Text("Due \(dueSummary)")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(LecternTheme.ink)
+                Spacer()
+            }
+        }
+        .padding(14)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
+    }
+
+    private var notesCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SettingsFieldLabel(title: "Notes")
+            TextEditor(text: $notes)
+                .font(.system(size: 12.5))
+                .foregroundStyle(LecternTheme.ink)
+                .frame(minHeight: 64, maxHeight: 110)
+                .scrollContentBackground(.hidden)
+                .padding(8)
+                .background(LecternTheme.surfaceFill, in: RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: LecternTheme.controlRadius, style: .continuous).stroke(LecternTheme.hairline))
+        }
+        .padding(14)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
+    }
+
+    private var statusCard: some View {
+        Toggle(isOn: $isComplete) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Completed").font(.system(size: 12.5, weight: .medium))
+                Text("Finished work moves to Submitted").font(.system(size: 10.5)).foregroundStyle(.secondary)
+            }
+        }
+        .toggleStyle(.switch)
+        .padding(14)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
+    }
+
+    private var footer: some View {
+        HStack {
+            if isEditing {
+                Button(role: .destructive) { showingDeleteConfirm = true } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+            Spacer()
+            Button("Cancel", role: .cancel) { dismiss() }
+                .keyboardShortcut(.cancelAction)
+            Button(isEditing ? "Save Changes" : "Add Assignment", action: saveIfValid)
+                .keyboardShortcut(.defaultAction)
+                .prominentAction()
+                .tint(LecternTheme.accent)
+                .disabled(!canSave)
+        }
+    }
+
+    private func saveIfValid() {
+        guard canSave else { return }
+        save()
+    }
+
+    private func combinedDue() -> Date {
+        let calendar = Calendar.current
+        let dayParts = calendar.dateComponents([.year, .month, .day], from: dueDate)
+        let timeParts = calendar.dateComponents([.hour, .minute], from: dueTime)
+        var merged = DateComponents()
+        merged.year = dayParts.year
+        merged.month = dayParts.month
+        merged.day = dayParts.day
+        merged.hour = timeParts.hour
+        merged.minute = timeParts.minute
+        return calendar.date(from: merged) ?? dueDate
+    }
+
+    private func save() {
+        let due = combinedDue()
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let points = Double(pointsText.trimmingCharacters(in: .whitespacesAndNewlines))
+        if let editing {
+            editing.title = trimmedTitle
+            editing.dueAt = due
+            editing.pointsPossible = points
+            editing.detailsHTML = trimmedNotes.isEmpty ? nil : trimmedNotes
+            editing.courseCanvasID = selectedCourse?.canvasID ?? 0
+            editing.courseName = selectedCourse?.name ?? "Personal"
+            editing.courseCode = selectedCourse?.courseCode
+            editing.submissionState = isComplete ? "submitted" : nil
+            editing.syncedAt = Date()
+        } else {
+            let assignment = CanvasAssignment(
+                canvasID: CanvasAssignment.makeLocalID(),
+                courseCanvasID: selectedCourse?.canvasID ?? 0,
+                courseName: selectedCourse?.name ?? "Personal",
+                title: trimmedTitle
+            )
+            assignment.dueAt = due
+            assignment.pointsPossible = points
+            assignment.detailsHTML = trimmedNotes.isEmpty ? nil : trimmedNotes
+            assignment.courseCode = selectedCourse?.courseCode
+            modelContext.insert(assignment)
+        }
+        try? modelContext.save()
+        dismiss()
+    }
+
+    private func delete() {
+        if let editing {
+            modelContext.delete(editing)
+            try? modelContext.save()
+        }
+        dismiss()
     }
 }
 
@@ -240,9 +946,15 @@ struct CanvasAssignmentsView: View {
     @State private var selectedCourseID: Int64?
     @State private var search = ""
 
+    @State private var showingAddSheet = false
+    @State private var editingAssignment: CanvasAssignment?
+
     private var visible: [CanvasAssignment] {
         assignments.filter { assignment in
-            guard allowedCourseIDs.contains(assignment.courseCanvasID), selectedCourseID == nil || selectedCourseID == assignment.courseCanvasID else { return false }
+            // Manual assignments are the student's own and always stay visible,
+            // regardless of the selected academic term.
+            guard assignment.isManual || allowedCourseIDs.contains(assignment.courseCanvasID) else { return false }
+            guard selectedCourseID == nil || selectedCourseID == assignment.courseCanvasID else { return false }
             let matchesSearch = search.isEmpty || assignment.title.localizedCaseInsensitiveContains(search) || assignment.courseName.localizedCaseInsensitiveContains(search)
             let matchesFilter = switch filter {
             case .upcoming: !assignment.isComplete && (assignment.dueAt ?? .distantFuture) >= Calendar.current.startOfDay(for: Date())
@@ -268,31 +980,71 @@ struct CanvasAssignmentsView: View {
                 Spacer()
                 StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: 230, icon: "book.closed")
                 TextField("Search assignments", text: $search).textFieldStyle(.roundedBorder).frame(width: 260)
+                Button { showingAddSheet = true } label: {
+                    Label("Add Assignment", systemImage: "plus")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Add a personal assignment")
             }
             ScrollView {
                 LazyVStack(spacing: 10) {
                     if visible.isEmpty { ContentUnavailableView("No assignments", systemImage: "checklist", description: Text("Nothing matches this view.")) }
                     ForEach(visible) { assignment in
-                        Button {
-                            if let value = assignment.htmlURL, let url = URL(string: value) { openURL(url) }
-                        } label: {
-                            HStack(spacing: 14) {
-                                Image(systemName: assignment.isComplete ? "checkmark.circle.fill" : assignment.isMissing ? "exclamationmark.circle.fill" : "circle")
-                                    .font(.system(size: 18)).foregroundStyle(assignment.isComplete ? LecternTheme.successTint : assignment.isMissing ? LecternTheme.warningTint : .secondary)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack { Text(assignment.title).font(.system(size: 13.5, weight: .semibold)); if assignment.isMissing { StatusChip("Missing", LecternTheme.warningTint) } }
-                                    Text("\(assignment.courseCode ?? assignment.courseName) · \(assignmentDetail(assignment))").font(.system(size: 11)).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(relativeDue(assignment.dueAt)).font(.system(size: 11, weight: .semibold)).foregroundStyle(LecternTheme.accent)
-                                Image(systemName: "arrow.up.right").font(.system(size: 10)).foregroundStyle(.tertiary)
-                            }
-                            .padding(15).studioPanel()
-                        }
-                        .buttonStyle(.plain)
+                        assignmentRow(assignment)
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showingAddSheet) {
+            ManualAssignmentSheet(courses: courses)
+        }
+        .sheet(item: $editingAssignment) { assignment in
+            ManualAssignmentSheet(editing: assignment, courses: courses)
+        }
+    }
+
+    @ViewBuilder
+    private func assignmentRow(_ assignment: CanvasAssignment) -> some View {
+        if assignment.isManual {
+            Button { editingAssignment = assignment } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: assignment.isComplete ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 18)).foregroundStyle(assignment.isComplete ? LecternTheme.successTint : .secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack { Text(assignment.title).font(.system(size: 13.5, weight: .semibold)); StatusChip("Personal", LecternTheme.accent) }
+                        Text("\(assignment.courseCode ?? assignment.courseName) · \(assignmentDetail(assignment))").font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(relativeDue(assignment.dueAt)).font(.system(size: 11, weight: .semibold)).foregroundStyle(LecternTheme.accent)
+                    Image(systemName: "pencil").font(.system(size: 10)).foregroundStyle(.tertiary)
+                }
+                .padding(15).studioPanel()
+            }
+            .buttonStyle(.plain)
+            .help("Edit personal assignment")
+        } else {
+            Button {
+                if let value = assignment.htmlURL, let url = URL(string: value) { openURL(url) }
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: assignment.isComplete ? "checkmark.circle.fill" : assignment.isMissing ? "exclamationmark.circle.fill" : "circle")
+                        .font(.system(size: 18)).foregroundStyle(assignment.isComplete ? LecternTheme.successTint : assignment.isMissing ? LecternTheme.warningTint : .secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack { Text(assignment.title).font(.system(size: 13.5, weight: .semibold)); if assignment.isMissing { StatusChip("Missing", LecternTheme.warningTint) } }
+                        Text("\(assignment.courseCode ?? assignment.courseName) · \(assignmentDetail(assignment))").font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(relativeDue(assignment.dueAt)).font(.system(size: 11, weight: .semibold)).foregroundStyle(LecternTheme.accent)
+                    Image(systemName: "arrow.up.right").font(.system(size: 10)).foregroundStyle(.tertiary)
+                }
+                .padding(15).studioPanel()
+            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -729,7 +1481,36 @@ struct StudioPage<Content: View>: View {
 
 private struct EventAgendaRow: View {
     let event: CanvasEvent
-    var body: some View { HStack(spacing: 14) { VStack(alignment: .leading) { Text(event.startAt.formatted(date: .omitted, time: .shortened)).font(.system(size: 12, weight: .semibold).monospacedDigit()); if let end = event.endAt { Text(end.formatted(date: .omitted, time: .shortened)).font(.system(size: 10)).foregroundStyle(.secondary) } }.frame(width: 78, alignment: .leading); Rectangle().fill(LecternTheme.accent).frame(width: 3, height: 42); VStack(alignment: .leading, spacing: 3) { Text(event.title).font(.system(size: 13, weight: .semibold)); Text([event.courseName, event.locationName].compactMap { $0 }.joined(separator: " · ")).font(.system(size: 11)).foregroundStyle(.secondary) }; Spacer() }.padding(14).studioPanel() }
+    var tint: Color = LecternTheme.accent
+    var showsPersonalBadge = false
+    private var isAllDay: Bool {
+        guard showsPersonalBadge, event.endAt == nil else { return false }
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: event.startAt)
+        return parts.hour == 0 && parts.minute == 0
+    }
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading) {
+                Text(isAllDay ? "All day" : event.startAt.formatted(date: .omitted, time: .shortened)).font(.system(size: 12, weight: .semibold).monospacedDigit())
+                if let end = event.endAt { Text(end.formatted(date: .omitted, time: .shortened)).font(.system(size: 10)).foregroundStyle(.secondary) }
+                else if showsPersonalBadge && !isAllDay { Text("Personal").font(.system(size: 10)).foregroundStyle(.secondary) }
+            }.frame(width: 78, alignment: .leading)
+            Rectangle().fill(tint).frame(width: 3, height: 42)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(event.title).font(.system(size: 13, weight: .semibold))
+                    if showsPersonalBadge { StatusChip("Personal", tint) }
+                }
+                Text([event.courseName, event.locationName].compactMap { $0 }.joined(separator: " · "))
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+            if showsPersonalBadge {
+                Image(systemName: "pencil").font(.system(size: 10)).foregroundStyle(.tertiary)
+            }
+        }.padding(14).studioPanel()
+    }
 }
 
 private struct AssignmentAgendaRow: View {

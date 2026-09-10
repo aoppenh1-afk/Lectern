@@ -33,6 +33,17 @@ final class CanvasAssignment {
     var isComplete: Bool {
         isExcused || submissionState == "submitted" || submissionState == "graded"
     }
+
+    /// Manual assignments created by the student live in the same table so
+    /// they render alongside Canvas work everywhere, but use negative IDs so
+    /// Canvas sync (positive remote IDs, upsert-only) can never overwrite them.
+    /// A courseCanvasID of 0 marks a personal assignment with no course.
+    var isManual: Bool { canvasID < 0 }
+
+    static func makeLocalID() -> Int64 {
+        let stamp = Int64(Date().timeIntervalSince1970)
+        return -(stamp * 1_000 + Int64.random(in: 0..<1_000))
+    }
 }
 
 @Model
@@ -54,6 +65,16 @@ final class CanvasEvent {
         self.title = title
         self.startAt = startAt
         self.syncedAt = Date()
+    }
+
+    /// Manual events created by the student live in the same table so they
+    /// render alongside Canvas deadlines everywhere, but use negative IDs so
+    /// Canvas sync (positive remote IDs, upsert-only) can never overwrite them.
+    var isManual: Bool { canvasID < 0 }
+
+    static func makeLocalID() -> Int64 {
+        let stamp = Int64(Date().timeIntervalSince1970)
+        return -(stamp * 1_000 + Int64.random(in: 0..<1_000))
     }
 }
 
