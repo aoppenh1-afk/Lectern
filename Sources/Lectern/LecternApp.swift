@@ -286,9 +286,7 @@ private struct OpenSettingsCommand: View {
 
     var body: some View {
         Button("Settings…") {
-            SettingsNavigator.open()
-            openWindow(id: "main")
-            NSApp.activate(ignoringOtherApps: true)
+            SettingsNavigator.openInMainWindow(openWindow: openWindow)
         }
         .keyboardShortcut(",", modifiers: .command)
     }
