@@ -41,6 +41,20 @@ enum LecternTheme {
         ("graphite", "Graphite"),
     ]
 
+    /// Asset catalog image name for sidebar botanical foliage matching the accent.
+    static func sidebarBotanicalImageName(for id: String) -> String {
+        switch id {
+        case "blue":
+            return "SidebarBotanicalBlue"
+        case "plum":
+            return "SidebarBotanicalPlum"
+        case "graphite":
+            return "SidebarBotanicalGraphite"
+        default:
+            return "SidebarBotanical"
+        }
+    }
+
     // MARK: Paper surfaces (adaptive light/dark)
 
     /// Warm canvas the whole app floats on.
@@ -675,6 +689,7 @@ extension View {
 /// window background matches edge-to-edge behind the sidebar and main workspace card.
 struct AppCanvasModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appearance.accent") private var accentID = "moss"
 
     func body(content: Content) -> some View {
         content
@@ -684,13 +699,16 @@ struct AppCanvasModifier: ViewModifier {
                     // rendering, so this must block other apps behind us.
                     LecternTheme.paper
 
-                    Image("SidebarBotanical")
+                    Image(LecternTheme.sidebarBotanicalImageName(for: accentID))
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 340)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                         .opacity(colorScheme == .dark ? 0.70 : 0.70)
                         .allowsHitTesting(false)
+                        .id(accentID)
+                        .transition(.opacity)
+                        .animation(LecternTheme.standardAnimation, value: accentID)
 
                     if colorScheme == .dark {
                         LinearGradient(
