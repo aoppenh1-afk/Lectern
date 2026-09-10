@@ -70,7 +70,17 @@ final class CanvasEvent {
     /// Manual events created by the student live in the same table so they
     /// render alongside Canvas deadlines everywhere, but use negative IDs so
     /// Canvas sync (positive remote IDs, upsert-only) can never overwrite them.
+    ///
+    /// `categoryRaw` and `reminderMinutesBefore` are manual-only. Both are
+    /// optional additions so existing stores migrate automatically.
+    var categoryRaw: String?
+    var reminderMinutesBefore: Int?
     var isManual: Bool { canvasID < 0 }
+
+    var eventCategory: EventCategory {
+        get { EventCategory(rawValue: categoryRaw ?? "") ?? .personal }
+        set { categoryRaw = newValue.rawValue }
+    }
 
     static func makeLocalID() -> Int64 {
         let stamp = Int64(Date().timeIntervalSince1970)
