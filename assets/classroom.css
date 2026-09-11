@@ -1,3 +1,4 @@
+@import url('product.css');
 /* The scene frames a fixed-size native workspace; it never squashes it. */
 .tour{overflow:clip;background:#b8baa6;border:0}
 .tour-scene{position:sticky;top:60px;height:calc(100svh - 60px);margin-bottom:calc(-100svh + 60px)}
@@ -144,11 +145,6 @@
 
 .demo-window-actions{display:flex;align-items:center;gap:6px}.demo-label button{border:1px solid #bbcbbb;border-radius:20px;background:#f5f7f0e8;color:#244431;font:600 11px -apple-system,sans-serif;padding:3px 9px;cursor:pointer;min-height:22px}
 
-/* The rest of the page explains what the visitor has just tried. */
-.product-intro{padding-block:100px 86px}.product-intro h2{font-size:clamp(36px,4.5vw,62px);max-width:780px;margin-bottom:26px}.product-lead{font-size:20px;line-height:1.7;max-width:720px;color:var(--muted)}.product-workflow{display:grid;grid-template-columns:repeat(3,1fr);gap:44px;margin-top:58px}.product-workflow article{border-top:1px solid var(--line);padding-top:22px}.feature-number{font:italic 28px Georgia,serif;color:#6d8468;display:block;margin-bottom:24px}.product-workflow h3{font:600 23px Georgia,serif}.product-workflow p{font-size:16px;color:var(--muted)}
-.course-life{background:#e9eee4;padding-block:80px}.course-life-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:100px;align-items:center}.course-life h2,.study-details h2{font-size:clamp(32px,3.7vw,48px);line-height:1.12}.course-life p,.study-details p{color:var(--muted)}.semester-note{background:#faf9f2;padding:36px 40px;box-shadow:0 12px 30px #2930290c;border:1px solid #d8decf;border-radius:4px;transform:rotate(1deg)}.semester-note dl{margin:0}.semester-note dl>div{padding:18px 0;border-bottom:1px solid var(--line)}.semester-note dl>div:last-child{border:0}.semester-note dt{font:600 20px Georgia,serif;margin-bottom:6px}.semester-note dd{margin:0;color:var(--muted);font-size:15px}
-.study-details{display:grid;grid-template-columns:1fr 1fr;gap:90px;padding-block:100px;border-bottom:1px solid var(--line)}.product-faq{padding-block:80px;max-width:850px}.product-faq h2{margin-bottom:36px}.product-faq details{border-top:1px solid var(--line);padding:20px 0}.product-faq details:last-child{border-bottom:1px solid var(--line)}.product-faq summary{font-weight:600;cursor:pointer}.product-faq details p{margin:16px 0 0;color:var(--muted)}
-@media(max-width:760px){.product-intro,.study-details,.product-faq{padding-block:54px}.product-lead{font-size:18px}.product-workflow,.course-life-grid,.study-details{grid-template-columns:1fr;gap:32px}.product-workflow{margin-top:34px}.course-life{padding-block:54px}.semester-note{padding:24px;transform:none}.scene-intro{margin-bottom:28px}.scroll-cue{text-align:center}.tour-product{top:0}}
 /* Homepage hook and classroom-tinted navigation. */
 .lectern-home .site-header{background:#b8baa6b3;backdrop-filter:blur(20px) saturate(115%);-webkit-backdrop-filter:blur(20px) saturate(115%);border-bottom:1px solid #29302916}
 .lectern-home .scene-intro{padding:12px 20px 0;margin-bottom:40px;text-shadow:0 2px 20px #16382470}
