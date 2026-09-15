@@ -2031,17 +2031,29 @@ struct CanvasAnnouncementsView: View {
 
     private func select(_ announcement: CanvasAnnouncement) {
         selectedAnnouncementID = announcement.canvasID
-        guard !announcement.isRead else { return }
         let isInbox = announcement.isInboxMessage
         let conversationID = -announcement.canvasID
-        announcement.isRead = true
-        try? modelContext.save()
-        // Mirror inbox reads to Canvas Inbox; announcements have no read API.
-        if isInbox, conversationID > 0 {
-            Task {
-                guard let credentials = try? canvasConnection.credentials() else { return }
-                await CanvasClient(credentials: credentials).markConversationRead(conversationID)
+        let wasUnread = !announcement.isRead
+        if wasUnread {
+            announcement.isRead = true
+            try? modelContext.save()
+        }
+        guard isInbox, conversationID > 0 else { return }
+        Task { @MainActor in
+            guard let credentials = try? canvasConnection.credentials() else { return }
+            let client = CanvasClient(credentials: credentials)
+            // Mirror inbox reads to Canvas Inbox; announcements have no read API.
+            if wasUnread {
+                await client.markConversationRead(conversationID)
             }
+            // Sync stores only the <=100 character list preview; upgrade to
+            // the full thread body for the detail view.
+            guard let thread = await client.fetchConversation(conversationID),
+                  let body = thread.fullBody,
+                  body != announcement.messageHTML else { return }
+            announcement.messageHTML = body
+            if let postedAt = thread.lastMessageAt { announcement.postedAt = postedAt }
+            try? modelContext.save()
         }
     }
 

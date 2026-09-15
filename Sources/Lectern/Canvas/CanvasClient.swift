@@ -520,6 +520,29 @@ actor CanvasClient {
               (200..<300).contains(http.statusCode) else { return }
     }
 
+    /// Full thread for one conversation. The list endpoint only returns a
+    /// <=100 character `last_message` preview; the show endpoint includes the
+    /// `messages` array (newest first) with complete bodies. Returns nil on
+    /// any failure — the caller keeps the preview.
+    /// `auto_mark_as_read=false`: read state is mirrored explicitly via
+    /// markConversationRead so a preview fetch never side-effects Canvas.
+    func fetchConversation(_ id: Int64) async -> CanvasConversationDTO? {
+        guard id > 0 else { return nil }
+        var components = URLComponents(
+            url: credentials.baseURL.appending(path: "/api/v1/conversations/\(id)"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [.init(name: "auto_mark_as_read", value: "false")]
+        guard let url = components?.url else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(credentials.token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        guard let (data, response) = try? await session.data(for: request),
+              let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode) else { return nil }
+        return try? decoder.decode(CanvasConversationDTO.self, from: data)
+    }
+
     private func fetchCoursePayloads(_ courses: [CanvasCourseDTO]) async -> [CoursePayload] {
         let maximumConcurrentCourses = 4
         var iterator = courses.makeIterator()
@@ -817,6 +840,13 @@ struct CanvasConversationDTO: Decodable, Sendable {
             displayName ?? name ?? fullName
         }
     }
+    /// One message in a full-thread (show) response, newest first.
+    struct Message: Decodable, Sendable {
+        let id: Int64?
+        let createdAt: Date?
+        let body: String?
+        let authorId: Int64?
+    }
     struct AudienceContexts: Decodable, Sendable {
         let courses: [String: [String]]?
         let groups: [String: [String]]?
@@ -843,6 +873,10 @@ struct CanvasConversationDTO: Decodable, Sendable {
     let contextName: String?
     let participants: [Participant]?
     let audienceContexts: AudienceContexts?
+    /// Full bodies, newest first. Present only in the show (single-thread)
+    /// response; the list endpoint omits it and carries just the preview in
+    /// `lastMessage`.
+    let messages: [Message]?
     /// Raw `properties` flags (e.g. ["last_author"]). Empty when absent/null.
     let propertyFlags: [String]
     /// Author captured only when `properties` arrives in legacy dict form
@@ -860,6 +894,7 @@ struct CanvasConversationDTO: Decodable, Sendable {
         case contextName
         case participants
         case audienceContexts
+        case messages
         case properties
         case lastAuthor
     }
@@ -889,6 +924,7 @@ struct CanvasConversationDTO: Decodable, Sendable {
         contextName = (try? container.decodeIfPresent(String.self, forKey: .contextName)) ?? nil
         participants = (try? container.decodeIfPresent([Participant].self, forKey: .participants)) ?? nil
         audienceContexts = (try? container.decodeIfPresent(AudienceContexts.self, forKey: .audienceContexts)) ?? nil
+        messages = (try? container.decodeIfPresent([Message].self, forKey: .messages)) ?? nil
 
         // `properties`: real API sends [String] or null. Accept legacy dict too.
         if let flags = try? container.decodeIfPresent([String].self, forKey: .properties) {
@@ -937,5 +973,15 @@ struct CanvasConversationDTO: Decodable, Sendable {
            !subject.isEmpty { return subject }
         if let author = resolvedAuthorName { return "Message from \(author)" }
         return "Inbox message"
+    }
+
+    /// Complete body for the detail view: newest full message first, falling
+    /// back to the <=100 character list preview when the thread was loaded
+    /// from the index endpoint.
+    var fullBody: String? {
+        if let body = messages?.lazy.compactMap({ $0.body }).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+            return body
+        }
+        return lastMessage
     }
 }

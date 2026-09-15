@@ -448,6 +448,48 @@ final class CanvasClientTests: XCTestCase {
         XCTAssertEqual(conversation.resolvedAuthorName, "Joe")
     }
 
+    func testInboxThreadFetchReturnsFullBody() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CanvasResourceURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let fullBody = "Topic: Microbiology\nHost: Radhashree Maitra\nTime: Sep 16, 2026 6:30 PM, Eastern Time (US and Canada)\n:\n2026-09-16 18:30:00\nJoin URL: https://yeshiva-university.zoom.us/j/99277861371"
+        CanvasResourceURLProtocol.handler = { request in
+            let url = try XCTUnwrap(request.url)
+            XCTAssertEqual(url.path, "/api/v1/conversations/987")
+            XCTAssertTrue(url.query?.contains("auto_mark_as_read=false") ?? false, "Preview fetch must not mark the thread read")
+            let payload: [String: Any] = [
+                "id": 987,
+                "subject": "[Create Meeting]",
+                "workflow_state": "unread",
+                "last_message": String(fullBody.prefix(100)),
+                "last_message_at": "2026-09-15T16:46:00Z",
+                "message_count": 1,
+                "context_name": "Microbiology",
+                "participants": [["id": 44, "name": "Radh Maitra", "full_name": "Radh Maitra"]],
+                "properties": ["last_author"],
+                "messages": [[
+                    "id": 3,
+                    "created_at": "2026-09-15T16:46:00Z",
+                    "body": fullBody,
+                    "author_id": 44,
+                    "generated": false,
+                ]],
+            ]
+            let data = try JSONSerialization.data(withJSONObject: payload)
+            return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, data)
+        }
+        defer { CanvasResourceURLProtocol.handler = nil }
+
+        let fetched = await CanvasClient(
+            credentials: CanvasCredentials(baseURL: URL(string: "https://school.instructure.com")!, token: "test-token"),
+            session: session
+        ).fetchConversation(987)
+
+        let thread = try XCTUnwrap(fetched)
+        XCTAssertEqual(thread.fullBody, fullBody)
+        XCTAssertGreaterThan(thread.fullBody?.count ?? 0, 100)
+    }
+
     func testInboxConversationFallsBackWhenSubjectMissing() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [CanvasResourceURLProtocol.self]
