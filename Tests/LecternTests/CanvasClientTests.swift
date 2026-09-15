@@ -364,8 +364,13 @@ final class CanvasClientTests: XCTestCase {
             case "/api/v1/courses":
                 body = #"[{"id":11,"name":"Course One"}]"#
             case "/api/v1/conversations":
-                XCTAssertTrue(url.query?.contains("scope=inbox") ?? false)
-                body = #"[{"id":987,"subject":"Office hours moved","workflow_state":"unread","last_message":"Hi, office hours move to Thursday.","last_message_at":"2026-09-10T12:00:00Z","message_count":1,"context_code":"course_11","context_name":"Course One","participants":[{"id":44,"name":"Prof Smith"}],"properties":{"last_author":{"id":44,"display_name":"Prof Smith"}}}]"#
+                // `scope=inbox` is not a valid Canvas scope — the inbox is the
+                // default (all non-archived). It must not be sent.
+                XCTAssertFalse(url.query?.contains("scope=") ?? false, "Inbox fetch must not send an invalid scope")
+                XCTAssertTrue(url.query?.contains("per_page=100") ?? false)
+                // Realistic list-endpoint payload: properties is a flags array,
+                // context_code is omitted, course comes from audience_contexts.
+                body = #"[{"id":987,"subject":"Office hours moved","workflow_state":"unread","last_message":"Hi, office hours move to Thursday.","last_message_at":"2026-09-10T12:00:00-06:00","message_count":1,"context_name":"Course One","audience":[44],"audience_contexts":{"courses":{"11":["StudentEnrollment"]},"groups":{}},"avatar_url":"https://school.instructure.com/images/messages/avatar-group-50.png","participants":[{"id":1,"name":"Me","full_name":"Current User"},{"id":44,"name":"Prof Smith","full_name":"Professor Smith"}],"properties":["attachments"],"visible":true}]"#
             default:
                 body = "[]"
             }
@@ -383,8 +388,64 @@ final class CanvasClientTests: XCTestCase {
         XCTAssertEqual(conversation.id, 987)
         XCTAssertTrue(conversation.isUnread)
         XCTAssertEqual(conversation.resolvedSubject, "Office hours moved")
+        XCTAssertEqual(conversation.resolvedCourseID, 11)
+        // Author falls back to participants when properties is a flags array.
+        XCTAssertTrue(conversation.resolvedAuthorName?.contains("Prof Smith") ?? false, conversation.resolvedAuthorName ?? "nil")
+        XCTAssertEqual(conversation.contextName, "Course One")
+    }
+
+    func testInboxConversationAcceptsLegacyDictProperties() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CanvasResourceURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        CanvasResourceURLProtocol.handler = { request in
+            let url = try XCTUnwrap(request.url)
+            let body: String
+            if url.path == "/api/v1/conversations" {
+                body = #"[{"id":988,"subject":"Office hours moved","workflow_state":"unread","last_message":"Hi.","last_message_at":"2026-09-10T12:00:00Z","message_count":1,"context_code":"course_11","context_name":"Course One","participants":[{"id":44,"name":"Prof Smith"}],"properties":{"last_author":{"id":44,"display_name":"Prof Smith"}}}]"#
+            } else {
+                body = "[]"
+            }
+            return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+        }
+        defer { CanvasResourceURLProtocol.handler = nil }
+
+        let snapshot = try await CanvasClient(
+            credentials: CanvasCredentials(baseURL: URL(string: "https://school.instructure.com")!, token: "test-token"),
+            session: session
+        ).fetchSnapshot()
+
+        let conversation = try XCTUnwrap(snapshot.conversations.first)
         XCTAssertEqual(conversation.resolvedAuthorName, "Prof Smith")
-        XCTAssertEqual(conversation.contextCode, "course_11")
+        XCTAssertEqual(conversation.resolvedCourseID, 11)
+    }
+
+    func testInboxConversationHandlesNullProperties() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CanvasResourceURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        CanvasResourceURLProtocol.handler = { request in
+            let url = try XCTUnwrap(request.url)
+            let body: String
+            if url.path == "/api/v1/conversations" {
+                body = #"[{"id":989,"subject":"Hello","workflow_state":"read","last_message":null,"last_message_at":null,"message_count":0,"context_name":"Canvas 101","audience":[],"audience_contexts":null,"participants":[{"id":1,"name":"Joe","full_name":"Joe TA"}],"properties":null,"visible":true}]"#
+            } else {
+                body = "[]"
+            }
+            return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+        }
+        defer { CanvasResourceURLProtocol.handler = nil }
+
+        let snapshot = try await CanvasClient(
+            credentials: CanvasCredentials(baseURL: URL(string: "https://school.instructure.com")!, token: "test-token"),
+            session: session
+        ).fetchSnapshot()
+
+        let conversation = try XCTUnwrap(snapshot.conversations.first)
+        XCTAssertEqual(conversation.id, 989)
+        XCTAssertFalse(conversation.isUnread)
+        XCTAssertNil(conversation.resolvedCourseID)
+        XCTAssertEqual(conversation.resolvedAuthorName, "Joe")
     }
 
     func testInboxConversationFallsBackWhenSubjectMissing() async throws {

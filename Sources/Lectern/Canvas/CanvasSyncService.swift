@@ -253,7 +253,11 @@ final class CanvasSyncService {
         for conversation in snapshot.conversations {
             guard conversation.id > 0 else { continue }
             let storageID = -conversation.id
-            let courseID = Self.courseID(from: conversation.contextCode) ?? 0
+            // The list endpoint omits context_code; fall back to
+            // audience_contexts so course filtering still works.
+            let courseID = Self.courseID(from: conversation.contextCode)
+                ?? conversation.resolvedCourseID
+                ?? 0
             let postedAt = conversation.lastMessageAt ?? Date()
             let courseName: String
             if courseID != 0 {

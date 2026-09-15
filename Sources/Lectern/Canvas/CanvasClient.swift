@@ -376,6 +376,16 @@ actor CanvasClient {
         var warnings: [String] = []
     }
 
+    /// Wrapper so one malformed thread never fails the whole inbox fetch:
+    /// bad items decode as nil and are skipped.
+    private struct LossyConversation: Decodable, Sendable {
+        let value: CanvasConversationDTO?
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            value = try? container.decode(CanvasConversationDTO.self)
+        }
+    }
+
     private let credentials: CanvasCredentials
     private let session: URLSession
     private let decoder: JSONDecoder
@@ -388,13 +398,29 @@ actor CanvasClient {
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let value = try container.decode(String.self)
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let date = formatter.date(from: value) { return date }
-            formatter.formatOptions = [.withInternetDateTime]
-            if let date = formatter.date(from: value) { return date }
+            if let date = Self.parseCanvasDate(value) { return date }
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid Canvas date: \(value)")
         }
+    }
+
+    /// Canvas timestamps are ISO-8601 in UTC (…Z) or with a numeric offset
+    /// (…-06:00), with or without fractional seconds. Try every variant so a
+    /// single unexpected format never fails the whole sync.
+    static func parseCanvasDate(_ value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: value) { return date }
+        // Fallback for offsets without colon (e.g. -0600) or other variants.
+        let fallback = DateFormatter()
+        fallback.locale = Locale(identifier: "en_US_POSIX")
+        fallback.timeZone = TimeZone(secondsFromGMT: 0)
+        for format in ["yyyy-MM-dd'T'HH:mm:ssXXXXX", "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"] {
+            fallback.dateFormat = format
+            if let date = fallback.date(from: value) { return date }
+        }
+        return nil
     }
 
     static func normalizedBaseURL(_ input: String) throws -> URL {
@@ -458,16 +484,19 @@ actor CanvasClient {
     private func fetchInboxPayload() async -> InboxPayload {
         var payload = InboxPayload()
         do {
-            // Canvas Inbox == conversations API. "inbox" scope covers read and
-            // unread non-archived threads. Pagination is followed by get(_:query:).
-            let values: [CanvasConversationDTO] = try await get(
+            // Canvas Inbox == conversations API. No `scope` param means "all
+            // non-archived" (read + unread), which is the Inbox view. Note:
+            // `scope=inbox` is NOT a valid Canvas scope (valid: unread,
+            // starred, archived, sent) and must not be sent.
+            // Pagination is followed by get(_:query:).
+            // Lossy decode: skip malformed threads instead of dropping inbox.
+            let wrapped: [LossyConversation] = try await get(
                 path: "/api/v1/conversations",
                 query: [
-                    .init(name: "scope", value: "inbox"),
                     .init(name: "per_page", value: "100"),
                 ]
             )
-            payload.conversations = values
+            payload.conversations = wrapped.compactMap(\.value)
         } catch {
             payload.warnings.append("Inbox messages: \(error.localizedDescription)")
         }
@@ -477,16 +506,15 @@ actor CanvasClient {
     /// Best-effort mirror of a local read to the Canvas Inbox. Failures are
     /// swallowed by the caller: the local badge is the source of truth.
     func markConversationRead(_ id: Int64) async {
-        var components = URLComponents(
-            url: credentials.baseURL.appending(path: "/api/v1/conversations/\(id)"),
-            resolvingAgainstBaseURL: false
-        )
-        components?.queryItems = [.init(name: "conversation[workflow_state]", value: "read")]
-        guard let url = components?.url else { return }
+        let url = credentials.baseURL.appending(path: "/api/v1/conversations/\(id)")
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("Bearer \(credentials.token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        // Canvas expects form-encoded params for PUT. Query-string params
+        // also work via Rails, but a body is the documented form.
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data("conversation%5Bworkflow_state%5D=read".utf8)
         guard let (_, response) = try? await session.data(for: request),
               let http = response as? HTTPURLResponse,
               (200..<300).contains(http.statusCode) else { return }
@@ -770,6 +798,14 @@ struct CanvasAnnouncementDTO: Decodable, Sendable {
 /// One Canvas Inbox thread (GET /api/v1/conversations). Every property is
 /// optional except id: Canvas tenants vary, so a missing field must degrade
 /// to a fallback, never fail the whole sync.
+///
+/// Real-world notes (see Canvas Conversations API docs):
+/// - `properties` is an array of flags like ["last_author", "attachments"],
+///   or null — NOT an object. Older test fixtures used a dict form, which is
+///   still accepted for backwards compatibility.
+/// - The list endpoint omits `context_code`; the course lives in
+///   `audience_contexts.courses` keys (e.g. {"123": [...]}).
+/// - `participants` entries carry `name` / `full_name` (no display_name).
 struct CanvasConversationDTO: Decodable, Sendable {
     struct Participant: Decodable, Sendable {
         let id: Int64?
@@ -781,13 +817,21 @@ struct CanvasConversationDTO: Decodable, Sendable {
             displayName ?? name ?? fullName
         }
     }
-    struct Properties: Decodable, Sendable {
-        struct Author: Decodable, Sendable {
-            let id: Int64?
-            let displayName: String?
-            let name: String?
+    struct AudienceContexts: Decodable, Sendable {
+        let courses: [String: [String]]?
+        let groups: [String: [String]]?
+
+        enum CodingKeys: String, CodingKey { case courses, groups }
+
+        init(from decoder: Decoder) throws {
+            // Tolerant: any unexpected shape degrades to nil rather than
+            // failing the conversation.
+            guard let container = try? decoder.container(keyedBy: CodingKeys.self) else {
+                courses = nil; groups = nil; return
+            }
+            courses = (try? container.decodeIfPresent([String: [String]].self, forKey: .courses)) ?? nil
+            groups = (try? container.decodeIfPresent([String: [String]].self, forKey: .groups)) ?? nil
         }
-        let lastAuthor: Author?
     }
     let id: Int64
     let subject: String?
@@ -798,13 +842,91 @@ struct CanvasConversationDTO: Decodable, Sendable {
     let contextCode: String?
     let contextName: String?
     let participants: [Participant]?
-    let properties: Properties?
+    let audienceContexts: AudienceContexts?
+    /// Raw `properties` flags (e.g. ["last_author"]). Empty when absent/null.
+    let propertyFlags: [String]
+    /// Author captured only when `properties` arrives in legacy dict form
+    /// {"last_author": {...}}. Real API responses use the flags array + participants.
+    let legacyLastAuthor: Participant?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case subject
+        case workflowState
+        case lastMessage
+        case lastMessageAt
+        case messageCount
+        case contextCode
+        case contextName
+        case participants
+        case audienceContexts
+        case properties
+        case lastAuthor
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int64.self, forKey: .id)
+        // Every optional field is decoded tolerantly: a single mistyped field
+        // must degrade to nil, never fail the whole conversation (and, via the
+        // array decode, never fail the whole inbox fetch).
+        subject = (try? container.decodeIfPresent(String.self, forKey: .subject)) ?? nil
+        workflowState = (try? container.decodeIfPresent(String.self, forKey: .workflowState)) ?? nil
+        lastMessage = (try? container.decodeIfPresent(String.self, forKey: .lastMessage)) ?? nil
+        // Tolerant date: try Date (uses the client's ISO-8601 strategy),
+        // then fall back to manual string parsing so offset variants never
+        // fail the whole conversation.
+        if let date = (try? container.decodeIfPresent(Date.self, forKey: .lastMessageAt)) ?? nil {
+            lastMessageAt = date
+        } else if let raw = (try? container.decodeIfPresent(String.self, forKey: .lastMessageAt)) ?? nil,
+                  let parsed = CanvasClient.parseCanvasDate(raw) {
+            lastMessageAt = parsed
+        } else {
+            lastMessageAt = nil
+        }
+        messageCount = (try? container.decodeIfPresent(Int.self, forKey: .messageCount)) ?? nil
+        contextCode = (try? container.decodeIfPresent(String.self, forKey: .contextCode)) ?? nil
+        contextName = (try? container.decodeIfPresent(String.self, forKey: .contextName)) ?? nil
+        participants = (try? container.decodeIfPresent([Participant].self, forKey: .participants)) ?? nil
+        audienceContexts = (try? container.decodeIfPresent(AudienceContexts.self, forKey: .audienceContexts)) ?? nil
+
+        // `properties`: real API sends [String] or null. Accept legacy dict too.
+        if let flags = try? container.decodeIfPresent([String].self, forKey: .properties) {
+            propertyFlags = flags ?? []
+            legacyLastAuthor = nil
+        } else if let legacy = try? container.decodeIfPresent([String: Participant].self, forKey: .properties) {
+            propertyFlags = []
+            // Keys arrive snake_cased ("last_author"); the key strategy maps
+            // them, but be permissive about the exact spelling.
+            legacyLastAuthor = legacy["lastAuthor"] ?? legacy["last_author"]
+        } else if let author = try? container.decodeIfPresent(Participant.self, forKey: .lastAuthor) {
+            propertyFlags = []
+            legacyLastAuthor = author
+        } else {
+            propertyFlags = []
+            legacyLastAuthor = nil
+        }
+    }
 
     var isUnread: Bool { workflowState?.lowercased() == "unread" }
 
+    /// Best-effort course ID: prefer explicit context_code, else the first
+    /// course key in audience_contexts (the list endpoint's only course signal).
+    var resolvedCourseID: Int64? {
+        if let code = contextCode, code.hasPrefix("course_"),
+           let id = Int64(code.dropFirst("course_".count)) {
+            return id
+        }
+        if let keys = audienceContexts?.courses?.keys {
+            // Keys are numeric strings like "123".
+            let ids = keys.compactMap(Int64.init).sorted()
+            if let first = ids.first { return first }
+        }
+        return nil
+    }
+
     var resolvedAuthorName: String? {
-        if let name = properties?.lastAuthor?.displayName ?? properties?.lastAuthor?.name,
-           !name.isEmpty { return name }
+        if let name = legacyLastAuthor?.resolvedName, !name.isEmpty { return name }
         let names = (participants ?? []).compactMap(\.resolvedName).filter { !$0.isEmpty }
         if names.isEmpty { return nil }
         return names.count == 1 ? names[0] : names.joined(separator: ", ")
