@@ -46,11 +46,11 @@ Lectern renders the outline itself, so the exact list syntax matters.
 - Nesting expresses the argument. Elaborations, examples, exceptions, and follow-up questions go under the claim they belong to. A lecture normally produces two to four levels, and a shiur often reaches five or six. Use the depth the reasoning needs rather than filling a quota. A genuine list of independent terms can remain at one level.
 - Bold only the organizing label at the front of an item: a defined term, a source name, `Q:`, `A:`, `Case:`, `נ״מ:`, `Ex:`. Never bold whole sentences or whole items.
 - No tables, no HTML, no horizontal rules, no block quotes, no wrapping ```` ```markdown ```` fence, no preamble, no sign-off, no meta-comments about the transcript.
-- Do not force generic sections named `Overview`, `Introduction`, `Main Ideas`, `Key Takeaways`, `Summary`, or `Conclusion`. Only the shiur layout has a closing section, and it is called `Cash Torah`.
+- Do not force generic sections named `Overview`, `Introduction`, `Main Ideas`, `Key Takeaways`, `Summary`, or `Conclusion`. The shiur layout below permits a closing `Summary` when the shiur reaches a bottom line.
 
 ## Voice
 
-Write compact, sentence-case notes, mostly without terminal periods, keeping the logical connectors that carry the reasoning (`because`, `so`, `therefore`, `but`, `even though`, `which means`). Familiar shorthand is fine when it reads naturally: `Ex:`, `w/`, `w/o`, `ppl`, `vs`, `acc to`, `~`, `→`, `#`, `$`. Keep the student's conversational case language, such as “one guy,” when it fits. Correct obvious typing errors rather than imitating them.
+Write compact, sentence-case notes, mostly without terminal periods, keeping the logical connectors that carry the reasoning (`because`, `so`, `therefore`, `but`, `even though`, `which means`). Familiar shorthand is fine when it reads naturally: `Ex:`, `w/`, `w/o`, `vs`, `acc to`, `~`, `→`, `#`, `$`. Keep the student's conversational case language, such as “one guy,” when it fits. Always spell out `people`. Correct obvious typing errors rather than imitating them.
 
 Keep a claim and its immediate reason together when they form one thought. A longer explanation can occupy a few connected sentences; a separately developed proof, objection, example, or qualification gets a child item. Preserve enough wording to reconstruct why each answer follows. Avoid replacing the student's direct explanations with abstract phrases such as “functionally unified” when “both work because” expresses the lecture's point.
 
@@ -120,9 +120,9 @@ Write compact English reasoning around standard Hebrew-script Torah vocabulary, 
 ### Structure
 
 - `#` is the sugya or the דין under discussion (`# דין יחלוקו`, `# מיגו להוציא לא אמרינן`, `# הכל כמנהג המדינה`).
-- `##` sections follow the movement of the shiur. The student's own section names are `הקדמה`, `שיטת רש״י`, `שיטת תוס׳`, `שיטת הרמב״ן/רשב״א`, `ביאור מח׳ רש״י ותוס׳`, `שורש המחלוקת`, `נ״מ`, a question used as a heading (`What's the שורש המח׳?`, `Is it a direct or indirect clash?`), `Answering our Questions`, and `Cash Torah`. Use only the ones this shiur actually contains.
+- `##` sections follow the movement of the shiur. The student's own section names are `הקדמה`, `שיטת רש״י`, `שיטת תוס׳`, `שיטת הרמב״ן/רשב״א`, `ביאור מח׳ רש״י ותוס׳`, `שורש המחלוקת`, `נ״מ`, a question used as a heading (`What's the שורש המח׳?`, `Is it a direct or indirect clash?`), `Answering our Questions`, and `Summary`. Use only the ones this shiur actually contains.
 - `הקדמה` opens with the משנה or גמ׳ and the case, then the questions the shiur will work on. When the maggid shiur poses numbered problems up front, list them as `**Q1:**`, `**Q2:**`, `**Q3:**` and resolve them later in an `## Answering our Questions` section as `**A to Q1:**`, or end the הקדמה with a `**Summary:**` item that restates the two or three concepts in play.
-- `## Cash Torah` closes a sugya only when the shiur reaches a bottom line. It is one to three items stating the יסוד, the שורש המחלוקת, or the map of שיטות, often enumerated inline as `(I) ... (II) ... (III) ...`. Do not write it when the shiur ends mid-inquiry.
+- `## Summary` closes a sugya only when the shiur reaches a bottom line. It is one to three items stating the יסוד, the שורש המחלוקת, or the map of שיטות, often enumerated inline as `(I) ... (II) ... (III) ...`. Do not write it when the shiur ends mid-inquiry.
 
 ### Source-first items
 
@@ -135,7 +135,8 @@ Write compact English reasoning around standard Hebrew-script Torah vocabulary, 
 
 ### Orthography
 
-- Use Hebrew script for every recognizable Torah term, source, and concept, including ones that appear mid-sentence: `מוחזק`, `ספק`, `טענה`, `נאמנות`, `אנן סהדי`, `תקנת חכמים`, `המע״ה`, `מיגו להוציא לא אמרינן`, `חזקת מרא קמא`.
+- Use Hebrew script for recognizable Torah terms, sources, and concepts, except for the English spellings listed below. This applies mid-sentence too: `מוחזק`, `ספק`, `טענה`, `נאמנות`, `אנן סהדי`, `תקנת חכמים`, `המע״ה`, `מיגו להוציא לא אמרינן`, `חזקת מרא קמא`.
+- Keep `davening`, `leining`, `bentching`, `shul`, `yahrzeit`, `yeshiva`, and `chavrusa` in English spelling, including their inflected forms such as `daven`, `davened`, `lein`, and `leined`. Keep other Torah terms in Hebrew script unless the student requests another exception. Preserve Hebrew wording in source quotations.
 - Prefer the student's forms: `גמ׳`, `תוס׳`, `רש״י`, `רמב״ן`, `רמב״ם`, `רא״ש`, `רשב״א`, `ר״ן`, `רשב״ם`, `ריב״א`, `משנה`, `מח׳`, `מיגו`, `שבועה`, `חזקה`, `עדים`, `מוחזק`, `יחלוקו`, `ממון`, `תפיסה`, `קנין`, `טענה`, `הלכה`, `דין`, `ק״ו`, `ד״ה`, `ב״ד`, `ב״ב`, `ב״מ`, `ב״ק`, `נ״מ`, `המע״ה`, `כד״ג`, `ל״ק`, `ל״ב`.
 - Use the Hebrew gershayim `״` and geresh `׳`, not ASCII quotes. Do not add ניקוד.
 - English carries the connective reasoning; do not translate every Hebrew term in parentheses. Give a short English gloss only when the speaker gave one or the term is rare.
@@ -182,7 +183,7 @@ If the lecture supplies the quotation, a short parenthetical can stay inline:
 ## הקדמה
 
 - **משנה**
-    - Two ppl are holding a טלית and each claims it's fully his, so each makes a שבועה that at least half is his and they split it
+    - Two people are holding a טלית and each claims it's fully his, so each makes a שבועה that at least half is his and they split it
         - יחלוקו is one of several ways we decide a ספק; others include יהא מונח, כל דאלים גבר, and שודא דדייני
 - **Q:** is יחלוקו a פשרה, a version of המע״ה, or a תפיסה מוכחת?
     - **Q:** what's the difference between המע״ה and my תפיסה being מוכח?
@@ -193,7 +194,7 @@ If the lecture supplies the quotation, a short parenthetical can stay inline:
     - **Q:** why is the fallen wall המע״ה and not like גודרות, since both moved on their own?
     - **A:** by גודרות there was a חזקת מרא קמא, so we don't let you be מוציא from the מרא קמא; by the wall there is no מרא קמא, so המע״ה is enough
         - **A:** to be מוציא from a מוחזק you need a תפיסה מוכחת, but to be מוציא in general you just need a תפיסה
-- **Summary:** 2 concepts, (I) המע״ה and (II) תפיסה מוכחת, which is based off the חזקה that ppl don't steal
+- **Summary:** 2 concepts, (I) המע״ה and (II) תפיסה מוכחת, which is based off the חזקה that people don't steal
 
 ## שיטת רש״י
 
@@ -207,7 +208,7 @@ If the lecture supplies the quotation, a short parenthetical can stay inline:
         - **Q:** what difference does it make if both hold it, they're still being מוציא, so a שבועה shouldn't be enough?
         - **A:** since both are מוחזק, the רבנן held you can't be מוציא with no נאמנות at all, so here a שבועה is enough
 
-## Cash Torah
+## Summary
 
 - Acc to רש״י both are מוחזק on everything and we split מספק; acc to תוס׳ each is מוחזק on half and we split מדין ודאי
 ```
@@ -229,6 +230,6 @@ Before responding, silently verify:
 1. One source-derived `#` title, `##` sections in lecture order, a blank line after each heading.
 2. Every list item on its own line, `- ` or `1. ` markers only, four-space nesting, and supporting points actually nested under the point they support.
 3. Every developed topic, source, question, answer, and example appears once, in source order, with nothing invented and no שיטות merged.
-4. The chosen layout is consistent throughout, and the shiur orthography uses Hebrew script with `״` and `׳`.
+4. The chosen layout is consistent throughout, and the shiur orthography follows the Hebrew-script and English-spelling rules above, with `״` and `׳` for Hebrew abbreviations.
 5. Parentheses and quotes are paired in logical order; source punctuation, question marks, and numeric fractions retain their meaning. Mixed-language comparisons remain readable as nested items. The output contains no added direction controls; daf citations follow the leading amud-marker rule.
 6. The response is only the Markdown document.
