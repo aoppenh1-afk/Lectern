@@ -17,14 +17,16 @@ final class GoogleDocsSyncService {
 
     private let auth: GoogleDocsAuth
     private let modelContainer: ModelContainer
-    private let client = GoogleDocsClient()
+    private let client: GoogleDocsClient
 
     private(set) var isSyncing = false
     private(set) var lastMessage: String?
     private(set) var lastSyncSucceeded = true
     private(set) var lastDocURL: URL?
+    private(set) var lastSyncLectureID: PersistentIdentifier?
 
-    init(auth: GoogleDocsAuth, modelContainer: ModelContainer) {
+    init(auth: GoogleDocsAuth, modelContainer: ModelContainer, client: GoogleDocsClient = GoogleDocsClient()) {
+        self.client = client
         self.auth = auth
         self.modelContainer = modelContainer
     }
@@ -32,6 +34,9 @@ final class GoogleDocsSyncService {
     func sync(lecture: Lecture) async {
         guard !isSyncing else { return }
         isSyncing = true
+        lastSyncLectureID = lecture.persistentModelID
+        lastMessage = nil
+        lastDocURL = nil
         defer { isSyncing = false }
 
         do {
@@ -102,22 +107,18 @@ final class GoogleDocsSyncService {
     }
 
     func openInDocs(lecture: Lecture) {
-        let documentID: String?
-        if let course = lecture.course {
-            documentID = course.googleDocId
-        } else {
-            documentID = UserDefaults.standard.string(forKey: Self.unfiledDocKey)
-        }
-        guard let documentID,
-              let url = GoogleDocsClient.editURL(documentID: documentID, tabID: lecture.googleTabId) else {
-            return
-        }
+        guard let url = documentURL(for: lecture) else { return }
         NSWorkspace.shared.open(url)
     }
 
     func canOpen(lecture: Lecture) -> Bool {
-        if let course = lecture.course { return course.googleDocId != nil }
-        return UserDefaults.standard.string(forKey: Self.unfiledDocKey) != nil
+        documentURL(for: lecture) != nil
+    }
+
+    func documentURL(for lecture: Lecture) -> URL? {
+        guard let documentID = storedDocumentID(for: lecture), !documentID.isEmpty,
+              let tabID = lecture.googleTabId, !tabID.isEmpty else { return nil }
+        return GoogleDocsClient.editURL(documentID: documentID, tabID: tabID)
     }
 
     func notesSyncState(for lecture: Lecture) -> GoogleNotesSyncState {
@@ -146,7 +147,7 @@ final class GoogleDocsSyncService {
         return created.id
     }
 
-    private func resolveTab(
+    func resolveTab(
         lecture: Lecture,
         document: GoogleDocument,
         title: String,
@@ -157,9 +158,8 @@ final class GoogleDocsSyncService {
         }
         // A replacement document or deleted tab needs its content written again.
         lecture.googleNotesHash = nil
-        if let match = document.tabs.first(where: { $0.title == title }) {
-            return match
-        }
+        // Titles are display labels, not lecture identities. In particular,
+        // truncating long titles can give separate lectures the same label.
         if lecture.googleTabId == nil,
            document.tabs.count == 1,
            let only = document.tabs.first,

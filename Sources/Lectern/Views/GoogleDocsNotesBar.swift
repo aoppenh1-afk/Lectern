@@ -48,14 +48,15 @@ struct GoogleDocsNotesBar: View {
                 }
             }
 
-            if let message = googleDocs.lastMessage {
+            if googleDocs.lastSyncLectureID == lecture.persistentModelID,
+               let message = googleDocs.lastMessage {
                 HStack(spacing: 6) {
                     Image(systemName: googleDocs.lastSyncSucceeded ? "checkmark.circle" : "exclamationmark.triangle")
                         .font(.system(size: 11))
                     Text(message)
                         .font(.system(size: 12))
                     Spacer()
-                    if googleDocs.lastSyncSucceeded, googleDocs.lastDocURL != nil {
+                    if googleDocs.lastSyncSucceeded, googleDocs.canOpen(lecture: lecture) {
                         Button("Open Doc") {
                             googleDocs.openInDocs(lecture: lecture)
                         }

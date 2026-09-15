@@ -41,6 +41,7 @@
 		245A024BB2B4E7D289D59A9A /* ParakeetTDT in Frameworks */ = {isa = PBXBuildFile; productRef = 7B77D7F08E734597FB340D71 /* ParakeetTDT */; };
 		246D6AABE4A01260E36A1011 /* CanvasClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */; };
 		25E0EBCA6B9B36768A41F813 /* YUTorahSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8E8D62B339AAE8CDACF807 /* YUTorahSearchIndex.swift */; };
+		262317A2F9B261FFB523B187 /* GoogleDocsSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA475B8E4EACE8E555128177 /* GoogleDocsSyncTests.swift */; };
 		26B56FA6D70AEFB77DB4E9D4 /* TranscriptionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D65BB56BA83F5089F0629283 /* TranscriptionSettingsView.swift */; };
 		26E2896F3FB97360C64941D4 /* WAVMixdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39ACF53C363072F06D09190A /* WAVMixdown.swift */; };
 		26E90B0EEA8592419A89B457 /* CapturePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0999EBAFBCFF39D7F174D28 /* CapturePipeline.swift */; };
@@ -371,6 +372,7 @@
 		B3217A5B8A37DD8207DD0478 /* AnkiConnectClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnkiConnectClient.swift; sourceTree = "<group>"; };
 		B564AF96344848C71EE09258 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		B67FCCE28F74E8E6AC84F215 /* LaunchAtLoginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginManager.swift; sourceTree = "<group>"; };
+		BA475B8E4EACE8E555128177 /* GoogleDocsSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsSyncTests.swift; sourceTree = "<group>"; };
 		BB85EBEEFA4C4DD64A6BA221 /* LiveBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveBookmark.swift; sourceTree = "<group>"; };
 		BBF49011BFA6F50BCA8A7598 /* GoogleDocsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsClient.swift; sourceTree = "<group>"; };
 		BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACPClient.swift; sourceTree = "<group>"; };
@@ -617,6 +619,7 @@
 				795B08D1A7D6BBE0408B836A /* ChatStudyMaterialTests.swift */,
 				2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */,
 				F2ECE882547DAE6ABCD5EC51 /* ExportAvailabilityTests.swift */,
+				BA475B8E4EACE8E555128177 /* GoogleDocsSyncTests.swift */,
 				4423ED80F0768A3752F0DC45 /* GoogleOAuthConfigurationTests.swift */,
 				46C4BC4B87A44CE7C458F8C7 /* LecternCloudSharingTests.swift */,
 				60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */,
@@ -983,6 +986,7 @@
 				92ED10122EC5ED40F4589F2E /* GoogleDocsError.swift in Sources */,
 				195EA20634018DCA43CF70BD /* GoogleDocsNotesBar.swift in Sources */,
 				A410E80D82033153C89AB820 /* GoogleDocsSyncService.swift in Sources */,
+				262317A2F9B261FFB523B187 /* GoogleDocsSyncTests.swift in Sources */,
 				F0BE959424B6DC733048E2C7 /* GoogleOAuthConfiguration.swift in Sources */,
 				71D0F30C0C4DB0C346EEE723 /* GoogleOAuthConfigurationTests.swift in Sources */,
 				1E2C8FDA18A3C566CC1F9976 /* LaunchAtLoginManager.swift in Sources */,
