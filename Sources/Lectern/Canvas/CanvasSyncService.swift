@@ -51,7 +51,7 @@ final class CanvasSyncService {
         do {
             let credentials = try connection.credentials()
             let snapshot = try await CanvasClient(credentials: credentials).fetchSnapshot()
-            try apply(snapshot)
+            try apply(snapshot, baseURL: credentials.baseURL)
             lastWarnings = snapshot.warnings
             let now = Date()
             lastSyncAt = now
@@ -69,7 +69,7 @@ final class CanvasSyncService {
         if case .failed = phase { phase = .idle }
     }
 
-    private func apply(_ snapshot: CanvasSnapshot) throws {
+    private func apply(_ snapshot: CanvasSnapshot, baseURL: URL) throws {
         let context = modelContainer.mainContext
         let allCourses = try context.fetch(FetchDescriptor<Course>())
         var coursesByCanvasID = Dictionary(uniqueKeysWithValues: allCourses.compactMap { course in
@@ -234,6 +234,7 @@ final class CanvasSyncService {
                 postedAt: postedAt
             )
             if announcementsByID[remote.id] == nil { context.insert(value) }
+            value.courseCanvasID = courseID
             value.courseName = courseNames[courseID] ?? value.courseName
             value.title = remote.title
             value.messageHTML = remote.message
@@ -241,7 +242,55 @@ final class CanvasSyncService {
             value.authorName = remote.author?.displayName
             value.htmlURL = remote.htmlURL
             value.syncedAt = Date()
+            // Read state is local: a fresh announcement starts unread and a
+            // sync never flips a read item back to unread.
             announcementsByID[remote.id] = value
+        }
+
+        // Canvas Inbox threads share the announcements list. They are stored
+        // with negative canvasIDs so they can never collide with the positive
+        // announcement IDs under the unique constraint.
+        for conversation in snapshot.conversations {
+            guard conversation.id > 0 else { continue }
+            let storageID = -conversation.id
+            let courseID = Self.courseID(from: conversation.contextCode) ?? 0
+            let postedAt = conversation.lastMessageAt ?? Date()
+            let courseName: String
+            if courseID != 0 {
+                courseName = courseNames[courseID] ?? conversation.contextName ?? "Course"
+            } else {
+                courseName = conversation.contextName ?? "Inbox"
+            }
+            let title = conversation.resolvedSubject
+            if let value = announcementsByID[storageID] {
+                value.courseCanvasID = courseID
+                value.courseName = courseName
+                value.title = title
+                if let body = conversation.lastMessage { value.messageHTML = body }
+                value.postedAt = postedAt
+                value.authorName = conversation.resolvedAuthorName ?? value.authorName
+                value.htmlURL = baseURL.appending(path: "/conversations/\(conversation.id)").absoluteString
+                value.syncedAt = Date()
+                value.sourceRaw = "inbox"
+                // If the thread was read elsewhere, clear the local badge.
+                // Never mark a locally-read thread unread from the server.
+                if !conversation.isUnread { value.isRead = true }
+            } else {
+                let value = CanvasAnnouncement(
+                    canvasID: storageID,
+                    courseCanvasID: courseID,
+                    courseName: courseName,
+                    title: title,
+                    postedAt: postedAt
+                )
+                value.messageHTML = conversation.lastMessage
+                value.authorName = conversation.resolvedAuthorName
+                value.htmlURL = baseURL.appending(path: "/conversations/\(conversation.id)").absoluteString
+                value.sourceRaw = "inbox"
+                value.isRead = !conversation.isUnread
+                context.insert(value)
+                announcementsByID[storageID] = value
+            }
         }
 
         try context.save()

@@ -120,7 +120,9 @@ struct SuperAppShellView: View {
         }.count
     }
     private var announcementCount: Int {
-        announcements.lazy.filter { scopedCanvasIDs.contains($0.courseCanvasID) }.count
+        announcements.lazy.filter {
+            ($0.courseCanvasID == 0 || scopedCanvasIDs.contains($0.courseCanvasID)) && !$0.isRead
+        }.count
     }
 
     var body: some View {
@@ -386,7 +388,9 @@ struct OverviewDashboardView: View {
         events.filter { $0.isManual || ($0.courseCanvasID.map(allowedCourseIDs.contains) ?? false) }
             .sorted { $0.startAt < $1.startAt }
     }
-    private var scopedAnnouncements: [CanvasAnnouncement] { announcements.filter { allowedCourseIDs.contains($0.courseCanvasID) } }
+    private var scopedAnnouncements: [CanvasAnnouncement] {
+        announcements.filter { $0.courseCanvasID == 0 || allowedCourseIDs.contains($0.courseCanvasID) }
+    }
 
     private var upcomingAssignments: [CanvasAssignment] {
         scopedAssignments.filter { !$0.isComplete && ($0.dueAt ?? .distantFuture) >= Calendar.current.startOfDay(for: Date()) }.prefix(3).map { $0 }
@@ -535,8 +539,13 @@ struct OverviewDashboardView: View {
                 ForEach(scopedAnnouncements.prefix(2)) { announcement in
                     VStack(alignment: .leading, spacing: 7) {
                         HStack {
-                            Circle().fill(LecternTheme.accent).frame(width: 7, height: 7)
+                            Circle().fill(announcement.isRead ? Color.secondary.opacity(0.35) : LecternTheme.accent).frame(width: 7, height: 7)
                             Text(announcement.courseName).font(.system(size: 11.5, weight: .medium)).foregroundStyle(LecternTheme.accent)
+                            if announcement.isInboxMessage {
+                                Text("Inbox").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+                                    .padding(.horizontal, 5).padding(.vertical, 2)
+                                    .background(Color.primary.opacity(0.06), in: Capsule())
+                            }
                             if let author = announcement.authorName { Text("·  \(author)").font(.system(size: 11)).foregroundStyle(.secondary) }
                             Spacer()
                             Text(announcement.postedAt.formatted(.relative(presentation: .named))).font(.system(size: 10)).foregroundStyle(.secondary)

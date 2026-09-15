@@ -5,7 +5,8 @@ import Security
 enum CanvasAutomaticSyncPolicy {
     static let maxAge: TimeInterval = 60 * 60
     // Increment when a release needs to populate new Canvas-backed data.
-    static let dataVersion = 2
+    // v3: Canvas Inbox threads sync into announcements + unread tracking.
+    static let dataVersion = 3
 
     static func shouldSync(lastSyncAt: Date?,
                            lastSyncedDataVersion: Int = dataVersion,

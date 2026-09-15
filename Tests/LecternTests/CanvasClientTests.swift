@@ -353,6 +353,89 @@ final class CanvasClientTests: XCTestCase {
         XCTAssertThrowsError(try CanvasClient.normalizedBaseURL("http://school.instructure.com"))
     }
 
+    func testInboxConversationsAppearInSnapshot() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CanvasResourceURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        CanvasResourceURLProtocol.handler = { request in
+            let url = try XCTUnwrap(request.url)
+            let body: String
+            switch url.path {
+            case "/api/v1/courses":
+                body = #"[{"id":11,"name":"Course One"}]"#
+            case "/api/v1/conversations":
+                XCTAssertTrue(url.query?.contains("scope=inbox") ?? false)
+                body = #"[{"id":987,"subject":"Office hours moved","workflow_state":"unread","last_message":"Hi, office hours move to Thursday.","last_message_at":"2026-09-10T12:00:00Z","message_count":1,"context_code":"course_11","context_name":"Course One","participants":[{"id":44,"name":"Prof Smith"}],"properties":{"last_author":{"id":44,"display_name":"Prof Smith"}}}]"#
+            default:
+                body = "[]"
+            }
+            return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+        }
+        defer { CanvasResourceURLProtocol.handler = nil }
+
+        let snapshot = try await CanvasClient(
+            credentials: CanvasCredentials(baseURL: URL(string: "https://school.instructure.com")!, token: "test-token"),
+            session: session
+        ).fetchSnapshot()
+
+        XCTAssertEqual(snapshot.conversations.count, 1)
+        let conversation = try XCTUnwrap(snapshot.conversations.first)
+        XCTAssertEqual(conversation.id, 987)
+        XCTAssertTrue(conversation.isUnread)
+        XCTAssertEqual(conversation.resolvedSubject, "Office hours moved")
+        XCTAssertEqual(conversation.resolvedAuthorName, "Prof Smith")
+        XCTAssertEqual(conversation.contextCode, "course_11")
+    }
+
+    func testInboxConversationFallsBackWhenSubjectMissing() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CanvasResourceURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        CanvasResourceURLProtocol.handler = { request in
+            let url = try XCTUnwrap(request.url)
+            let body: String
+            if url.path == "/api/v1/conversations" {
+                body = #"[{"id":555,"workflow_state":"read","last_message":"See you then.","last_message_at":"2026-09-11T09:00:00Z","participants":[{"id":7,"display_name":"Jane Doe"}]}]"#
+            } else {
+                body = "[]"
+            }
+            return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+        }
+        defer { CanvasResourceURLProtocol.handler = nil }
+
+        let snapshot = try await CanvasClient(
+            credentials: CanvasCredentials(baseURL: URL(string: "https://school.instructure.com")!, token: "test-token"),
+            session: session
+        ).fetchSnapshot()
+
+        let conversation = try XCTUnwrap(snapshot.conversations.first)
+        XCTAssertFalse(conversation.isUnread)
+        XCTAssertEqual(conversation.resolvedAuthorName, "Jane Doe")
+        XCTAssertEqual(conversation.resolvedSubject, "Message from Jane Doe")
+    }
+
+    func testInboxFailureDegradesToWarningInsteadOfFailingSync() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CanvasResourceURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        CanvasResourceURLProtocol.handler = { request in
+            let url = try XCTUnwrap(request.url)
+            if url.path == "/api/v1/conversations" {
+                return (HTTPURLResponse(url: url, statusCode: 403, httpVersion: nil, headerFields: nil)!, Data(#"{"errors":[{"message":"forbidden"}]}"#.utf8))
+            }
+            return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data("[]".utf8))
+        }
+        defer { CanvasResourceURLProtocol.handler = nil }
+
+        let snapshot = try await CanvasClient(
+            credentials: CanvasCredentials(baseURL: URL(string: "https://school.instructure.com")!, token: "test-token"),
+            session: session
+        ).fetchSnapshot()
+
+        XCTAssertTrue(snapshot.conversations.isEmpty)
+        XCTAssertTrue(snapshot.warnings.contains { $0.contains("Inbox messages") })
+    }
+
     func testFindsOpaqueNextPaginationLink() {
         let header = "<https://school.instructure.com/api/v1/courses?page=1>; rel=\"current\", <https://school.instructure.com/api/v1/courses?opaque=abc%2B123>; rel=\"next\""
         XCTAssertEqual(

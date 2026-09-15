@@ -2008,34 +2008,86 @@ struct CanvasResourcesView: View {
 
 struct CanvasAnnouncementsView: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.modelContext) private var modelContext
+    @Environment(CanvasConnectionSettings.self) private var canvasConnection
     @Query(sort: \CanvasAnnouncement.postedAt, order: .reverse) private var announcements: [CanvasAnnouncement]
     let courses: [Course]
     let allowedCourseIDs: Set<Int64>
     @State private var selectedCourseID: Int64?
     @State private var selectedAnnouncementID: Int64?
-    private var visible: [CanvasAnnouncement] { announcements.filter { allowedCourseIDs.contains($0.courseCanvasID) && (selectedCourseID == nil || selectedCourseID == $0.courseCanvasID) } }
+    private var visible: [CanvasAnnouncement] {
+        announcements.filter {
+            ($0.courseCanvasID == 0 || allowedCourseIDs.contains($0.courseCanvasID))
+            && (selectedCourseID == nil || selectedCourseID == $0.courseCanvasID)
+        }
+    }
     private var selected: CanvasAnnouncement? { visible.first { $0.canvasID == selectedAnnouncementID } }
+    private var unreadVisible: [CanvasAnnouncement] { visible.filter { !$0.isRead } }
     private var courseOptions: [StudioDropdownOption<Int64?>] {
         [StudioDropdownOption(value: nil, title: "All courses")] + courses.compactMap { course in
             course.canvasID.map { StudioDropdownOption(value: Optional($0), title: course.name, subtitle: course.courseCode) }
         }
     }
 
+    private func select(_ announcement: CanvasAnnouncement) {
+        selectedAnnouncementID = announcement.canvasID
+        guard !announcement.isRead else { return }
+        let isInbox = announcement.isInboxMessage
+        let conversationID = -announcement.canvasID
+        announcement.isRead = true
+        try? modelContext.save()
+        // Mirror inbox reads to Canvas Inbox; announcements have no read API.
+        if isInbox, conversationID > 0 {
+            Task {
+                guard let credentials = try? canvasConnection.credentials() else { return }
+                await CanvasClient(credentials: credentials).markConversationRead(conversationID)
+            }
+        }
+    }
+
+    private func markAllVisibleRead() {
+        var changed = false
+        for announcement in unreadVisible {
+            announcement.isRead = true
+            changed = true
+        }
+        if changed { try? modelContext.save() }
+    }
+
     var body: some View {
-        StudioPage(title: "Announcements", subtitle: "Complete faculty updates for Fall 2026") {
+        StudioPage(title: "Announcements", subtitle: "Faculty updates and Canvas Inbox messages") {
             HStack {
                 StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: 250, icon: "book.closed")
                 Spacer()
+                if !unreadVisible.isEmpty {
+                    Button("Mark all read", action: markAllVisibleRead)
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(LecternTheme.accent)
+                }
             }
             HStack(spacing: 0) {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         if visible.isEmpty { ContentUnavailableView("No announcements", systemImage: "megaphone") }
                         ForEach(visible) { announcement in
-                            Button { selectedAnnouncementID = announcement.canvasID } label: {
+                            Button { select(announcement) } label: {
                                 VStack(alignment: .leading, spacing: 7) {
-                                    HStack { Text(announcement.courseName).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(LecternTheme.accent); Spacer(); Text(announcement.postedAt.formatted(date: .abbreviated, time: .omitted)).font(.system(size: 10)).foregroundStyle(.secondary) }
-                                    Text(announcement.title).font(.system(size: 13, weight: .semibold, design: .serif)).lineLimit(2)
+                                    HStack {
+                                        if !announcement.isRead {
+                                            Circle().fill(LecternTheme.accent).frame(width: 7, height: 7)
+                                        }
+                                        Text(announcement.courseName).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(LecternTheme.accent)
+                                        if announcement.isInboxMessage {
+                                            Text("Inbox").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+                                                .padding(.horizontal, 5).padding(.vertical, 2)
+                                                .background(Color.primary.opacity(0.06), in: Capsule())
+                                        }
+                                        Spacer(); Text(announcement.postedAt.formatted(date: .abbreviated, time: .omitted)).font(.system(size: 10)).foregroundStyle(.secondary)
+                                    }
+                                    Text(announcement.title)
+                                        .font(.system(size: 13, weight: announcement.isRead ? .regular : .semibold, design: .serif))
+                                        .lineLimit(2)
                                     Text(announcement.messageHTML?.canvasPlainText ?? "No preview available").font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(3)
                                 }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(selectedAnnouncementID == announcement.canvasID ? LecternTheme.accent.opacity(0.10) : LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(LecternTheme.hairline))
                             }.buttonStyle(.plain)

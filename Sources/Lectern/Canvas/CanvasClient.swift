@@ -371,6 +371,11 @@ actor CanvasClient {
         var warnings: [String] = []
     }
 
+    private struct InboxPayload: Sendable {
+        var conversations: [CanvasConversationDTO] = []
+        var warnings: [String] = []
+    }
+
     private let credentials: CanvasCredentials
     private let session: URLSession
     private let decoder: JSONDecoder
@@ -441,10 +446,50 @@ actor CanvasClient {
             ]
         )
 
+        let inbox = await fetchInboxPayload()
+
         return CanvasSnapshot(courses: courses, assignments: assignments,
                               events: events, modules: modules, files: files, folders: folders,
                               announcements: announcements,
-                              warnings: warnings)
+                              conversations: inbox.conversations,
+                              warnings: warnings + inbox.warnings)
+    }
+
+    private func fetchInboxPayload() async -> InboxPayload {
+        var payload = InboxPayload()
+        do {
+            // Canvas Inbox == conversations API. "inbox" scope covers read and
+            // unread non-archived threads. Pagination is followed by get(_:query:).
+            let values: [CanvasConversationDTO] = try await get(
+                path: "/api/v1/conversations",
+                query: [
+                    .init(name: "scope", value: "inbox"),
+                    .init(name: "per_page", value: "100"),
+                ]
+            )
+            payload.conversations = values
+        } catch {
+            payload.warnings.append("Inbox messages: \(error.localizedDescription)")
+        }
+        return payload
+    }
+
+    /// Best-effort mirror of a local read to the Canvas Inbox. Failures are
+    /// swallowed by the caller: the local badge is the source of truth.
+    func markConversationRead(_ id: Int64) async {
+        var components = URLComponents(
+            url: credentials.baseURL.appending(path: "/api/v1/conversations/\(id)"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [.init(name: "conversation[workflow_state]", value: "read")]
+        guard let url = components?.url else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(credentials.token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        guard let (_, response) = try? await session.data(for: request),
+              let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode) else { return }
     }
 
     private func fetchCoursePayloads(_ courses: [CanvasCourseDTO]) async -> [CoursePayload] {
@@ -599,6 +644,7 @@ struct CanvasSnapshot: Sendable {
     let files: [CanvasFileDTO]
     let folders: [CanvasFolderDTO]
     let announcements: [CanvasAnnouncementDTO]
+    let conversations: [CanvasConversationDTO]
     let warnings: [String]
 }
 
@@ -719,4 +765,55 @@ struct CanvasAnnouncementDTO: Decodable, Sendable {
     let htmlURL: String?
     let contextCode: String?
     let author: Author?
+}
+
+/// One Canvas Inbox thread (GET /api/v1/conversations). Every property is
+/// optional except id: Canvas tenants vary, so a missing field must degrade
+/// to a fallback, never fail the whole sync.
+struct CanvasConversationDTO: Decodable, Sendable {
+    struct Participant: Decodable, Sendable {
+        let id: Int64?
+        let name: String?
+        let displayName: String?
+        let fullName: String?
+
+        var resolvedName: String? {
+            displayName ?? name ?? fullName
+        }
+    }
+    struct Properties: Decodable, Sendable {
+        struct Author: Decodable, Sendable {
+            let id: Int64?
+            let displayName: String?
+            let name: String?
+        }
+        let lastAuthor: Author?
+    }
+    let id: Int64
+    let subject: String?
+    let workflowState: String?
+    let lastMessage: String?
+    let lastMessageAt: Date?
+    let messageCount: Int?
+    let contextCode: String?
+    let contextName: String?
+    let participants: [Participant]?
+    let properties: Properties?
+
+    var isUnread: Bool { workflowState?.lowercased() == "unread" }
+
+    var resolvedAuthorName: String? {
+        if let name = properties?.lastAuthor?.displayName ?? properties?.lastAuthor?.name,
+           !name.isEmpty { return name }
+        let names = (participants ?? []).compactMap(\.resolvedName).filter { !$0.isEmpty }
+        if names.isEmpty { return nil }
+        return names.count == 1 ? names[0] : names.joined(separator: ", ")
+    }
+
+    var resolvedSubject: String {
+        if let subject = subject?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !subject.isEmpty { return subject }
+        if let author = resolvedAuthorName { return "Message from \(author)" }
+        return "Inbox message"
+    }
 }

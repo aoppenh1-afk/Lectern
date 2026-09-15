@@ -136,6 +136,15 @@ final class CanvasAnnouncement {
     var authorName: String?
     var htmlURL: String?
     var syncedAt: Date
+    /// Local read state. New rows start unread; opening the announcement in
+    /// Lectern flips this to true. Sync never flips true back to false.
+    var isRead = false
+    /// Nil (legacy) means a course announcement. "inbox" means a Canvas
+    /// Inbox conversation surfaced alongside announcements. Optional so
+    /// existing stores migrate without a default-value migration.
+    var sourceRaw: String?
+
+    var isInboxMessage: Bool { sourceRaw == "inbox" }
 
     init(canvasID: Int64, courseCanvasID: Int64, courseName: String,
          title: String, postedAt: Date) {
@@ -145,5 +154,7 @@ final class CanvasAnnouncement {
         self.title = title
         self.postedAt = postedAt
         self.syncedAt = Date()
+        self.isRead = false
+        self.sourceRaw = nil
     }
 }
