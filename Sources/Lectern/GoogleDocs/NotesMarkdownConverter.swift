@@ -117,8 +117,15 @@ enum NotesMarkdownConverter {
         let datePart = date.formatted(.dateTime.month(.abbreviated).day())
         let title = lectureTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let combined = title.isEmpty ? datePart : "\(datePart) · \(title)"
-        if combined.count <= 100 { return combined }
-        return String(combined.prefix(99)) + "…"
+        // Docs tab labels allow 50 characters. Count UTF-16 conservatively,
+        // but truncate only between whole characters, including Hebrew marks.
+        if combined.utf16.count <= 50 { return combined }
+        var prefix = ""
+        for character in combined {
+            guard prefix.utf16.count + String(character).utf16.count <= 49 else { break }
+            prefix.append(character)
+        }
+        return prefix + "…"
     }
 
     static let bulletPreset = "BULLET_DISC_CIRCLE_SQUARE"

@@ -21,7 +21,11 @@ struct GoogleBatchResult {
 /// Thin Google Docs REST client. Tab create/update payloads are hand-built
 /// so we're not stuck on generated types that lag the tabs API.
 struct GoogleDocsClient {
-    private let session: URLSession = .shared
+    private let session: URLSession
+
+    init(session: URLSession = .shared) {
+        self.session = session
+    }
     private let docsRoot = URL(string: "https://docs.googleapis.com/v1/documents")!
 
     func createDocument(title: String, accessToken: String) async throws -> GoogleDocument {
