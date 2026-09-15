@@ -95,7 +95,13 @@ struct SuperAppShellView: View {
     }
 
     private var scopedCourses: [Course] {
-        courses.filter { AcademicScopeMatcher.matches(term: $0.termName, selectedTerm: selectedTerm) }
+        courses.filter {
+            AcademicScopeMatcher.includesInCoursesLibrary(
+                canvasID: $0.canvasID,
+                term: $0.termName,
+                selectedTerm: selectedTerm
+            )
+        }
     }
 
     private var scopedCanvasIDs: Set<Int64> { Set(scopedCourses.compactMap(\.canvasID)) }
