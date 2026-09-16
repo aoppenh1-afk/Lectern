@@ -9,7 +9,10 @@ struct CanvasZoomInvitation: Codable, Equatable, Sendable {
     let joinURL: URL
 
     static func parse(_ text: String) -> [Self] {
-        text.components(separatedBy: "[Create Meeting]").dropFirst().compactMap { block in
+        // HTML-to-text conversion can emit Unicode line/paragraph separators.
+        // Normalize them so field values stop at the same boundaries as plain text.
+        let normalizedText = text.components(separatedBy: .newlines).joined(separator: "\n")
+        return normalizedText.components(separatedBy: "[Create Meeting]").dropFirst().compactMap { block in
             func field(_ name: String) -> String? {
                 let pattern = "(?m)^\\s*" + name + ":\\s*([^\\r\\n]+)"
                 guard let range = block.range(of: pattern, options: .regularExpression) else { return nil }

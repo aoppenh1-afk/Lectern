@@ -80,6 +80,17 @@ final class CanvasZoomInvitationTests: XCTestCase {
         XCTAssertEqual(CanvasZoomInvitation.parse(html.canvasPlainText).count, 1)
     }
 
+    func testRenderedLineSeparatorsPreserveInvitationFields() {
+        let expected = CanvasZoomInvitation.parse(message)
+        XCTAssertEqual(expected.count, 1)
+        // HTML rendering can use Unicode line/paragraph separators instead of LF.
+        for separator in ["\r\n", "\r", "\u{0085}", "\u{2028}", "\u{2029}"] {
+            let rendered = message.replacingOccurrences(of: "\n", with: separator)
+            XCTAssertEqual(CanvasZoomInvitation.parse(rendered), expected,
+                           "Line separator: \(separator.debugDescription)")
+        }
+    }
+
     private func date(_ value: String) -> Date {
         ISO8601DateFormatter().date(from: value)!
     }
