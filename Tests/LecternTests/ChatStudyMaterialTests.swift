@@ -143,7 +143,7 @@ struct ChatStudyMaterialTests {
         let (container, course, service, turnID) = try fixture(material)
         let lecture = try service.saveMaterial(material, turnID: turnID, course: course, lectureID: nil, newLectureTitle: "Cards only")
         #expect(LectureChatSource.make(for: lecture)?.content.contains("Cell division") == true)
-        #expect(CourseChatSource.make(course: course, lectures: [lecture])?.chunks.joined().contains("Cell division") == true)
+        #expect(CourseChatSource.make(course: course, lectures: [lecture])?.documents.map(\.content).joined().contains("Cell division") == true)
         let freshContext = ModelContext(container)
         let fetchedCourse = try #require(freshContext.fetch(FetchDescriptor<Course>()).first)
         let history = try JSONDecoder().decode([CourseSynthesisService.Turn].self, from: #require(fetchedCourse.studyChatHistory))

@@ -393,6 +393,7 @@ struct CourseSynthesisView: View {
                     Text("\(selectedSourceCount) selected")
                         .font(.system(size: 10.5))
                         .foregroundStyle(.secondary)
+                        .help("Selected sources stay available for follow-up questions. Changing the selection refreshes the chat's source context.")
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) { sourcesCollapsed = true }
                     } label: {

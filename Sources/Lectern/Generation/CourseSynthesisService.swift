@@ -9,78 +9,56 @@ struct CourseChatCanvasSource {
 struct CourseChatSource {
     let title: String
     let labels: [String]
-    let chunks: [String]
+    let documents: [CourseChatDocument]
 
     @MainActor
     static func make(course: Course,
                      lectures: [Lecture],
                      canvasSources: [CourseChatCanvasSource] = [],
                      attachments: [ReferenceAttachment]? = nil) -> CourseChatSource? {
-        var sources: [(String, String)] = []
+        var sources: [CourseChatDocument] = []
 
-        sources.append(contentsOf: canvasSources.map { ($0.label, $0.content) })
+        sources.append(contentsOf: canvasSources.enumerated().map {
+            CourseChatDocument(id: "canvas-\($0.offset)-\($0.element.label)",
+                               label: $0.element.label, content: $0.element.content)
+        })
 
         for attachment in (attachments ?? course.attachments).sorted(by: { $0.addedAt < $1.addedAt }) {
-            sources.append(("Course file: \(attachment.name)", attachment.extractedText))
+            sources.append(.init(id: sourceID(attachment.persistentModelID), label: "Course file: \(attachment.name)", content: attachment.extractedText))
         }
 
         for lecture in lectures.sorted(by: { $0.capturedAt < $1.capturedAt }) {
+            let lectureID = sourceID(lecture.persistentModelID)
             if let notes = lecture.artifact(of: .notes)?.content,
                !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                sources.append(("\(lecture.title) notes", notes))
+                sources.append(.init(id: "\(lectureID)-notes", label: "\(lecture.title) notes", content: notes))
             }
             if let cleaned = lecture.artifact(of: .cleanedTranscript)?.content,
                !cleaned.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                sources.append(("\(lecture.title) transcript", cleaned))
+                sources.append(.init(id: "\(lectureID)-transcript", label: "\(lecture.title) transcript", content: cleaned))
             } else if let raw = lecture.artifact(of: .rawTranscript)?.content,
                       !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                sources.append(("\(lecture.title) raw transcript", raw))
+                sources.append(.init(id: "\(lectureID)-raw transcript", label: "\(lecture.title) raw transcript", content: raw))
             }
             sources.append(contentsOf: ChatStudyMaterial.studySources(for: lecture).map {
-                ("\(lecture.title) \($0.0.lowercased())", $0.1)
+                CourseChatDocument(id: "\(lectureID)-\($0.0)", label: "\(lecture.title) \($0.0.lowercased())", content: $0.1)
             })
             for attachment in lecture.attachments.sorted(by: { $0.addedAt < $1.addedAt }) {
-                sources.append(("\(lecture.title) file: \(attachment.name)", attachment.extractedText))
+                sources.append(.init(id: sourceID(attachment.persistentModelID), label: "\(lecture.title) file: \(attachment.name)", content: attachment.extractedText))
             }
         }
 
+        sources.removeAll { $0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard !sources.isEmpty else { return nil }
-        var labels: [String] = []
-        var chunks: [String] = []
-        var current = ""
-        let chunkLimit = 300_000
+        return CourseChatSource(title: course.name, labels: sources.map(\.label), documents: sources)
+    }
 
-        func appendToChunks(label: String, content: String) {
-            var remainder = content[...]
-            var part = 1
-            while !remainder.isEmpty {
-                let room = max(1, chunkLimit - current.count - label.count - 64)
-                let end = remainder.index(remainder.startIndex,
-                                          offsetBy: min(room, remainder.count))
-                let excerpt = String(remainder[..<end])
-                let partLabel = content.count > excerpt.count ? "\(label), part \(part)" : label
-                let rendered = "<source name=\"\(partLabel)\">\n\(excerpt)\n</source>"
-                if !current.isEmpty, current.count + rendered.count > chunkLimit {
-                    chunks.append(current)
-                    current = ""
-                    continue
-                }
-                current += current.isEmpty ? rendered : "\n\n\(rendered)"
-                remainder = remainder[end...]
-                part += 1
-            }
-        }
-
-        for (label, content) in sources {
-            guard !content.isEmpty else { continue }
-            labels.append(label)
-            appendToChunks(label: label, content: content)
-        }
-        if !current.isEmpty { chunks.append(current) }
-        guard !chunks.isEmpty else { return nil }
-        return CourseChatSource(title: course.name,
-                                labels: labels,
-                                chunks: chunks)
+    private static func sourceID(_ id: PersistentIdentifier) -> String {
+        // PersistentIdentifier's Codable representation includes its store identity.
+        // The encoder cannot fail for this type, but keep the fallback unique in memory.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return (try? encoder.encode(id)).map { CourseChatWorkspace.digest($0) } ?? String(describing: id)
     }
 }
 
@@ -107,11 +85,12 @@ final class CourseSynthesisService {
     private var retryAction: (() -> Void)?
     var canRetry: Bool { retryAction != nil && lastError != nil && !isResponding }
     private let workspaceDirectory: URL
+    private let chatSession: CourseChatSession
 
-    init() {
+    init(workspaceDirectory: URL? = nil, chatSession: CourseChatSession = CourseChatSession()) {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        workspaceDirectory = support.appendingPathComponent("Lectern/Workspace", isDirectory: true)
-        try? FileManager.default.createDirectory(at: workspaceDirectory, withIntermediateDirectories: true)
+        self.workspaceDirectory = workspaceDirectory ?? support.appendingPathComponent("Lectern/Workspace/Courses", isDirectory: true)
+        self.chatSession = chatSession
     }
 
     func send(_ question: String,
@@ -181,75 +160,22 @@ final class CourseSynthesisService {
                 ) ?? (studyRequest?.usesTopicOnly == true ? CourseChatSource(
                     title: course.name,
                     labels: ["Student topic and conversation; no course sources"],
-                    chunks: ["Student-supplied topic: \(trimmed)"]
+                    documents: []
                 ) : nil) else { throw CanvasResourceContentError.invalidResponse }
-                let promptImages = canvasImages
-                let sourceMaterial: String
-                if source.chunks.count == 1 {
-                    sourceMaterial = source.chunks[0]
-                } else {
-                    let findings = try await withThrowingTaskGroup(of: (Int, String).self) { group in
-                        for (index, chunk) in source.chunks.enumerated() {
-                            let subsetImages = index == 0 ? promptImages : []
-                            group.addTask {
-                                let prompt = """
-                                Analyze this subset of course sources for the student's question. Return only grounded findings that help answer it. Preserve source names and note disagreements or missing evidence.
-
-                                Student question:
-                                \(trimmed)
-
-                                Course source subset \(index + 1) of \(source.chunks.count):
-                                \(chunk)
-                                """
-                                let finding = try await Self.request(
-                                    prompt: prompt,
-                                    profile: profile,
-                                    thinkingLevel: thinkingLevel,
-                                    modelOverride: modelOverride,
-                                    workspaceDirectory: self.workspaceDirectory,
-                                    images: subsetImages
-                                )
-                                return (index, finding)
-                            }
-                        }
-                        var values: [(Int, String)] = []
-                        for try await finding in group { values.append(finding) }
-                        return values.sorted(by: { $0.0 < $1.0 }).map(\.1)
-                    }
-                    sourceMaterial = findings.enumerated().map {
-                        "<subset-findings index=\"\($0.offset + 1)\">\n\($0.element)\n</subset-findings>"
-                    }.joined(separator: "\n\n")
-                }
                 try Task.checkCancellation()
-                let prompt = """
-                You are Lectern's course study assistant. Answer using the supplied course sources.
-
-                Rules:
-                - Compare lectures by name when the question asks for differences or development over time.
-                - Distinguish lecture material from attached class notes or slides.
-                - If the sources do not support a claim, say so.
-                - Cite source names inline. Do not invent citations.
-                - Use concise Markdown when it helps.
-
-                \(studyRequest?.instruction ?? "")
-
-                Course: \(source.title)
-
-                \(sourceMaterial)
-
-                Previous conversation:
-                \(priorConversation.isEmpty ? "None" : priorConversation)
-
-                Student question:
-                \(trimmed)
-                """
-                let answer = try await Self.request(
-                    prompt: prompt,
+                guard self.activeTurnID == turnID else { return }
+                let workspace = try CourseChatWorkspace.prepare(
+                    root: workspaceDirectory, courseID: course.persistentModelID,
+                    source: source, images: canvasImages
+                )
+                let answer = try await chatSession.answer(
+                    question: trimmed,
+                    workspace: workspace,
+                    history: priorConversation,
+                    studyInstruction: studyRequest?.instruction,
                     profile: profile,
                     thinkingLevel: thinkingLevel,
-                    modelOverride: modelOverride,
-                    workspaceDirectory: workspaceDirectory,
-                    images: source.chunks.count == 1 ? promptImages : []
+                    modelOverride: modelOverride
                 ) { [weak self] chunk in
                     Task { @MainActor in
                         guard let self, self.activeTurnID == turnID, studyRequest == nil else { return }
@@ -270,6 +196,7 @@ final class CourseSynthesisService {
                 pendingQuestion = nil
             } catch {
                 guard activeTurnID == turnID else { return }
+                chatSession.close()
                 lastError = error.localizedDescription
                 response = ""
                 pendingQuestion = nil
@@ -287,6 +214,7 @@ final class CourseSynthesisService {
     }
 
     func cancel() {
+        chatSession.close()
         activeTurnID = nil
         task?.cancel()
         task = nil
@@ -438,60 +366,4 @@ final class CourseSynthesisService {
         return lecture
     }
 
-    private nonisolated static func request(
-        prompt: String,
-        profile: AgentProfile,
-        thinkingLevel: ThinkingLevel,
-        modelOverride: String?,
-        workspaceDirectory: URL,
-        images: [ACPConnection.PromptImage] = [],
-        onChunk: (@Sendable (String) -> Void)? = nil
-    ) async throws -> String {
-        if profile.id == AgentProfiles.antigravityID {
-            var prompt = prompt
-            let inputs = images.enumerated().map { index, image in
-                let ext: String
-                switch image.mimeType {
-                case "image/jpeg": ext = "jpg"
-                case "image/gif": ext = "gif"
-                case "image/webp": ext = "webp"
-                default: ext = "png"
-                }
-                let name = "course-image-\(index + 1).\(ext)"
-                prompt += "\n\nCourse image \(index + 1): @\(name)"
-                return AntigravityACPClient.WorkspaceInput.data(image.data, named: name)
-            }
-            let modelID = AntigravityACPClient.applyThinking(
-                thinkingLevel,
-                to: modelOverride ?? profile.model ?? AntigravityACPClient.modelID
-            )
-            let output = try await AntigravityACPClient.configured(for: profile).run(
-                prompt: prompt,
-                modelID: modelID,
-                thinkingLevel: thinkingLevel,
-                inputs: inputs
-            )
-            onChunk?(output)
-            return output
-        }
-
-        let connection = try await ACPConnection.connect(profile: profile)
-        defer { connection.shutdown() }
-        let session: ACPConnection.SessionInfo
-        do {
-            session = try await connection.newSession(workingDirectory: workspaceDirectory)
-        } catch ACPConnection.ACPError.authRequired(let methods) {
-            guard let methodID = profile.authMethodID ?? methods.first else {
-                throw ACPConnection.ACPError.authRequired(methods: methods)
-            }
-            try await connection.authenticate(methodID: methodID)
-            session = try await connection.newSession(workingDirectory: workspaceDirectory)
-        }
-        await connection.applyGenerationSettings(
-            session: session,
-            model: modelOverride,
-            thinkingLevel: thinkingLevel.rawValue
-        )
-        return try await connection.prompt(sessionID: session.id, text: prompt, images: images, onChunk: onChunk)
-    }
 }

@@ -87,8 +87,10 @@
 		4BCD52D700A21B47DC5A6A35 /* AgentDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07DF18B64B18FC06E4CC2F90 /* AgentDetector.swift */; };
 		4C70DDFDC829C92E73B9E5C1 /* ReferenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6AC1B3F5C73C9B7EF6CD77 /* ReferenceAttachment.swift */; };
 		4D9AEBD52937FD19A865A46C /* GenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE4FA9BA6277A22013E953E /* GenerationService.swift */; };
+		4E21F726771346036C0888F2 /* CourseChatWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EFC9513E7B49CB7D61BB270 /* CourseChatWorkspaceTests.swift */; };
 		4E6393AF5E0BF37C9D6B5B2A /* ShiurAutomationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264D4BFEED3B376DCCA86F0F /* ShiurAutomationService.swift */; };
 		506B4E0C2FEE82EABA756F91 /* CardSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01528EDB75F8B898B2746A6 /* CardSyncService.swift */; };
+		51E11BD809FF96AEFC9D3676 /* CourseChatWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F46B8A6B33F851C468C0B2 /* CourseChatWorkspace.swift */; };
 		534F2F824A5B4CE43A3C1995 /* TranscriptionProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87CA75D98C0B0A79B24C31A6 /* TranscriptionProviders.swift */; };
 		54CC63CA6BCF1FC7456E54AF /* TranscriptSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6293D7F84B3E2FE505739AF8 /* TranscriptSegment.swift */; };
 		54EDF39C4881E27E83B1287F /* LocalModelAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7484EB4DB7F42BE66D0D748 /* LocalModelAvailability.swift */; };
@@ -130,6 +132,7 @@
 		7354896DDC4659DE0B74DC24 /* RemoteAudioDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F39B466BD1D9EADCD297E23 /* RemoteAudioDownloader.swift */; };
 		738476D698B44E747F8CC745 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F31D7E05008BB4C97BB3E77 /* StatusBarController.swift */; };
 		73E019E6325643CA84769460 /* UpdatePromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB3E3B37AF7F3949572FF90 /* UpdatePromptView.swift */; };
+		741FCEF61BD74C4AC3C40F5B /* CourseChatSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E288DC0E345CF315E2AFB88 /* CourseChatSession.swift */; };
 		7461744B772DB8803A6BB84A /* LectureChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC2F44F19A8CD8C4379AC82 /* LectureChatView.swift */; };
 		769C8CF41FCE0C5A67B52A8E /* Recording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */; };
 		76DFF5C7F10FCD387528F6F2 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872C99F2068ADE2855DB440D /* ChatMessage.swift */; };
@@ -153,6 +156,7 @@
 		82688AA7EC72B3D17C7DE1B1 /* NotesContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51D3E04EE9E7EAE2AA0AA37 /* NotesContentView.swift */; };
 		83C3227214598844795493DD /* CourseSynthesisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627A2CDC9029D01B87C36A0C /* CourseSynthesisService.swift */; };
 		842D8599706A74FB64C53E5E /* GoogleOAuthConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 522F58B2452A56EBECCA5001 /* GoogleOAuthConfiguration.swift */; };
+		861EE2F4B3F2F6D1457CBCCE /* CourseChatSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E288DC0E345CF315E2AFB88 /* CourseChatSession.swift */; };
 		86CA65565DB52DB819C9C7BB /* CanvasWorkspaceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31FE176891F8FD111C81F219 /* CanvasWorkspaceViews.swift */; };
 		87D749F58B1B9A6848DD93E5 /* LectureImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A11419823C0A975075BD958 /* LectureImportService.swift */; };
 		8ADBECF8CDB31C153F5376F3 /* NotesMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D8E9C05E6FE70084DD545AC /* NotesMarkdown.swift */; };
@@ -256,6 +260,7 @@
 		E465A572EDFE4E4DE5C2EE56 /* MCPSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9D3AE061392BC596F79D58F /* MCPSettingsView.swift */; };
 		E53BF8227118E90A15FE8D58 /* LecternCloudSharing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B11AAF51FB13798ADCA980B /* LecternCloudSharing.swift */; };
 		E5F1009B3531ED6CA5C9FA57 /* AppUpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84584CA17279DC67909F94C /* AppUpdaterTests.swift */; };
+		E7638A432C01741DECBAB8BF /* CourseChatWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F46B8A6B33F851C468C0B2 /* CourseChatWorkspace.swift */; };
 		E8ECF29E985AE8D447DD99EE /* UpdatePromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB3E3B37AF7F3949572FF90 /* UpdatePromptView.swift */; };
 		E8ED86FDEF0068BDD81A1027 /* CanvasZoomInvitationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D551E9087618C5ABA17D11 /* CanvasZoomInvitationTests.swift */; };
 		E8F6650540B184E92DED4BBF /* LectureDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DFFBA8697AE3C7AB28D15DE /* LectureDetailView.swift */; };
@@ -276,6 +281,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		02F46B8A6B33F851C468C0B2 /* CourseChatWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseChatWorkspace.swift; sourceTree = "<group>"; };
 		03592B808597F36DE3B7F38E /* FlashcardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashcardsView.swift; sourceTree = "<group>"; };
 		04630DB60DD0FFC955B6207D /* LectureBundleExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureBundleExportSheet.swift; sourceTree = "<group>"; };
 		061C2A9944E44D8A633CC026 /* LectureDocumentExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureDocumentExportService.swift; sourceTree = "<group>"; };
@@ -332,6 +338,7 @@
 		4C30D8A14329AC61D5345BC9 /* LectureExportAvailability+Lecture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LectureExportAvailability+Lecture.swift"; sourceTree = "<group>"; };
 		4C5B6AFA684E43B8FEA1573E /* ShiurImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiurImportSheet.swift; sourceTree = "<group>"; };
 		4D642A5FC231E577576031CA /* ParakeetTDT */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ParakeetTDT; path = Vendor/ParakeetTDT; sourceTree = SOURCE_ROOT; };
+		4E288DC0E345CF315E2AFB88 /* CourseChatSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseChatSession.swift; sourceTree = "<group>"; };
 		510EE419EF1BDEB5F0F5897D /* LectureDocumentRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureDocumentRenderer.swift; sourceTree = "<group>"; };
 		518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionProviderTests.swift; sourceTree = "<group>"; };
 		522F58B2452A56EBECCA5001 /* GoogleOAuthConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleOAuthConfiguration.swift; sourceTree = "<group>"; };
@@ -339,6 +346,7 @@
 		576A2CBC9D67B86F6B125E6E /* ExternalTranscriptionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalTranscriptionEngine.swift; sourceTree = "<group>"; };
 		5B4267DED0F3263C662ECD1F /* CanvasZoomInvitation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomInvitation.swift; sourceTree = "<group>"; };
 		5BFBAE3C002FC74BE3DCC442 /* ZoomJoinFollowUpTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomJoinFollowUpTests.swift; sourceTree = "<group>"; };
+		5EFC9513E7B49CB7D61BB270 /* CourseChatWorkspaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseChatWorkspaceTests.swift; sourceTree = "<group>"; };
 		5F31D7E05008BB4C97BB3E77 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesMarkdownTests.swift; sourceTree = "<group>"; };
 		6158A28C0BB3D26FAEAE192F /* Lecture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Lecture.swift; sourceTree = "<group>"; };
@@ -631,6 +639,7 @@
 				D877127DC8DE4B1DC47FD222 /* CaptureSourceTests.swift */,
 				795B08D1A7D6BBE0408B836A /* ChatStudyMaterialTests.swift */,
 				2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */,
+				5EFC9513E7B49CB7D61BB270 /* CourseChatWorkspaceTests.swift */,
 				F2ECE882547DAE6ABCD5EC51 /* ExportAvailabilityTests.swift */,
 				BA475B8E4EACE8E555128177 /* GoogleDocsSyncTests.swift */,
 				4423ED80F0768A3752F0DC45 /* GoogleOAuthConfigurationTests.swift */,
@@ -773,6 +782,8 @@
 				BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */,
 				61B8478F30090A0838FA7BCC /* ChatMarkdownRenderer.swift */,
 				17E498DA5E7400A992FE2328 /* ChatStudyMaterial.swift */,
+				4E288DC0E345CF315E2AFB88 /* CourseChatSession.swift */,
+				02F46B8A6B33F851C468C0B2 /* CourseChatWorkspace.swift */,
 				627A2CDC9029D01B87C36A0C /* CourseSynthesisService.swift */,
 				E5496C48DE5EDC0027745A0E /* DiagramRenderer.swift */,
 				EFE4FA9BA6277A22013E953E /* GenerationService.swift */,
@@ -986,6 +997,9 @@
 				5F48CA518FE926E6F2B01953 /* CompletionNotificationTests.swift in Sources */,
 				B0183D74ECA0C677FCFD815A /* CompletionNotifier.swift in Sources */,
 				5D4CA351DF51CD0C2C7A4A92 /* Course.swift in Sources */,
+				861EE2F4B3F2F6D1457CBCCE /* CourseChatSession.swift in Sources */,
+				51E11BD809FF96AEFC9D3676 /* CourseChatWorkspace.swift in Sources */,
+				4E21F726771346036C0888F2 /* CourseChatWorkspaceTests.swift in Sources */,
 				83C3227214598844795493DD /* CourseSynthesisService.swift in Sources */,
 				AE87750815836CE9030CEE46 /* CourseSynthesisView.swift in Sources */,
 				38D70FC74BDD776AF9763A0E /* DiagramRenderer.swift in Sources */,
@@ -1120,6 +1134,8 @@
 				11B676CDDFEDF8FCE083CA1F /* Color+Hex.swift in Sources */,
 				5CC2CA3F302C627237B9794E /* CompletionNotifier.swift in Sources */,
 				BCC4C4D4D041A3049E9A0007 /* Course.swift in Sources */,
+				741FCEF61BD74C4AC3C40F5B /* CourseChatSession.swift in Sources */,
+				E7638A432C01741DECBAB8BF /* CourseChatWorkspace.swift in Sources */,
 				DCA25DC41D36D19446E842B2 /* CourseSynthesisService.swift in Sources */,
 				04A2587DE03F9385C9796948 /* CourseSynthesisView.swift in Sources */,
 				40CEAE1E9CEA4D5E3168D188 /* DiagramRenderer.swift in Sources */,

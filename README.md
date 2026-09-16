@@ -81,6 +81,12 @@ Lectern checks this repository's GitHub Releases about once a day and offers to 
 
 You can also download any version from the [Releases page](https://github.com/aoppenh1-afk/Lectern/releases).
 
+## Course chat sources
+
+Course chat keeps the selected documents in a separate local workspace for each course under `~/Library/Application Support/Lectern/Workspace/Courses`. Codex and OpenCode receive file references and read relevant passages as needed. Follow-up questions reuse the live conversation instead of resending the documents and conversation history.
+
+Antigravity uses native attachments, supplied once when a session starts. Changing the sources or agent settings, switching courses, clearing the chat, or restarting Lectern starts a fresh session. Saved conversation history restores continuity, and deselected documents are removed from that course's source folder on the next request. Agents still use tokens for passages they read and for conversation context; file references do not make those tokens free.
+
 ## Other agents
 
 Antigravity ACP is the default. **Settings › Agents** manages its runtime and Google account separately, and detects other supported agents on this Mac (ChatGPT via `codex-acp`, OpenCode).
