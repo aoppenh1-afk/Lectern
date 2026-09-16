@@ -199,11 +199,11 @@ enum NotesMarkdownConverter {
         let anchored = anchorHebrewRuns(in: text, boldRanges: bold)
         var result = AttributedString()
         var previous = original.startIndex
-        for offset in anchored.insertions {
-            let stringIndex = String.Index(utf16Offset: offset, in: text)
+        for insertion in anchored.insertions {
+            let stringIndex = String.Index(utf16Offset: insertion.offset, in: text)
             guard let index = AttributedString.Index(stringIndex, within: original) else { continue }
             result.append(original[previous..<index])
-            result.append(AttributedString("\u{200E}"))
+            result.append(AttributedString(insertion.text))
             previous = index
         }
         result.append(original[previous...])
@@ -364,10 +364,15 @@ enum NotesMarkdownConverter {
         }
     }
 
+    private struct DirectionInsertion {
+        let offset: Int
+        let text: String
+    }
+
     private static func anchorHebrewRuns(
         in text: String,
         boldRanges: [(start: Int, end: Int)]
-    ) -> (text: String, bold: [(start: Int, end: Int)], insertions: [Int]) {
+    ) -> (text: String, bold: [(start: Int, end: Int)], insertions: [DirectionInsertion]) {
         let textLength = text.utf16.count
         // A leading bold organizing label is a separate LTR block from its
         // explanation. Emphasis within the explanation keeps its phrase intact.
@@ -376,86 +381,143 @@ enum NotesMarkdownConverter {
             return prefix.trimmingCharacters(in: .whitespaces).isEmpty ? bold.end : nil
         }
         let boundaries = [0] + (labelEnd.map { [$0] } ?? []) + [textLength]
-        let segments = zip(boundaries, boundaries.dropFirst()).flatMap {
-            hebrewSegments(in: text, from: $0.0, to: $0.1)
+        let segments = zip(boundaries, boundaries.dropFirst()).flatMap { bounds in
+            hebrewSegments(in: text, from: bounds.0, to: bounds.1,
+                isLabel: bounds.1 == labelEnd)
         }
 
-        // Google Docs does not reliably honor RLI/PDI isolates: adjacent Hebrew
-        // labels reorder and brackets mirror despite an LTR paragraph. U+200E
-        // has the direction of an English letter but no visible glyph or width.
-        // Mark phrase edges to keep the surrounding blocks in LTR order.
-        // Hebrew-internal commas and citation punctuation stay within the run.
+        // LRM keeps separate outline components in LTR order. RLM inside those
+        // boundaries gives quotes and paired punctuation the Hebrew run's
+        // direction, including when the run wraps onto another line.
+        let insertions = segments.flatMap { segment -> [DirectionInsertion] in
+            let content = utf16Substring(text, from: segment.start, to: segment.end)
+            let needsRTLBoundary = content.unicodeScalars.first.map { !isHebrew($0) } == true
+                || content.unicodeScalars.last.map { !isHebrew($0) } == true
+            return [
+                DirectionInsertion(offset: segment.start, text: needsRTLBoundary ? "\u{200E}\u{200F}" : "\u{200E}"),
+                DirectionInsertion(offset: segment.end, text: needsRTLBoundary ? "\u{200F}\u{200E}" : "\u{200E}"),
+            ]
+        }
         var output = ""
         var previousEnd = 0
-        for segment in segments {
-            output += utf16Substring(text, from: previousEnd, to: segment.start)
-            output += "\u{200E}"
-            output += utf16Substring(text, from: segment.start, to: segment.end)
-            output += "\u{200E}"
-            previousEnd = segment.end
+        for insertion in insertions {
+            output += utf16Substring(text, from: previousEnd, to: insertion.offset)
+            output += insertion.text
+            previousEnd = insertion.offset
         }
         output += utf16Substring(text, from: previousEnd, to: textLength)
 
-        let insertionOffsets = segments.flatMap { [$0.start, $0.end] }
         let adjustedBold = boldRanges.map { bold in
-            let shiftedStart = bold.start + insertionOffsets.count(where: { $0 <= bold.start })
-            let shiftedEnd = bold.end + insertionOffsets.count(where: { $0 < bold.end })
+            let shiftedStart = bold.start + insertions.filter { $0.offset <= bold.start }.reduce(0) { $0 + $1.text.utf16.count }
+            let shiftedEnd = bold.end + insertions.filter { $0.offset < bold.end }.reduce(0) { $0 + $1.text.utf16.count }
             return (shiftedStart, shiftedEnd)
         }
-        return (output, adjustedBold, insertionOffsets)
+        return (output, adjustedBold, insertions)
     }
 
+    /// Hebrew passages are linguistic units, not punctuation-delimited words.
+    /// A source label owns its citation; an aside in English prose is separate
+    /// from the preceding Hebrew term. Balanced Hebrew quotes/asides own their
+    /// delimiters, so a line wrap cannot leave a bracket facing the wrong way.
     private static func hebrewSegments(
         in text: String,
         from lowerBound: Int,
-        to upperBound: Int
+        to upperBound: Int,
+        isLabel: Bool
     ) -> [(start: Int, end: Int)] {
         guard upperBound > lowerBound else { return [] }
-        let lowerIndex = String.Index(utf16Offset: lowerBound, in: text)
-        let upperIndex = String.Index(utf16Offset: upperBound, in: text)
-        var segments: [(start: Int, end: Int)] = []
-        var segmentStart: Int?
-        var lastHebrewEnd = lowerBound
-        var offset = lowerBound
+        let part = utf16Substring(text, from: lowerBound, to: upperBound)
+        let scalars = Array(part.unicodeScalars)
+        var offsets = [lowerBound]
+        for scalar in scalars { offsets.append(offsets.last! + scalar.utf16.count) }
 
-        func finishSegment() {
-            guard let start = segmentStart else { return }
-            segments.append((start, lastHebrewEnd))
-            segmentStart = nil
+        func hebrewOnly(_ range: Range<Int>) -> Bool {
+            let contents = scalars[range]
+            return contents.contains(where: isHebrew) && !contents.contains {
+                CharacterSet.letters.contains($0) && !isHebrew($0)
+            }
+        }
+        func segment(_ range: Range<Int>) -> (start: Int, end: Int) {
+            (offsets[range.lowerBound], offsets[range.upperBound])
+        }
+        var start = 0
+        var end = scalars.count
+        while start < end && CharacterSet.whitespacesAndNewlines.contains(scalars[start]) { start += 1 }
+        while end > start && CharacterSet.whitespacesAndNewlines.contains(scalars[end - 1]) { end -= 1 }
+        // A source/explanation separator belongs to the outer LTR outline.
+        // The daf amud marker is part of the source itself.
+        if isLabel && end > start && scalars[end - 1] == ":" {
+            let label = String(String.UnicodeScalarView(scalars[start..<end]))
+            if label.range(of: #"דף\s+[א-ת״׳]+:$"#, options: .regularExpression) == nil { end -= 1 }
+        }
+        guard end > start else { return [] }
+        if !CharacterSet.decimalDigits.contains(scalars[start]), hebrewOnly(start..<end) {
+            return [segment(start..<end)]
         }
 
-        // Citation punctuation stays with the Hebrew citation, including both
-        // endpoints of a range. Ordinary sentence colons still separate labels.
+        let pairs: [Unicode.Scalar: Unicode.Scalar] = ["(": ")", "[": "]", "{": "}", "\"": "\"", "“": "”"]
+        func pairedEnd(at opening: Int) -> Int? {
+            guard let closing = pairs[scalars[opening]] else { return nil }
+            // ASCII quotes between Hebrew letters are abbreviation marks.
+            if scalars[opening] == "\"" && opening > start && isHebrew(scalars[opening - 1]) { return nil }
+            var depth = 1
+            var cursor = opening + 1
+            while cursor < end {
+                if scalars[cursor] == closing {
+                    if closing == "\"" && cursor > opening + 1 && cursor + 1 < end
+                        && isHebrew(scalars[cursor - 1]) && isHebrew(scalars[cursor + 1]) {
+                        cursor += 1
+                        continue
+                    }
+                    depth -= 1
+                    if depth == 0 { return cursor + 1 }
+                } else if scalars[cursor] == scalars[opening] { depth += 1 }
+                cursor += 1
+            }
+            return nil
+        }
+
+        // A terminal daf amud marker still belongs to its numeral when the
+        // surrounding sentence resumes in English.
         let citation = try! NSRegularExpression(
             pattern: #"דף[ \t]+[א-ת״׳]+[.:]?(?:[-–][א-ת״׳]+[.:]?)?"#)
-        let citationRanges = citation.matches(in: text,
+        let citations = citation.matches(in: text,
             range: NSRange(location: lowerBound, length: upperBound - lowerBound)).map(\.range)
-
-        let scalars = Array(text[lowerIndex..<upperIndex].unicodeScalars)
-        for (index, scalar) in scalars.enumerated() {
-            let scalarEnd = offset + scalar.utf16.count
-            if isHebrew(scalar) {
-                if segmentStart == nil { segmentStart = offset }
-                lastHebrewEnd = scalarEnd
-            } else if (scalar == "\"" || scalar == "'") && index > 0
-                && index + 1 < scalars.count
-                && isHebrew(scalars[index - 1]) && isHebrew(scalars[index + 1]) {
-                // Legacy ASCII abbreviation quotes belong inside the word.
-                lastHebrewEnd = scalarEnd
-            } else if citationRanges.contains(where: { NSLocationInRange(offset, $0) }) {
-                lastHebrewEnd = scalarEnd
-            } else if scalar == ",", segmentStart != nil,
-                      scalars.dropFirst(index + 1).first(where: { !CharacterSet.whitespaces.contains($0) }).map(isHebrew) == true {
-                // A comma between Hebrew clauses belongs to the RTL passage.
-                lastHebrewEnd = scalarEnd
-            } else if !CharacterSet.whitespaces.contains(scalar) {
-                // Other sentence punctuation, paired brackets, and numbers
-                // belong to the surrounding LTR sentence.
-                finishSegment()
+        var segments: [(start: Int, end: Int)] = []
+        var cursor = start
+        while cursor < end {
+            if let close = pairedEnd(at: cursor), hebrewOnly((cursor + 1)..<(close - 1)) {
+                segments.append(segment(cursor..<close))
+                cursor = close
+                continue
             }
-            offset = scalarEnd
+            guard isHebrew(scalars[cursor]) else { cursor += 1; continue }
+            let runStart = cursor
+            var runEnd = cursor + 1
+            cursor += 1
+            while cursor < end {
+                let scalar = scalars[cursor]
+                if isHebrew(scalar) {
+                    runEnd = cursor + 1
+                } else if CharacterSet.whitespaces.contains(scalar) {
+                    // Retain whitespace only if another Hebrew word follows.
+                } else if (scalar == "\"" || scalar == "'") && cursor + 1 < end
+                    && isHebrew(scalars[cursor - 1]) && isHebrew(scalars[cursor + 1]) {
+                    runEnd = cursor + 1
+                } else if citations.contains(where: { NSLocationInRange(offsets[cursor], $0) }) {
+                    runEnd = cursor + 1
+                } else if ",;:.!?…–-".unicodeScalars.contains(scalar),
+                    scalars[(cursor + 1)..<end].first(where: {
+                        !CharacterSet.whitespaces.contains($0) && !",;:.!?…–-".unicodeScalars.contains($0)
+                    }).map(isHebrew) == true {
+                    // Commas, ellipses, colons, and semicolons do not restart
+                    // a continuing Hebrew passage.
+                    runEnd = cursor + 1
+                } else { break }
+                cursor += 1
+            }
+            segments.append(segment(runStart..<runEnd))
         }
-        finishSegment()
         return segments
     }
 

@@ -9,10 +9,15 @@ final class NotesMarkdownTests: XCTestCase {
         XCTAssertEqual(NotesDafCitation.normalize(expected), expected)
         let plan = NotesMarkdownConverter.plan(markdown: input)
         XCTAssertEqual(Self.visible(plan.text), "גמ׳ דף לו: on שבת (דף ל״ו.) and דף קיט:; רש״י: explanation")
-        XCTAssertTrue(plan.text.contains("דף לו:\u{200E}"))
+        XCTAssertTrue(plan.text.contains("דף לו:\u{200F}\u{200E}"))
         let bold = plan.boldRanges[0]
         XCTAssertEqual(Self.visible((plan.text as NSString).substring(with:
             NSRange(location: bold.start - 1, length: bold.end - bold.start))), "גמ׳ דף לו:")
+    }
+
+    func testDafAmudMarkerStaysInsideHebrewInEnglishProse() {
+        let plan = NotesMarkdownConverter.plan(markdown: "- See גמ׳ דף לו: and compare דף לז.")
+        XCTAssertEqual(plan.text, "See \u{200E}\u{200F}גמ׳ דף לו:\u{200F}\u{200E} and compare \u{200E}\u{200F}דף לז.\u{200F}\u{200E}")
     }
 
     func testDafFormattingLeavesOtherPunctuationAndCodeAlone() {
@@ -211,9 +216,9 @@ final class NotesMarkdownTests: XCTestCase {
 
         XCTAssertEqual(
             lines[1],
-            "\u{200E}משנה\u{200E}: \u{200E}בפרק במה טומנין\u{200E} (\u{200E}דף מז:\u{200E}): Distinguishes between two classes."
+            "\u{200E}משנה\u{200E}: \u{200E}בפרק במה טומנין\u{200E} \u{200E}\u{200F}(דף מז:)\u{200F}\u{200E}: Distinguishes between two classes."
         )
-        XCTAssertEqual(lines[2], "\t\u{200E}גזירה שמא ירתיח\u{200E} (\u{200E}שבת\u{200E})")
+        XCTAssertEqual(lines[2], "\t\u{200E}\u{200F}גזירה שמא ירתיח (שבת)\u{200F}\u{200E}")
         XCTAssertEqual(
             Self.visible((plan.text as NSString).substring(
                 with: NSRange(
@@ -260,7 +265,7 @@ final class NotesMarkdownTests: XCTestCase {
 
         XCTAssertEqual(
             plan.text,
-            "\u{200E}שיטת שאר ראשונים\u{200E} (\u{200E}תוס׳, ריטב״א\u{200E}): "
+            "\u{200E}\u{200F}שיטת שאר ראשונים (תוס׳, ריטב״א)\u{200F}\u{200E}: "
                 + "\u{200E}שהייה\u{200E} and \u{200E}הטמנה\u{200E} "
                 + "are two entirely separate realms with distinct mechanisms"
         )
@@ -275,11 +280,11 @@ final class NotesMarkdownTests: XCTestCase {
         )
     }
 
-    func testGoogleDocsAnchorsEnglishLedHebrewWithoutSwallowingParentheses() {
+    func testGoogleDocsKeepsEnglishLedAsideSeparateFromHebrewTerm() {
         let plan = NotesMarkdownConverter.plan(
             markdown: "- On שבת (שלא יוסיף הבל בשבת)"
         )
-        XCTAssertEqual(plan.text, "On \u{200E}שבת\u{200E} (\u{200E}שלא יוסיף הבל בשבת\u{200E})")
+        XCTAssertEqual(plan.text, "On \u{200E}שבת\u{200E} \u{200E}\u{200F}(שלא יוסיף הבל בשבת)\u{200F}\u{200E}")
     }
 
     func testGoogleDocsKeepsHebrewCommasRTLAndEnglishPunctuationLTR() {
@@ -293,7 +298,7 @@ final class NotesMarkdownTests: XCTestCase {
         )
     }
 
-    func testGoogleDocsKeepsNestedBracketsQuotesAndNumericLabelsOutsideHebrewRuns() {
+    func testGoogleDocsPreservesBalancedBracketsQuotesAndNumbers() {
         let examples = [
             "נ״מ 1 on שבת (בלעך):",
             "רבא (מימרא 1): הטמנה on שבת itself",
@@ -305,15 +310,15 @@ final class NotesMarkdownTests: XCTestCase {
         for example in examples {
             let plan = NotesMarkdownConverter.plan(markdown: "- " + example)
             XCTAssertEqual(Self.visible(plan.text), example)
-            var inside = false
+            // Both sides of a bracket pair must belong to the same directional
+            // unit, even when nested. Numbers retain their stored order.
+            var bracketDepth = 0
             for scalar in plan.text.unicodeScalars {
-                if scalar.value == 0x200E {
-                    inside.toggle()
-                } else if "()[]{}:;?/0123456789".unicodeScalars.contains(scalar) {
-                    XCTAssertFalse(inside, "Punctuation or number inside Hebrew boundary marks: \(example)")
-                }
+                if "([{".unicodeScalars.contains(scalar) { bracketDepth += 1 }
+                if ")]}".unicodeScalars.contains(scalar) { bracketDepth -= 1 }
+                if scalar.value == 0x200E { XCTAssertEqual(bracketDepth, 0, example) }
             }
-            XCTAssertFalse(inside, example)
+            XCTAssertEqual(bracketDepth, 0, example)
         }
     }
 
@@ -459,10 +464,10 @@ final class NotesMarkdownTests: XCTestCase {
     func testGoogleDocsAnchorsScreenshotLabelsWithStrongLTRMarks() {
         let examples = [
             ("**חנניה:** נותנים means חזרה", "\u{200E}חנניה\u{200E}: \u{200E}נותנים\u{200E} means \u{200E}חזרה\u{200E}"),
-            ("חנניה; חכמים", "\u{200E}חנניה\u{200E}; \u{200E}חכמים\u{200E}"),
-            ("**גירסא 1 (רש״י ורוב ראשונים)**", "\u{200E}גירסא\u{200E} 1 (\u{200E}רש״י ורוב ראשונים\u{200E})"),
-            ("**משנה (דף ל״ו:)**", "\u{200E}משנה\u{200E} (\u{200E}דף ל״ו:\u{200E})"),
-            ("**רמב״ם (פירוש המשניות):** in the printed version", "\u{200E}רמב״ם\u{200E} (\u{200E}פירוש המשניות\u{200E}): in the printed version"),
+            ("חנניה; חכמים", "\u{200E}חנניה; חכמים\u{200E}"),
+            ("**גירסא 1 (רש״י ורוב ראשונים)**", "\u{200E}\u{200F}גירסא 1 (רש״י ורוב ראשונים)\u{200F}\u{200E}"),
+            ("**משנה (דף ל״ו:)**", "\u{200E}\u{200F}משנה (דף ל״ו:)\u{200F}\u{200E}"),
+            ("**רמב״ם (פירוש המשניות):** in the printed version", "\u{200E}\u{200F}רמב״ם (פירוש המשניות)\u{200F}\u{200E}: in the printed version"),
         ]
         for (markdown, expected) in examples {
             XCTAssertEqual(NotesMarkdownConverter.plan(markdown: "- " + markdown).text, expected)
@@ -471,6 +476,7 @@ final class NotesMarkdownTests: XCTestCase {
 
     private static func visible(_ text: String) -> String {
         text.replacingOccurrences(of: "\u{200E}", with: "")
+            .replacingOccurrences(of: "\u{200F}", with: "")
             .replacingOccurrences(of: "\u{2067}", with: "")
             .replacingOccurrences(of: "\u{2069}", with: "")
     }

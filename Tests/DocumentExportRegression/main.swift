@@ -24,6 +24,8 @@ precondition(x("גמ׳") < x("ורבו") && x("קודם") < x("applied"),
     "Source, Hebrew explanation, and English continuation must stay in LTR block order")
 print("PASS: mixed Hebrew source and explanation render RTL inside an LTR outline")
 
+await MainActor.run { checkHebrewDirectionExamples() }
+
 let suppliedOutput = CommandLine.arguments.dropFirst().first.map {
     URL(fileURLWithPath: $0, isDirectory: true)
 }
@@ -56,7 +58,8 @@ The professor compared **competitive** and *noncompetitive* inhibition.
 What happens to Vmax during noncompetitive inhibition?
 
 **Answer:** Vmax decreases.
-"""
+""" + "\n\n# Hebrew direction examples\n\n"
+    + hebrewDirectionExamples.map { "- " + $0 }.joined(separator: "\n")
 
 let markdownURL = output.appendingPathComponent("lecture.md")
 let pdfURL = output.appendingPathComponent("lecture.pdf")
@@ -76,7 +79,7 @@ try await MainActor.run {
             failures.append("Export text must be fixed black")
         }
     }
-    precondition(document.string.contains("(\u{200E}דף ל״ו:\u{200E})"), "Daf amud mark must follow its numeral")
+    precondition(document.string.replacingOccurrences(of: "\u{200E}", with: "").replacingOccurrences(of: "\u{200F}", with: "").contains("(דף ל״ו:)"), "Daf amud mark must follow its numeral")
     let label = (document.string as NSString).range(of: "חנניה")
     let font = document.attribute(.font, at: label.location, effectiveRange: nil) as! NSFont
     if !NSFontManager.shared.traits(of: font).contains(.boldFontMask) { failures.append("Inline Hebrew bold was lost") }
@@ -118,6 +121,12 @@ precondition(!nodes( "//w:szCs").isEmpty)
 precondition(!nodes( "//w:bCs").isEmpty)
 precondition(!nodes( "//w:ind[@w:hanging='360']").isEmpty)
 precondition(!nodes( "//w:tabs/w:tab[@w:pos='1440']").isEmpty)
+let exportedParagraphs = nodes("//w:p").map { $0.stringValue ?? "" }
+for example in hebrewDirectionExamples {
+    let expected = NotesMarkdownConverter.inlinePlan(example).text
+    precondition(exportedParagraphs.contains { $0.contains(expected) },
+        "DOCX must serialize the Hebrew phrase boundaries without losing controls")
+}
 let paragraphs = nodes( "//w:p").count
 precondition(nodes( "//w:p/w:pPr/w:bidi[@w:val='0']").count == paragraphs)
 
