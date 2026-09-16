@@ -176,6 +176,22 @@ final class SystemCompletionNotifier: NSObject, CompletionNotifying, UNUserNotif
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
+        if notification.request.identifier.hasPrefix("lectern-zoom-") {
+            let id = String(notification.request.identifier.dropFirst("lectern-zoom-".count))
+            await MainActor.run { CanvasZoomReminderService.current?.present(id: id) }
+            return []
+        }
+        return [.banner, .sound]
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let identifier = response.notification.request.identifier
+        guard identifier.hasPrefix("lectern-zoom-"),
+              response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
+        let id = String(identifier.dropFirst("lectern-zoom-".count))
+        await MainActor.run { CanvasZoomReminderService.current?.present(id: id) }
     }
 }

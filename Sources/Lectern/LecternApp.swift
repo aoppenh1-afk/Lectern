@@ -130,6 +130,7 @@ struct LecternApp: App {
     private let lectureImportService: LectureImportService
     private let shiurAutomationService: ShiurAutomationService
     private let automationScheduler: AutomationScheduler
+    private let zoomReminders: CanvasZoomReminderService
 
     init() {
         do {
@@ -172,6 +173,8 @@ struct LecternApp: App {
         canvasConnection = CanvasConnectionSettings()
         canvasSync = CanvasSyncService(modelContainer: container, connection: canvasConnection)
         canvasResourceOpener = CanvasResourceOpener(connection: canvasConnection)
+        zoomReminders = CanvasZoomReminderService(container: container, capture: captureController,
+                                                   sync: canvasSync, connection: canvasConnection)
         appUpdater = AppUpdater()
         onboardingState = OnboardingState()
         notificationPreferences = NotificationPreferences()
@@ -237,9 +240,11 @@ struct LecternApp: App {
                 .environment(notificationPreferences)
                 .environment(shiurAutomationService)
                 .preferredColorScheme(surfacePreferences.appearance.colorScheme)
+                .task { zoomReminders.start() }
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                     transcriptionService.cancelAll()
                     automationScheduler.stop()
+                    zoomReminders.stop()
                     cloudSharing.shutdown()
                 }
         }

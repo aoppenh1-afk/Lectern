@@ -63,6 +63,16 @@ open /Applications/Lectern.app
 
 Do not commit tokens, `.env` files, or Keychain material. Do not change `git config`. Do not force-push.
 
+## Canvas Zoom reminders
+
+While Lectern is running, connected Canvas accounts are checked about every five minutes for Zoom invitations in announcements and full Inbox threads. Lectern reads the `[Create Meeting]` block's main `Time:` field and ignores the trailing recurrence dates. Eastern and other supported time zones use daylight saving rules.
+
+A matching Canvas calendar event, or an explicit syllabus line such as “Class meetings: Wednesdays 6:45 PM,” can override an early invitation time. The match must identify the same course and weekday/date, with a start within one hour of the invitation. Ambiguous schedules keep the invitation time; arbitrary prose is not interpreted.
+
+At the scheduled time, Lectern shows a join prompt when active or a macOS notification when in the background. If notifications are unavailable, it uses the prompt. Clicking **Join Zoom** opens the HTTPS link in your browser. The floating prompt stays available while you join, and recording starts only when you click **Start Zoom recording when ready**. Choose browser/system audio or Zoom app audio; the recording is filed under the matched course. Existing recordings are never interrupted.
+
+Discovered reminders survive relaunches. New messages require Lectern to be running and online to sync; meetings more than 15 minutes past their start are skipped. The trailing date list does not create recurring reminders.
+
 ## Updating
 
 Lectern checks this repository's GitHub Releases about once a day and offers to install a newer build in place (**Settings › General › Check for updates**, or Lectern menu › Check for Updates…). It downloads the zip, verifies the checksum, swaps the app, and relaunches.

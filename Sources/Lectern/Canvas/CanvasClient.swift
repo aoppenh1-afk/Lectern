@@ -695,8 +695,8 @@ struct CanvasSnapshot: Sendable {
     let files: [CanvasFileDTO]
     let folders: [CanvasFolderDTO]
     let announcements: [CanvasAnnouncementDTO]
-    let conversations: [CanvasConversationDTO]
-    let warnings: [String]
+    var conversations: [CanvasConversationDTO]
+    var warnings: [String]
 }
 
 struct CanvasFileDTO: Decodable, Sendable {
@@ -869,14 +869,14 @@ struct CanvasConversationDTO: Decodable, Sendable {
     let lastMessage: String?
     let lastMessageAt: Date?
     let messageCount: Int?
-    let contextCode: String?
+    var contextCode: String?
     let contextName: String?
     let participants: [Participant]?
     let audienceContexts: AudienceContexts?
     /// Full bodies, newest first. Present only in the show (single-thread)
     /// response; the list endpoint omits it and carries just the preview in
     /// `lastMessage`.
-    let messages: [Message]?
+    var messages: [Message]?
     /// Raw `properties` flags (e.g. ["last_author"]). Empty when absent/null.
     let propertyFlags: [String]
     /// Author captured only when `properties` arrives in legacy dict form
