@@ -8,11 +8,17 @@ final class ZoomJoinFollowUpTests: XCTestCase {
         let followUp = ZoomJoinFollowUp()
         var hidden = false
         var fired = false
-        followUp.schedule(delay: .milliseconds(60), hide: { hidden = true }) { fired = true }
+        let completed = expectation(description: "Delayed follow-up ran")
+        followUp.schedule(delay: .milliseconds(60), hide: { hidden = true }) {
+            fired = true
+            completed.fulfill()
+        }
+        defer { followUp.cancel() }
         XCTAssertTrue(hidden)
         XCTAssertTrue(followUp.isPending)
         XCTAssertFalse(fired)
-        try await Task.sleep(for: .milliseconds(150))
+        // Wait for the event, not a guess at how quickly the CI runner schedules it.
+        await fulfillment(of: [completed], timeout: 5)
         XCTAssertTrue(fired)
         XCTAssertFalse(followUp.isPending)
     }
@@ -30,9 +36,14 @@ final class ZoomJoinFollowUpTests: XCTestCase {
     func testNewJoinReplacesPreviousFollowUp() async throws {
         let followUp = ZoomJoinFollowUp()
         var events: [String] = []
+        let completed = expectation(description: "Replacement follow-up ran")
         followUp.schedule(delay: .milliseconds(30), hide: {}) { events.append("old") }
-        followUp.schedule(delay: .milliseconds(30), hide: {}) { events.append("new") }
-        try await Task.sleep(for: .milliseconds(100))
+        followUp.schedule(delay: .milliseconds(30), hide: {}) {
+            events.append("new")
+            completed.fulfill()
+        }
+        defer { followUp.cancel() }
+        await fulfillment(of: [completed], timeout: 5)
         XCTAssertEqual(events, ["new"])
     }
 
