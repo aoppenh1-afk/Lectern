@@ -494,6 +494,7 @@ private struct AppearancePane: View {
 // MARK: - Recording
 
 private struct RecordingPane: View {
+    @AppStorage(ZoomJoinFollowUp.autoRecordKey) private var autoRecordZoom = false
     @Environment(SurfacePreferences.self) private var surfacePreferences
 
     @AppStorage("surface.popoverEnabled") private var popoverEnabled = true
@@ -522,6 +523,16 @@ private struct RecordingPane: View {
                 .pickerStyle(.menu)
                 .frame(width: 160)
                 .labelsHidden()
+            }
+
+            SettingsRow(
+                title: "Automatically record Zoom meetings",
+                caption: "Start recording system audio 30 seconds after you click Join Zoom in Lectern, even if you are still waiting to enter. When off, a small recording prompt appears instead."
+            ) {
+                Toggle("Automatically record Zoom meetings", isOn: $autoRecordZoom)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
             }
 
             SettingsRow(

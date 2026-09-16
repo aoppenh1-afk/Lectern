@@ -26,6 +26,7 @@ final class CanvasZoomReminderService {
     private var syncTask: Task<Void, Never>?
     private var nextSyncAttempt = Date.distantPast
     private var panel: NSPanel?
+    private let followUp = ZoomJoinFollowUp()
     private var accountDomain: String
     private static let storageKey = "canvas.zoomReminders.v1"
 
@@ -73,6 +74,8 @@ final class CanvasZoomReminderService {
     }
 
     func stop() {
+        followUp.cancel()
+        panel?.close()
         loop?.cancel(); loop = nil
         syncTask?.cancel(); syncTask = nil
     }
@@ -84,6 +87,7 @@ final class CanvasZoomReminderService {
     }
 
     private func clear() {
+        followUp.cancel()
         let ids = reminders.map { Self.prefix + $0.id }
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ids)
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ids)
@@ -154,7 +158,9 @@ final class CanvasZoomReminderService {
         for reminder in upcoming.sorted(by: { $0.startAt < $1.startAt }).prefix(32) {
             let content = UNMutableNotificationContent()
             content.title = "Join \(reminder.invitation.topic) on Zoom?"
-            content.body = "Click to join. Lectern will ask when you’re ready to record."
+            content.body = UserDefaults.standard.bool(forKey: ZoomJoinFollowUp.autoRecordKey)
+                ? "Click to join. Lectern will start recording system audio after 30 seconds."
+                : "Click to join. Lectern will remind you to record after 30 seconds."
             content.sound = .default
             let interval = reminder.startAt.timeIntervalSinceNow
             guard interval > 0 else { continue }
@@ -186,15 +192,17 @@ final class CanvasZoomReminderService {
               reminders[index].startAt > Date().addingTimeInterval(-15 * 60) else { return }
         // A timer and the foreground notification delegate can race for the same reminder.
         guard !reminders[index].prompted else { return }
-        if panel?.isVisible == true { return }
+        if panel?.isVisible == true || followUp.isPending { return }
         let reminder = reminders[index]
         reminders[index].prompted = true
         save()
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [Self.prefix + id])
         center.removeDeliveredNotifications(withIdentifiers: [Self.prefix + id])
-        let view = CanvasZoomJoinView(reminder: reminder, capture: capture,
-                                     course: course(for: reminder.courseID)) { [weak self] in
+        let view = CanvasZoomJoinView(reminder: reminder,
+                                     course: course(for: reminder.courseID), joined: { [weak self] in
+            self?.joined(reminder)
+        }) { [weak self] in
             self?.panel?.close()
         }
         panel?.close()
@@ -222,6 +230,32 @@ final class CanvasZoomReminderService {
         self.panel = panel
     }
 
+    private func joined(_ reminder: Reminder) {
+        let screen = panel?.screen ?? NSScreen.main
+        let domain = accountDomain
+        followUp.schedule(hide: { self.panel?.close() }) { [weak self] in
+            guard let self, self.connection.isConnected,
+                  self.connection.domain == domain, self.accountDomain == domain,
+                  !self.capture.phase.isLive else { return }
+            var error: String?
+            if UserDefaults.standard.bool(forKey: ZoomJoinFollowUp.autoRecordKey) {
+                await self.capture.start(in: self.course(for: reminder.courseID), source: .systemAudio)
+                guard !Task.isCancelled else { return }
+                if self.capture.phase.isLive { return }
+                error = self.capture.errorMessage ?? "Could not start recording. Try again."
+            }
+            guard !Task.isCancelled else { return }
+            self.panel?.close()
+            let view = ZoomRecordingCard(reminder: reminder, capture: self.capture,
+                                         course: self.course(for: reminder.courseID), error: error) { [weak self] in
+                self?.panel?.close()
+            }
+            let panel = ZoomJoinFollowUp.makePanel(content: NSHostingView(rootView: view), screen: screen)
+            self.panel = panel
+            panel.orderFrontRegardless()
+        }
+    }
+
     private func course(for id: Int64?) -> Course? {
         guard let id else { return nil }
         return (try? container.mainContext.fetch(FetchDescriptor<Course>()))?.first { $0.canvasID == id }
@@ -234,28 +268,24 @@ final class CanvasZoomReminderService {
 }
 
 private struct CanvasZoomJoinView: View {
+    @AppStorage(ZoomJoinFollowUp.autoRecordKey) private var autoRecordZoom = false
     let reminder: CanvasZoomReminderService.Reminder
-    let capture: CaptureController
     let course: Course?
+    let joined: () -> Void
     let close: () -> Void
-    @State private var opened = false
-    @State private var source: CaptureSource = .systemAudio
     @State private var error: String?
 
-    @State private var starting = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 20) {
             HStack(alignment: .top) {
-                Image(systemName: opened ? "waveform" : "video.fill")
+                Image(systemName: "video.fill")
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 60, height: 60)
                     .background(
-                        LinearGradient(colors: opened
-                            ? [LecternTheme.accent, LecternTheme.accent.opacity(0.65)]
-                            : [Color(red: 0.36, green: 0.65, blue: 1), Color(red: 0.20, green: 0.38, blue: 0.96)],
+                        LinearGradient(colors: [Color(red: 0.36, green: 0.65, blue: 1), Color(red: 0.20, green: 0.38, blue: 0.96)],
                                        startPoint: .topLeading, endPoint: .bottomTrailing),
                         in: RoundedRectangle(cornerRadius: 17))
                     .overlay(RoundedRectangle(cornerRadius: 17).strokeBorder(.white.opacity(0.2)))
@@ -282,12 +312,10 @@ private struct CanvasZoomJoinView: View {
                         .background(LecternTheme.accent.opacity(0.12), in: Capsule())
                         .overlay(Capsule().strokeBorder(LecternTheme.accent.opacity(0.22)))
                 }
-                Text(opened ? "Record Zoom Meeting?" : "Join Zoom Meeting?")
+                Text("Join Zoom Meeting?")
                     .font(.system(size: 30, weight: .semibold, design: .serif))
                     .fixedSize(horizontal: false, vertical: true)
-                Text(opened
-                     ? "Join in Zoom, then start recording when you're ready."
-                     : "Your Zoom session is about to start.")
+                Text("Your Zoom session is about to start.")
                     .font(.system(size: 15))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -309,29 +337,6 @@ private struct CanvasZoomJoinView: View {
             .background(LecternTheme.paper.opacity(0.18), in: RoundedRectangle(cornerRadius: 13))
             .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(LecternTheme.hairline))
 
-            if opened {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("AUDIO SOURCE")
-                        .font(.system(size: 10, weight: .semibold)).tracking(1.2)
-                        .foregroundStyle(.secondary)
-                    Picker("Audio source", selection: $source) {
-                        Text("Browser / system audio").tag(CaptureSource.systemAudio)
-                        Text("Zoom app only").tag(CaptureSource.zoomApp)
-                        Text("System audio + microphone").tag(CaptureSource.mixed)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .disabled(starting)
-                    Text(source.caption).font(.caption).foregroundStyle(.secondary)
-                    if capture.phase.isLive {
-                        Text("Another recording is already in progress.")
-                            .font(.caption).foregroundStyle(LecternTheme.warningTint)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
             if let error {
                 Label(error, systemImage: "exclamationmark.circle")
                     .font(.caption).foregroundStyle(LecternTheme.recordTint)
@@ -341,11 +346,10 @@ private struct CanvasZoomJoinView: View {
             VStack(spacing: 12) {
                 Button(action: primaryAction) {
                     ZStack {
-                        Text(starting ? "Starting recording…" : opened ? "Start recording" : "Join Zoom")
+                        Text("Join Zoom")
                         HStack {
                             Spacer()
-                            if starting { ProgressView().controlSize(.small) }
-                            else { Image(systemName: opened ? "record.circle" : "arrow.right") }
+                            Image(systemName: "arrow.right")
                         }
                     }
                     .font(.system(size: 16, weight: .semibold))
@@ -354,10 +358,9 @@ private struct CanvasZoomJoinView: View {
                 }
                 .buttonStyle(ZoomPromptButtonStyle(primary: true, dark: colorScheme == .dark))
                 .keyboardShortcut(.defaultAction)
-                .disabled(opened && (capture.phase.isLive || starting))
 
                 Button(action: close) {
-                    Text(opened ? "Dismiss" : "Not now")
+                    Text("Not now")
                         .font(.system(size: 14, weight: .medium))
                         .frame(maxWidth: .infinity, minHeight: 40)
                 }
@@ -365,7 +368,9 @@ private struct CanvasZoomJoinView: View {
             }
 
             Rectangle().fill(LecternTheme.hairline).frame(height: 1)
-            Text(opened ? "Lectern will capture audio for your transcript." : "This will open Zoom in a new window.")
+            Text(autoRecordZoom
+                 ? "Opens Zoom, then automatically records system audio after 30 seconds."
+                 : "Opens Zoom. A small recording prompt will appear after 30 seconds.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -400,17 +405,8 @@ private struct CanvasZoomJoinView: View {
 
     private func primaryAction() {
         error = nil
-        if opened {
-            guard !starting, !capture.phase.isLive else { return }
-            starting = true
-            Task {
-                await capture.start(in: course, source: source)
-                starting = false
-                if case .recording = capture.phase { close() }
-                else { error = capture.errorMessage }
-            }
-        } else if NSWorkspace.shared.open(reminder.invitation.joinURL) {
-            opened = true
+        if NSWorkspace.shared.open(reminder.invitation.joinURL) {
+            joined()
         } else {
             error = "Could not open the Zoom link. Try again."
         }
@@ -439,5 +435,117 @@ private struct ZoomPromptButtonStyle: ButtonStyle {
             }
             .opacity(isEnabled ? 1 : 0.45)
             .onHover { hovering = $0 }
+    }
+}
+
+
+/// Keeps the browser handoff clear and owns cancellation of the delayed action.
+@MainActor
+final class ZoomJoinFollowUp {
+    static let autoRecordKey = "recording.autoRecordZoom"
+    private(set) var isPending = false
+    private var task: Task<Void, Never>?
+
+    func schedule(delay: Duration = .seconds(30), hide: () -> Void,
+                  action: @escaping @MainActor () async -> Void) {
+        cancel()
+        hide()
+        isPending = true
+        task = Task { [weak self] in
+            do { try await Task.sleep(for: delay) } catch { return }
+            guard !Task.isCancelled else { return }
+            await action()
+            guard !Task.isCancelled else { return }
+            self?.isPending = false
+            self?.task = nil
+        }
+    }
+
+    func cancel() {
+        task?.cancel()
+        task = nil
+        isPending = false
+    }
+
+    static func makePanel(content: NSView, screen: NSScreen?) -> NSPanel {
+        let panel = NSPanel(contentRect: .zero,
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.level = .floating
+        panel.hidesOnDeactivate = false
+        panel.isMovableByWindowBackground = true
+        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        panel.contentView = content
+        panel.setContentSize(content.fittingSize)
+        if let bounds = (screen ?? NSScreen.main)?.visibleFrame {
+            panel.setFrameOrigin(NSPoint(x: bounds.maxX - panel.frame.width - 20,
+                                         y: bounds.minY + 20))
+        }
+        return panel
+    }
+}
+
+private struct ZoomRecordingCard: View {
+    let reminder: CanvasZoomReminderService.Reminder
+    let capture: CaptureController
+    let course: Course?
+    @State var error: String?
+    let close: () -> Void
+    @State private var source: CaptureSource = .systemAudio
+    @State private var starting = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Record Zoom meeting?", systemImage: "waveform")
+                    .font(.headline)
+                Spacer()
+                Button(action: close) { Image(systemName: "xmark") }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Dismiss recording reminder")
+                    .disabled(starting)
+            }
+            Text(reminder.invitation.topic)
+                .font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+            Picker("Audio", selection: $source) {
+                Text("Browser / system audio").tag(CaptureSource.systemAudio)
+                Text("Zoom app only").tag(CaptureSource.zoomApp)
+                Text("System audio + microphone").tag(CaptureSource.mixed)
+            }
+            .disabled(starting)
+            if let error {
+                Text(error).font(.caption).foregroundStyle(LecternTheme.recordTint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if capture.phase.isLive && !starting {
+                Text("Another recording is already in progress.").font(.caption)
+            }
+            HStack {
+                Button("Dismiss", action: close).disabled(starting)
+                Spacer()
+                Button(starting ? "Starting…" : "Start recording") {
+                    guard !starting, !capture.phase.isLive else { return }
+                    starting = true
+                    error = nil
+                    Task {
+                        await capture.start(in: course, source: source)
+                        starting = false
+                        if case .recording = capture.phase { close() }
+                        else { error = capture.errorMessage }
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(LecternTheme.accent)
+                .disabled(starting || capture.phase.isLive)
+            }
+        }
+        .padding(18)
+        .frame(width: 340)
+        .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(LecternTheme.hairline))
+        .fixedSize(horizontal: false, vertical: true)
     }
 }

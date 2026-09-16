@@ -13,7 +13,6 @@
 		04A2587DE03F9385C9796948 /* CourseSynthesisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD87EB0581FBD62DD9CC2F0B /* CourseSynthesisView.swift */; };
 		079017CD656338721EDA9BEC /* FlashcardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03592B808597F36DE3B7F38E /* FlashcardsView.swift */; };
 		0932FFD48E3317DAB25BAB3C /* CanvasClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */; };
-		CABF3123B00D9BB61EE9589F /* CanvasZoomInvitationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BA6EBEC69EEA41FE6E63B55 /* CanvasZoomInvitationTests.swift */; };
 		097B599C3CD156F1FE5B4DD1 /* AntigravityACPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */; };
 		0A4E6FA74143F510308DCD82 /* PillWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76FE69A65922487DBD5E43CA /* PillWindowController.swift */; };
 		0BE6A96BF3F7762C36D2F872 /* LiveBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB85EBEEFA4C4DD64A6BA221 /* LiveBookmark.swift */; };
@@ -84,8 +83,6 @@
 		48C206E7348E4166EF00D67E /* YUTorahSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B431E6A4C6DD679E2D7C259 /* YUTorahSearchService.swift */; };
 		493DE2F5C28A17C34D2321D0 /* ShiurSourceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F1D30F6F9F6D6F1E7515706 /* ShiurSourceProvider.swift */; };
 		4A0B4901AD2C903ACF822BDC /* CanvasSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85118E4C36171306169DA123 /* CanvasSyncService.swift */; };
-		059B63AB3939092B70CD657C /* CanvasZoomReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FA52C51BFCE5712195F8B68 /* CanvasZoomReminderService.swift */; };
-		AEAC960B1C5D6A1F25724618 /* CanvasZoomInvitation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858BEC5D6D1E8BFC3F8DE7F8 /* CanvasZoomInvitation.swift */; };
 		4BBF4BC45D57B67037B3D8EB /* SystemAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439DF4E05C878D8E23AA6E75 /* SystemAudioCapture.swift */; };
 		4BCD52D700A21B47DC5A6A35 /* AgentDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07DF18B64B18FC06E4CC2F90 /* AgentDetector.swift */; };
 		4C70DDFDC829C92E73B9E5C1 /* ReferenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6AC1B3F5C73C9B7EF6CD77 /* ReferenceAttachment.swift */; };
@@ -115,9 +112,8 @@
 		644147453180D0B0EC407215 /* CaptureSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5002DE6320201A09808F4D /* CaptureSource.swift */; };
 		64D1BB7B2C4864F6221429AE /* CanvasHTMLTextCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */; };
 		64DD4C5F7F480DCF741D86E4 /* ShiurSubscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43BAFC671A118892D77577AD /* ShiurSubscription.swift */; };
+		6507D966F12A86F1569DD0E5 /* CanvasZoomReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2470516AC63AAE0B25C2D906 /* CanvasZoomReminderService.swift */; };
 		65B07A882FAF3490827BBA72 /* CanvasSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85118E4C36171306169DA123 /* CanvasSyncService.swift */; };
-		2DCD90928BBF3D4F3CC09674 /* CanvasZoomReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FA52C51BFCE5712195F8B68 /* CanvasZoomReminderService.swift */; };
-		F176AA4CA2FD7AA233411ACD /* CanvasZoomInvitation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858BEC5D6D1E8BFC3F8DE7F8 /* CanvasZoomInvitation.swift */; };
 		66FEF621C726AB98517FB265 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F761716AB6F39B0F119719 /* OnboardingView.swift */; };
 		67C2B516005F92253AA7165C /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7D0F6D80C445E9723332BE /* MainWindowView.swift */; };
 		681C224C5CB19823E357C693 /* ReferenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6AC1B3F5C73C9B7EF6CD77 /* ReferenceAttachment.swift */; };
@@ -127,6 +123,7 @@
 		6AC221B5CC644CE1D388095D /* SurfacePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363051532AA63A00332E82D7 /* SurfacePreferences.swift */; };
 		6C8B2B6804CFA43DFC1D5537 /* AnkiConnectClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3217A5B8A37DD8207DD0478 /* AnkiConnectClient.swift */; };
 		6CEA910FD49F1BE8BB05BCCF /* ShiurImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C5B6AFA684E43B8FEA1573E /* ShiurImportSheet.swift */; };
+		6D66EC24A6173D2D503D4894 /* CanvasZoomReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2470516AC63AAE0B25C2D906 /* CanvasZoomReminderService.swift */; };
 		6E93D4DC8C530BC4C5472563 /* GoogleDocsSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A92C58BA4F8412B20A3504 /* GoogleDocsSyncService.swift */; };
 		6F51FC24AF770F80FDB1414E /* LecternBundleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A00E389C268DAA3F3B2249 /* LecternBundleService.swift */; };
 		71D0F30C0C4DB0C346EEE723 /* GoogleOAuthConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4423ED80F0768A3752F0DC45 /* GoogleOAuthConfigurationTests.swift */; };
@@ -164,6 +161,7 @@
 		8BE649B38DF898AC27E78800 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872C99F2068ADE2855DB440D /* ChatMessage.swift */; };
 		8CEF00F77314A75DDAE1752F /* OnboardingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED5ED7AC83F9F7234C35460 /* OnboardingState.swift */; };
 		8E6816198EC12C476E419072 /* CardSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01528EDB75F8B898B2746A6 /* CardSyncService.swift */; };
+		8FD6D1B288AFD9EEA34E8D53 /* ZoomJoinFollowUpTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BFBAE3C002FC74BE3DCC442 /* ZoomJoinFollowUpTests.swift */; };
 		9057CF2BC820828797889158 /* Recording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */; };
 		91156C78834D510839B91214 /* LectureExportAvailability+Lecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C30D8A14329AC61D5345BC9 /* LectureExportAvailability+Lecture.swift */; };
 		919717555519875DF0C08F6F /* CanvasSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A763F772641D5D2F5F79CDB9 /* CanvasSettingsView.swift */; };
@@ -173,6 +171,7 @@
 		92BA99F1D8777D835D66AFCF /* AntigravityACP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BFE16C6F2F14A491896949 /* AntigravityACP.swift */; };
 		92E03A9C0B6913F9E5AF308C /* SubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85330EAFA97A4A66B2B2E9A0 /* SubscriptionsView.swift */; };
 		92ED10122EC5ED40F4589F2E /* GoogleDocsError.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF820DB24255443A5561D031 /* GoogleDocsError.swift */; };
+		92EE403760186F55744C0F94 /* CanvasZoomInvitation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B4267DED0F3263C662ECD1F /* CanvasZoomInvitation.swift */; };
 		93D3161AC57DF8C49442C3CB /* GoogleDocsNotesBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6883F2E69A64C8505C606EE /* GoogleDocsNotesBar.swift */; };
 		93D5D015C6492C0F863B1A43 /* YUTorahRSSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D853730E8F00F809FFF741FD /* YUTorahRSSParser.swift */; };
 		945656E2CCCE5BFD98EBA189 /* mermaid.min.js in Resources */ = {isa = PBXBuildFile; fileRef = E7DC166705C567DFF81BC6B6 /* mermaid.min.js */; };
@@ -204,6 +203,7 @@
 		B0183D74ECA0C677FCFD815A /* CompletionNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165645A8C3854D55C5824601 /* CompletionNotifier.swift */; };
 		B1B2808981B5CF35F77DE477 /* LectureChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 405F827FE93E4C441645FA2B /* LectureChatService.swift */; };
 		B1C8626312E7CF92B5F96D1A /* CanvasConnectionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09DF40420E86AFCF7499E39F /* CanvasConnectionSettings.swift */; };
+		B47C909B210FCC74D89E8E43 /* CanvasZoomInvitation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B4267DED0F3263C662ECD1F /* CanvasZoomInvitation.swift */; };
 		B5E2B6A82B90454D78C45EA4 /* ExportAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2ECE882547DAE6ABCD5EC51 /* ExportAvailabilityTests.swift */; };
 		B939ECE1EC73DF3FCE35CB4D /* GoogleDocsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBF49011BFA6F50BCA8A7598 /* GoogleDocsClient.swift */; };
 		B95C93ED8ECDBB991A1C9336 /* Flashcard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC884E8F1288033F883B48CF /* Flashcard.swift */; };
@@ -257,6 +257,7 @@
 		E53BF8227118E90A15FE8D58 /* LecternCloudSharing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B11AAF51FB13798ADCA980B /* LecternCloudSharing.swift */; };
 		E5F1009B3531ED6CA5C9FA57 /* AppUpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84584CA17279DC67909F94C /* AppUpdaterTests.swift */; };
 		E8ECF29E985AE8D447DD99EE /* UpdatePromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB3E3B37AF7F3949572FF90 /* UpdatePromptView.swift */; };
+		E8ED86FDEF0068BDD81A1027 /* CanvasZoomInvitationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D551E9087618C5ABA17D11 /* CanvasZoomInvitationTests.swift */; };
 		E8F6650540B184E92DED4BBF /* LectureDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DFFBA8697AE3C7AB28D15DE /* LectureDetailView.swift */; };
 		E9B92244F39EB6A999CF8D7E /* ShiurAutomationItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A89B0C992EA7A3BF00F120 /* ShiurAutomationItem.swift */; };
 		EAAF82191FD0F66658CB5D6A /* CanvasModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C125CBCA32F7C013115044A9 /* CanvasModels.swift */; };
@@ -303,6 +304,7 @@
 		1F1D30F6F9F6D6F1E7515706 /* ShiurSourceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiurSourceProvider.swift; sourceTree = "<group>"; };
 		1F4553C1CACE105140BCDE50 /* Artifact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Artifact.swift; sourceTree = "<group>"; };
 		20159E2CD18F89CA247F90E6 /* MeetingAudioTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingAudioTarget.swift; sourceTree = "<group>"; };
+		2470516AC63AAE0B25C2D906 /* CanvasZoomReminderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomReminderService.swift; sourceTree = "<group>"; };
 		2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LecternBundleOptions.swift; sourceTree = "<group>"; };
 		264D4BFEED3B376DCCA86F0F /* ShiurAutomationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiurAutomationService.swift; sourceTree = "<group>"; };
 		29CA61043373B5435D7F00F2 /* RetentionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetentionService.swift; sourceTree = "<group>"; };
@@ -335,6 +337,8 @@
 		522F58B2452A56EBECCA5001 /* GoogleOAuthConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleOAuthConfiguration.swift; sourceTree = "<group>"; };
 		52B1F78BFD01E4667FE613F2 /* ReferenceMaterialService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceMaterialService.swift; sourceTree = "<group>"; };
 		576A2CBC9D67B86F6B125E6E /* ExternalTranscriptionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalTranscriptionEngine.swift; sourceTree = "<group>"; };
+		5B4267DED0F3263C662ECD1F /* CanvasZoomInvitation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomInvitation.swift; sourceTree = "<group>"; };
+		5BFBAE3C002FC74BE3DCC442 /* ZoomJoinFollowUpTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomJoinFollowUpTests.swift; sourceTree = "<group>"; };
 		5F31D7E05008BB4C97BB3E77 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesMarkdownTests.swift; sourceTree = "<group>"; };
 		6158A28C0BB3D26FAEAE192F /* Lecture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Lecture.swift; sourceTree = "<group>"; };
@@ -351,10 +355,7 @@
 		795B08D1A7D6BBE0408B836A /* ChatStudyMaterialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStudyMaterialTests.swift; sourceTree = "<group>"; };
 		7F48400CBE26D86C8AA210BB /* GlassStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyle.swift; sourceTree = "<group>"; };
 		832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasClientTests.swift; sourceTree = "<group>"; };
-		2BA6EBEC69EEA41FE6E63B55 /* CanvasZoomInvitationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomInvitationTests.swift; sourceTree = "<group>"; };
 		85118E4C36171306169DA123 /* CanvasSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasSyncService.swift; sourceTree = "<group>"; };
-		1FA52C51BFCE5712195F8B68 /* CanvasZoomReminderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomReminderService.swift; sourceTree = "<group>"; };
-		858BEC5D6D1E8BFC3F8DE7F8 /* CanvasZoomInvitation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomInvitation.swift; sourceTree = "<group>"; };
 		85330EAFA97A4A66B2B2E9A0 /* SubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionsView.swift; sourceTree = "<group>"; };
 		872C99F2068ADE2855DB440D /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
 		87CA75D98C0B0A79B24C31A6 /* TranscriptionProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionProviders.swift; sourceTree = "<group>"; };
@@ -372,6 +373,7 @@
 		9D8E9C05E6FE70084DD545AC /* NotesMarkdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesMarkdown.swift; sourceTree = "<group>"; };
 		A0999EBAFBCFF39D7F174D28 /* CapturePipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePipeline.swift; sourceTree = "<group>"; };
 		A13E515E0B5FEBA11763B7DA /* AgentProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProfile.swift; sourceTree = "<group>"; };
+		A1D551E9087618C5ABA17D11 /* CanvasZoomInvitationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomInvitationTests.swift; sourceTree = "<group>"; };
 		A763F772641D5D2F5F79CDB9 /* CanvasSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasSettingsView.swift; sourceTree = "<group>"; };
 		A80840764862370BCD46CACE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A9D3AE061392BC596F79D58F /* MCPSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSettingsView.swift; sourceTree = "<group>"; };
@@ -452,8 +454,8 @@
 				0B59062BA24987B047FA43FD /* CanvasHTMLTextCache.swift */,
 				C125CBCA32F7C013115044A9 /* CanvasModels.swift */,
 				85118E4C36171306169DA123 /* CanvasSyncService.swift */,
-				1FA52C51BFCE5712195F8B68 /* CanvasZoomReminderService.swift */,
-				858BEC5D6D1E8BFC3F8DE7F8 /* CanvasZoomInvitation.swift */,
+				5B4267DED0F3263C662ECD1F /* CanvasZoomInvitation.swift */,
+				2470516AC63AAE0B25C2D906 /* CanvasZoomReminderService.swift */,
 			);
 			path = Canvas;
 			sourceTree = "<group>";
@@ -624,8 +626,8 @@
 				6BFA6B96F07B02712B0D39EC /* AutomationPipelineTests.swift */,
 				E5799385903A5C07596ADBFF /* BundleImportRecoveryTests.swift */,
 				832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */,
-				2BA6EBEC69EEA41FE6E63B55 /* CanvasZoomInvitationTests.swift */,
 				0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */,
+				A1D551E9087618C5ABA17D11 /* CanvasZoomInvitationTests.swift */,
 				D877127DC8DE4B1DC47FD222 /* CaptureSourceTests.swift */,
 				795B08D1A7D6BBE0408B836A /* ChatStudyMaterialTests.swift */,
 				2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */,
@@ -636,6 +638,7 @@
 				60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */,
 				518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */,
 				EC7DCD05473F0313914D4564 /* YUTorahSubscriptionTests.swift */,
+				5BFBAE3C002FC74BE3DCC442 /* ZoomJoinFollowUpTests.swift */,
 				70F43C2783FA3C249FCCC19F /* Fixtures */,
 			);
 			path = LecternTests;
@@ -959,16 +962,16 @@
 				ABA9FEA792D2E4749F8B5CFB /* BundleImportRecoveryTests.swift in Sources */,
 				D850E1E9B74B2D1B0CBF2E16 /* CanvasClient.swift in Sources */,
 				0932FFD48E3317DAB25BAB3C /* CanvasClientTests.swift in Sources */,
-				CABF3123B00D9BB61EE9589F /* CanvasZoomInvitationTests.swift in Sources */,
 				B1C8626312E7CF92B5F96D1A /* CanvasConnectionSettings.swift in Sources */,
 				A2603490A7FBF8826A31E9C6 /* CanvasHTMLTextCache.swift in Sources */,
 				64D1BB7B2C4864F6221429AE /* CanvasHTMLTextCacheTests.swift in Sources */,
 				641EFB3A6575F12F62A44257 /* CanvasModels.swift in Sources */,
 				919717555519875DF0C08F6F /* CanvasSettingsView.swift in Sources */,
 				65B07A882FAF3490827BBA72 /* CanvasSyncService.swift in Sources */,
-				2DCD90928BBF3D4F3CC09674 /* CanvasZoomReminderService.swift in Sources */,
-				F176AA4CA2FD7AA233411ACD /* CanvasZoomInvitation.swift in Sources */,
 				EE93387A69A06B5C2A41B40A /* CanvasWorkspaceViews.swift in Sources */,
+				B47C909B210FCC74D89E8E43 /* CanvasZoomInvitation.swift in Sources */,
+				E8ED86FDEF0068BDD81A1027 /* CanvasZoomInvitationTests.swift in Sources */,
+				6507D966F12A86F1569DD0E5 /* CanvasZoomReminderService.swift in Sources */,
 				BFC19196C16A69DE00155F5A /* CaptureController.swift in Sources */,
 				822D17F6137D0CEC6245E31E /* CapturePipeline.swift in Sources */,
 				644147453180D0B0EC407215 /* CaptureSource.swift in Sources */,
@@ -1079,6 +1082,7 @@
 				C07E616910691BA0DEA41D51 /* YUTorahSourceProvider.swift in Sources */,
 				21DE24DB5F083149A51666C0 /* YUTorahSubscriptionTests.swift in Sources */,
 				29E1DD5CA82422CA54C9A6F8 /* YUTorahURLResolver.swift in Sources */,
+				8FD6D1B288AFD9EEA34E8D53 /* ZoomJoinFollowUpTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1102,9 +1106,9 @@
 				EAAF82191FD0F66658CB5D6A /* CanvasModels.swift in Sources */,
 				E428600840C3171691894E28 /* CanvasSettingsView.swift in Sources */,
 				4A0B4901AD2C903ACF822BDC /* CanvasSyncService.swift in Sources */,
-				059B63AB3939092B70CD657C /* CanvasZoomReminderService.swift in Sources */,
-				AEAC960B1C5D6A1F25724618 /* CanvasZoomInvitation.swift in Sources */,
 				86CA65565DB52DB819C9C7BB /* CanvasWorkspaceViews.swift in Sources */,
+				92EE403760186F55744C0F94 /* CanvasZoomInvitation.swift in Sources */,
+				6D66EC24A6173D2D503D4894 /* CanvasZoomReminderService.swift in Sources */,
 				96768F959FE10609CFEE708A /* CaptureController.swift in Sources */,
 				26E90B0EEA8592419A89B457 /* CapturePipeline.swift in Sources */,
 				C60D195AB45647FBB85C9E75 /* CaptureSource.swift in Sources */,
