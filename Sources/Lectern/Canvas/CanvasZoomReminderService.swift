@@ -159,8 +159,8 @@ final class CanvasZoomReminderService {
             let content = UNMutableNotificationContent()
             content.title = "Join \(reminder.invitation.topic) on Zoom?"
             content.body = UserDefaults.standard.bool(forKey: ZoomJoinFollowUp.autoRecordKey)
-                ? "Click to join. Lectern will start recording system audio after 30 seconds."
-                : "Click to join. Lectern will remind you to record after 30 seconds."
+                ? "Click to join. Lectern will start recording the Zoom app after 1 minute."
+                : "Click to join. Lectern will remind you to record after 1 minute."
             content.sound = .default
             let interval = reminder.startAt.timeIntervalSinceNow
             guard interval > 0 else { continue }
@@ -239,7 +239,7 @@ final class CanvasZoomReminderService {
                   !self.capture.phase.isLive else { return }
             var error: String?
             if UserDefaults.standard.bool(forKey: ZoomJoinFollowUp.autoRecordKey) {
-                await self.capture.start(in: self.course(for: reminder.courseID), source: .systemAudio)
+                await self.capture.start(in: self.course(for: reminder.courseID), source: .zoomApp)
                 guard !Task.isCancelled else { return }
                 if self.capture.phase.isLive { return }
                 error = self.capture.errorMessage ?? "Could not start recording. Try again."
@@ -369,8 +369,8 @@ private struct CanvasZoomJoinView: View {
 
             Rectangle().fill(LecternTheme.hairline).frame(height: 1)
             Text(autoRecordZoom
-                 ? "Opens Zoom, then automatically records system audio after 30 seconds."
-                 : "Opens Zoom. A small recording prompt will appear after 30 seconds.")
+                 ? "Opens Zoom, then automatically records the Zoom app after 1 minute."
+                 : "Opens Zoom. A small recording prompt will appear after 1 minute.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -446,7 +446,7 @@ final class ZoomJoinFollowUp {
     private(set) var isPending = false
     private var task: Task<Void, Never>?
 
-    func schedule(delay: Duration = .seconds(30), hide: () -> Void,
+    func schedule(delay: Duration = .seconds(60), hide: () -> Void,
                   action: @escaping @MainActor () async -> Void) {
         cancel()
         hide()
@@ -494,7 +494,7 @@ private struct ZoomRecordingCard: View {
     let course: Course?
     @State var error: String?
     let close: () -> Void
-    @State private var source: CaptureSource = .systemAudio
+    @State private var source: CaptureSource = .zoomApp
     @State private var starting = false
 
     var body: some View {
