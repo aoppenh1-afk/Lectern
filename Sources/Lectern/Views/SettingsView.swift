@@ -527,7 +527,7 @@ private struct RecordingPane: View {
 
             SettingsRow(
                 title: "Automatically record Zoom meetings",
-                caption: "Start recording system audio 30 seconds after you click Join Zoom in Lectern, even if you are still waiting to enter. When off, a small recording prompt appears instead."
+                caption: "Start recording the Zoom app 1 minute after you click Join Zoom in Lectern, even if you are still waiting to enter. When off, a small recording prompt appears instead."
             ) {
                 Toggle("Automatically record Zoom meetings", isOn: $autoRecordZoom)
                     .toggleStyle(.switch)

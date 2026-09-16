@@ -125,6 +125,12 @@ final class StatusBarController {
             let pop = popover ?? buildPopover()
             self.popover = pop
             pop.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            // Clicking the status item while another app is active shows the
+            // popover but leaves it without key focus, forcing a second click
+            // before controls respond. Activate and make key so the first
+            // click is immediately interactive.
+            NSApp.activate(ignoringOtherApps: true)
+            pop.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
         }
     }
 

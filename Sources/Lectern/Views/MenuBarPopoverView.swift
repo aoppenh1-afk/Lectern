@@ -22,9 +22,10 @@ struct MenuBarPopoverView: View {
                         .transition(.opacity)
                 }
             }
+            .frame(maxWidth: .infinity)
             .padding(14)
         }
-        .frame(width: 252)
+        .frame(width: 252, alignment: .center)
     }
 
     // MARK: - Idle
@@ -62,6 +63,7 @@ struct MenuBarPopoverView: View {
                 }
                 .labelsHidden()
                 .controlSize(.small)
+                .frame(maxWidth: .infinity)
                 .onChange(of: selectedCourse) { _, course in
                     selectedLanguage = course?.language ?? .english
                 }
@@ -79,6 +81,7 @@ struct MenuBarPopoverView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .controlSize(.small)
+                .frame(maxWidth: .infinity)
                 Text(sourceCaption)
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
@@ -94,6 +97,7 @@ struct MenuBarPopoverView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .controlSize(.small)
+                .frame(maxWidth: .infinity)
                 Text(selectedLanguage.caption)
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
@@ -123,6 +127,7 @@ struct MenuBarPopoverView: View {
             }
             .prominentAction()
             .tint(LecternTheme.recordTint)
+            .frame(maxWidth: .infinity)
 
             Divider().opacity(0.5)
 
@@ -199,6 +204,7 @@ struct MenuBarPopoverView: View {
                     .padding(.vertical, 4)
             }
             .prominentAction()
+            .frame(maxWidth: .infinity)
 
             HStack(spacing: 6) {
                 TextField("Quick thought…", text: $bookmarkNote)
