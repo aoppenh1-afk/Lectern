@@ -13,6 +13,7 @@
 		04A2587DE03F9385C9796948 /* CourseSynthesisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD87EB0581FBD62DD9CC2F0B /* CourseSynthesisView.swift */; };
 		079017CD656338721EDA9BEC /* FlashcardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03592B808597F36DE3B7F38E /* FlashcardsView.swift */; };
 		0932FFD48E3317DAB25BAB3C /* CanvasClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */; };
+		CABF3123B00D9BB61EE9589F /* CanvasZoomInvitationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BA6EBEC69EEA41FE6E63B55 /* CanvasZoomInvitationTests.swift */; };
 		097B599C3CD156F1FE5B4DD1 /* AntigravityACPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */; };
 		0A4E6FA74143F510308DCD82 /* PillWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76FE69A65922487DBD5E43CA /* PillWindowController.swift */; };
 		0BE6A96BF3F7762C36D2F872 /* LiveBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB85EBEEFA4C4DD64A6BA221 /* LiveBookmark.swift */; };
@@ -83,6 +84,8 @@
 		48C206E7348E4166EF00D67E /* YUTorahSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B431E6A4C6DD679E2D7C259 /* YUTorahSearchService.swift */; };
 		493DE2F5C28A17C34D2321D0 /* ShiurSourceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F1D30F6F9F6D6F1E7515706 /* ShiurSourceProvider.swift */; };
 		4A0B4901AD2C903ACF822BDC /* CanvasSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85118E4C36171306169DA123 /* CanvasSyncService.swift */; };
+		059B63AB3939092B70CD657C /* CanvasZoomReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FA52C51BFCE5712195F8B68 /* CanvasZoomReminderService.swift */; };
+		AEAC960B1C5D6A1F25724618 /* CanvasZoomInvitation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858BEC5D6D1E8BFC3F8DE7F8 /* CanvasZoomInvitation.swift */; };
 		4BBF4BC45D57B67037B3D8EB /* SystemAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439DF4E05C878D8E23AA6E75 /* SystemAudioCapture.swift */; };
 		4BCD52D700A21B47DC5A6A35 /* AgentDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07DF18B64B18FC06E4CC2F90 /* AgentDetector.swift */; };
 		4C70DDFDC829C92E73B9E5C1 /* ReferenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6AC1B3F5C73C9B7EF6CD77 /* ReferenceAttachment.swift */; };
@@ -113,6 +116,8 @@
 		64D1BB7B2C4864F6221429AE /* CanvasHTMLTextCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */; };
 		64DD4C5F7F480DCF741D86E4 /* ShiurSubscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43BAFC671A118892D77577AD /* ShiurSubscription.swift */; };
 		65B07A882FAF3490827BBA72 /* CanvasSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85118E4C36171306169DA123 /* CanvasSyncService.swift */; };
+		2DCD90928BBF3D4F3CC09674 /* CanvasZoomReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FA52C51BFCE5712195F8B68 /* CanvasZoomReminderService.swift */; };
+		F176AA4CA2FD7AA233411ACD /* CanvasZoomInvitation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 858BEC5D6D1E8BFC3F8DE7F8 /* CanvasZoomInvitation.swift */; };
 		66FEF621C726AB98517FB265 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F761716AB6F39B0F119719 /* OnboardingView.swift */; };
 		67C2B516005F92253AA7165C /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B7D0F6D80C445E9723332BE /* MainWindowView.swift */; };
 		681C224C5CB19823E357C693 /* ReferenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6AC1B3F5C73C9B7EF6CD77 /* ReferenceAttachment.swift */; };
@@ -346,7 +351,10 @@
 		795B08D1A7D6BBE0408B836A /* ChatStudyMaterialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStudyMaterialTests.swift; sourceTree = "<group>"; };
 		7F48400CBE26D86C8AA210BB /* GlassStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassStyle.swift; sourceTree = "<group>"; };
 		832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasClientTests.swift; sourceTree = "<group>"; };
+		2BA6EBEC69EEA41FE6E63B55 /* CanvasZoomInvitationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomInvitationTests.swift; sourceTree = "<group>"; };
 		85118E4C36171306169DA123 /* CanvasSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasSyncService.swift; sourceTree = "<group>"; };
+		1FA52C51BFCE5712195F8B68 /* CanvasZoomReminderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomReminderService.swift; sourceTree = "<group>"; };
+		858BEC5D6D1E8BFC3F8DE7F8 /* CanvasZoomInvitation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomInvitation.swift; sourceTree = "<group>"; };
 		85330EAFA97A4A66B2B2E9A0 /* SubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionsView.swift; sourceTree = "<group>"; };
 		872C99F2068ADE2855DB440D /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
 		87CA75D98C0B0A79B24C31A6 /* TranscriptionProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionProviders.swift; sourceTree = "<group>"; };
@@ -444,6 +452,8 @@
 				0B59062BA24987B047FA43FD /* CanvasHTMLTextCache.swift */,
 				C125CBCA32F7C013115044A9 /* CanvasModels.swift */,
 				85118E4C36171306169DA123 /* CanvasSyncService.swift */,
+				1FA52C51BFCE5712195F8B68 /* CanvasZoomReminderService.swift */,
+				858BEC5D6D1E8BFC3F8DE7F8 /* CanvasZoomInvitation.swift */,
 			);
 			path = Canvas;
 			sourceTree = "<group>";
@@ -614,6 +624,7 @@
 				6BFA6B96F07B02712B0D39EC /* AutomationPipelineTests.swift */,
 				E5799385903A5C07596ADBFF /* BundleImportRecoveryTests.swift */,
 				832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */,
+				2BA6EBEC69EEA41FE6E63B55 /* CanvasZoomInvitationTests.swift */,
 				0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */,
 				D877127DC8DE4B1DC47FD222 /* CaptureSourceTests.swift */,
 				795B08D1A7D6BBE0408B836A /* ChatStudyMaterialTests.swift */,
@@ -948,12 +959,15 @@
 				ABA9FEA792D2E4749F8B5CFB /* BundleImportRecoveryTests.swift in Sources */,
 				D850E1E9B74B2D1B0CBF2E16 /* CanvasClient.swift in Sources */,
 				0932FFD48E3317DAB25BAB3C /* CanvasClientTests.swift in Sources */,
+				CABF3123B00D9BB61EE9589F /* CanvasZoomInvitationTests.swift in Sources */,
 				B1C8626312E7CF92B5F96D1A /* CanvasConnectionSettings.swift in Sources */,
 				A2603490A7FBF8826A31E9C6 /* CanvasHTMLTextCache.swift in Sources */,
 				64D1BB7B2C4864F6221429AE /* CanvasHTMLTextCacheTests.swift in Sources */,
 				641EFB3A6575F12F62A44257 /* CanvasModels.swift in Sources */,
 				919717555519875DF0C08F6F /* CanvasSettingsView.swift in Sources */,
 				65B07A882FAF3490827BBA72 /* CanvasSyncService.swift in Sources */,
+				2DCD90928BBF3D4F3CC09674 /* CanvasZoomReminderService.swift in Sources */,
+				F176AA4CA2FD7AA233411ACD /* CanvasZoomInvitation.swift in Sources */,
 				EE93387A69A06B5C2A41B40A /* CanvasWorkspaceViews.swift in Sources */,
 				BFC19196C16A69DE00155F5A /* CaptureController.swift in Sources */,
 				822D17F6137D0CEC6245E31E /* CapturePipeline.swift in Sources */,
@@ -1088,6 +1102,8 @@
 				EAAF82191FD0F66658CB5D6A /* CanvasModels.swift in Sources */,
 				E428600840C3171691894E28 /* CanvasSettingsView.swift in Sources */,
 				4A0B4901AD2C903ACF822BDC /* CanvasSyncService.swift in Sources */,
+				059B63AB3939092B70CD657C /* CanvasZoomReminderService.swift in Sources */,
+				AEAC960B1C5D6A1F25724618 /* CanvasZoomInvitation.swift in Sources */,
 				86CA65565DB52DB819C9C7BB /* CanvasWorkspaceViews.swift in Sources */,
 				96768F959FE10609CFEE708A /* CaptureController.swift in Sources */,
 				26E90B0EEA8592419A89B457 /* CapturePipeline.swift in Sources */,

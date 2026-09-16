@@ -17,6 +17,10 @@ final class CanvasSyncService {
     private static let lastSyncKey = "canvas.lastSuccessfulSync"
     private static let lastSyncDataVersionKey = "canvas.lastSuccessfulSyncDataVersion"
 
+    var didSync: ((CanvasSnapshot) async -> Void)?
+    private var inboxCache: [Int64: CanvasConversationDTO] = [:]
+    private var inboxAccount: String?
+
     private(set) var phase: Phase = .idle
     private(set) var lastSyncAt: Date?
     private(set) var lastSyncedDataVersion: Int
@@ -50,8 +54,36 @@ final class CanvasSyncService {
         phase = .syncing
         do {
             let credentials = try connection.credentials()
-            let snapshot = try await CanvasClient(credentials: credentials).fetchSnapshot()
+            let client = CanvasClient(credentials: credentials)
+            var snapshot = try await client.fetchSnapshot()
+            let account = credentials.baseURL.absoluteString + credentials.token
+            if inboxAccount != account { inboxCache = [:]; inboxAccount = account }
+            // List responses are previews. Read full changed threads without marking them read.
+            for index in snapshot.conversations.indices {
+                var preview = snapshot.conversations[index]
+                if let cached = inboxCache[preview.id], preview.lastMessageAt != nil,
+                   cached.lastMessageAt == preview.lastMessageAt,
+                   cached.messageCount == preview.messageCount {
+                    preview.contextCode = preview.contextCode ?? cached.contextCode
+                    preview.messages = cached.messages
+                    snapshot.conversations[index] = preview
+                } else if let full = await client.fetchConversation(preview.id) {
+                    preview.contextCode = preview.contextCode ?? full.contextCode
+                    preview.messages = full.messages
+                    snapshot.conversations[index] = preview
+                    inboxCache[preview.id] = full
+                } else {
+                    snapshot.warnings.append("Could not scan the full Inbox thread \(preview.id) for Zoom invitations.")
+                }
+            }
+            let currentCredentials = try connection.credentials()
+            guard currentCredentials.baseURL == credentials.baseURL,
+                  currentCredentials.token == credentials.token else {
+                phase = .idle
+                return
+            }
             try apply(snapshot, baseURL: credentials.baseURL)
+            await didSync?(snapshot)
             lastWarnings = snapshot.warnings
             let now = Date()
             lastSyncAt = now

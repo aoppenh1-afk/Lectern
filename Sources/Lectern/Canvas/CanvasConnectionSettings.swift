@@ -8,7 +8,8 @@ enum CanvasAutomaticSyncPolicy {
     // v3: Canvas Inbox threads sync into announcements + unread tracking.
     // v4: Inbox decoder fix (properties flags array, no scope param) — force
     // one refetch for stores synced with the broken v3 decoder.
-    static let dataVersion = 4
+    // v5: scan full inbox messages for Zoom invitations.
+    static let dataVersion = 5
 
     static func shouldSync(lastSyncAt: Date?,
                            lastSyncedDataVersion: Int = dataVersion,
