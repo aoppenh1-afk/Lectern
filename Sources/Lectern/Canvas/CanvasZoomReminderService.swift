@@ -198,9 +198,18 @@ final class CanvasZoomReminderService {
             self?.panel?.close()
         }
         panel?.close()
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 390, height: 300),
-                            styleMask: [.titled, .closable, .utilityWindow], backing: .buffered, defer: false)
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 460, height: 600),
+                            styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
         panel.title = "Lectern · Zoom"
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.standardWindowButton(.closeButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.isMovableByWindowBackground = true
         panel.isReleasedWhenClosed = false
         panel.level = .floating
         panel.hidesOnDeactivate = false
@@ -233,42 +242,202 @@ private struct CanvasZoomJoinView: View {
     @State private var source: CaptureSource = .systemAudio
     @State private var error: String?
 
+    @State private var starting = false
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(reminder.invitation.topic).font(.title2.bold())
-            Text("Host: \(reminder.invitation.host)").foregroundStyle(.secondary)
-            Text(reminder.startAt.formatted(date: .abbreviated, time: .shortened))
-            if reminder.startAt != reminder.invitation.startAt {
-                Text("Using the Canvas class schedule.").font(.caption)
-            }
-            if opened {
-                Text("Join in the Zoom app or your browser, then start recording when you’re ready.")
-                Picker("Record", selection: $source) {
-                    Text("Browser / system audio").tag(CaptureSource.systemAudio)
-                    Text("Zoom app only").tag(CaptureSource.zoomApp)
-                    Text("System audio + microphone").tag(CaptureSource.mixed)
+        VStack(spacing: 20) {
+            HStack(alignment: .top) {
+                Image(systemName: opened ? "waveform" : "video.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 60, height: 60)
+                    .background(
+                        LinearGradient(colors: opened
+                            ? [LecternTheme.accent, LecternTheme.accent.opacity(0.65)]
+                            : [Color(red: 0.36, green: 0.65, blue: 1), Color(red: 0.20, green: 0.38, blue: 0.96)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: 17))
+                    .overlay(RoundedRectangle(cornerRadius: 17).strokeBorder(.white.opacity(0.2)))
+                Spacer()
+                Button(action: close) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 30, height: 30)
+                        .background(LecternTheme.subtleFill, in: Circle())
                 }
-                Text(source.caption).font(.caption).foregroundStyle(.secondary)
-                if capture.phase.isLive { Text("Another recording is already in progress.") }
-                Button("Start Zoom recording when ready") {
-                    Task {
-                        await capture.start(in: course, source: source)
-                        if case .recording = capture.phase { close() }
-                        else { error = capture.errorMessage }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel("Dismiss Zoom reminder")
+            }
+
+            VStack(spacing: 12) {
+                if let course {
+                    Label(course.name, systemImage: "book")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(LecternTheme.accent)
+                        .lineLimit(2)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(LecternTheme.accent.opacity(0.12), in: Capsule())
+                        .overlay(Capsule().strokeBorder(LecternTheme.accent.opacity(0.22)))
+                }
+                Text(opened ? "Record Zoom Meeting?" : "Join Zoom Meeting?")
+                    .font(.system(size: 30, weight: .semibold, design: .serif))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(opened
+                     ? "Join in Zoom, then start recording when you're ready."
+                     : "Your Zoom session is about to start.")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .multilineTextAlignment(.center)
+
+            VStack(spacing: 16) {
+                detail("Host", icon: "person.2", value: reminder.invitation.host)
+                detail("Date", icon: "calendar", value: reminder.startAt.formatted(date: .abbreviated, time: .omitted))
+                detail("Time", icon: "clock", value: reminder.startAt.formatted(date: .omitted, time: .shortened))
+                detail("Meeting", icon: "video", value: reminder.invitation.topic)
+                if reminder.startAt != reminder.invitation.startAt {
+                    Text("Using the Canvas class schedule.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(LecternTheme.paper.opacity(0.18), in: RoundedRectangle(cornerRadius: 13))
+            .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(LecternTheme.hairline))
+
+            if opened {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("AUDIO SOURCE")
+                        .font(.system(size: 10, weight: .semibold)).tracking(1.2)
+                        .foregroundStyle(.secondary)
+                    Picker("Audio source", selection: $source) {
+                        Text("Browser / system audio").tag(CaptureSource.systemAudio)
+                        Text("Zoom app only").tag(CaptureSource.zoomApp)
+                        Text("System audio + microphone").tag(CaptureSource.mixed)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .disabled(starting)
+                    Text(source.caption).font(.caption).foregroundStyle(.secondary)
+                    if capture.phase.isLive {
+                        Text("Another recording is already in progress.")
+                            .font(.caption).foregroundStyle(LecternTheme.warningTint)
                     }
                 }
-                .disabled(capture.phase.isLive)
-            } else {
-                Text("Do you want to join this Zoom?")
-                Button("Join Zoom") {
-                    if NSWorkspace.shared.open(reminder.invitation.joinURL) { opened = true }
-                    else { error = "Could not open the Zoom link. Try again." }
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if let error { Text(error).foregroundStyle(.red).font(.caption) }
-            Button(opened ? "Dismiss" : "Not now", action: close)
+
+            if let error {
+                Label(error, systemImage: "exclamationmark.circle")
+                    .font(.caption).foregroundStyle(LecternTheme.recordTint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(spacing: 12) {
+                Button(action: primaryAction) {
+                    ZStack {
+                        Text(starting ? "Starting recording…" : opened ? "Start recording" : "Join Zoom")
+                        HStack {
+                            Spacer()
+                            if starting { ProgressView().controlSize(.small) }
+                            else { Image(systemName: opened ? "record.circle" : "arrow.right") }
+                        }
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .padding(.horizontal, 20)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(ZoomPromptButtonStyle(primary: true, dark: colorScheme == .dark))
+                .keyboardShortcut(.defaultAction)
+                .disabled(opened && (capture.phase.isLive || starting))
+
+                Button(action: close) {
+                    Text(opened ? "Dismiss" : "Not now")
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                }
+                .buttonStyle(ZoomPromptButtonStyle(primary: false, dark: colorScheme == .dark))
+            }
+
+            Rectangle().fill(LecternTheme.hairline).frame(height: 1)
+            Text(opened ? "Lectern will capture audio for your transcript." : "This will open Zoom in a new window.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
-        .padding(22)
-        .frame(width: 390, height: 480, alignment: .topLeading)
+        .padding(32)
+        .frame(width: 460)
+        .foregroundStyle(LecternTheme.ink)
+        .background {
+            RoundedRectangle(cornerRadius: 22)
+                .fill(LecternTheme.canvasCard)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(LinearGradient(colors: [.white.opacity(0.035), .clear],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                }
+                .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(LecternTheme.ink.opacity(0.18)))
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func detail(_ label: String, icon: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon).font(.system(size: 17)).frame(width: 20)
+                .foregroundStyle(.secondary)
+            Text(label).foregroundStyle(.secondary).frame(width: 70, alignment: .leading)
+            Text(value).frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: 13))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func primaryAction() {
+        error = nil
+        if opened {
+            guard !starting, !capture.phase.isLive else { return }
+            starting = true
+            Task {
+                await capture.start(in: course, source: source)
+                starting = false
+                if case .recording = capture.phase { close() }
+                else { error = capture.errorMessage }
+            }
+        } else if NSWorkspace.shared.open(reminder.invitation.joinURL) {
+            opened = true
+        } else {
+            error = "Could not open the Zoom link. Try again."
+        }
+    }
+}
+
+private struct ZoomPromptButtonStyle: ButtonStyle {
+    let primary: Bool
+    let dark: Bool
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(maxWidth: .infinity)
+            .foregroundStyle(primary ? Color.white : LecternTheme.ink)
+            .background {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(primary
+                          ? LecternTheme.accent.opacity(dark ? 0.58 : 1)
+                          : LecternTheme.subtleFill)
+                    .overlay(RoundedRectangle(cornerRadius: 10)
+                        .fill(.white.opacity(configuration.isPressed ? 0.03 : hovering ? 0.09 : 0)))
+                    .overlay(RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(primary ? LecternTheme.accent.opacity(0.3) : LecternTheme.hairline))
+            }
+            .opacity(isEnabled ? 1 : 0.45)
+            .onHover { hovering = $0 }
     }
 }
