@@ -177,17 +177,15 @@ enum LectureDocumentRenderer {
         ]
         if let background { attributes[.backgroundColor] = background }
         if underline { attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue }
-        // Consume the tested Hebrew boundary and bold ranges without changing
-        // the Google Docs converter or its requests.
-        // A disposable plain prefix prevents list-like inline content such as
-        // "1. example" from being interpreted as another structural list.
-        let plan = NotesMarkdownConverter.plan(markdown: "x " + text)
-        let rendered = literal ? text : prefix + String(plan.text.dropFirst(2)) + "\n"
+        // Inline parsing preserves the leading source label boundary without
+        // treating list-like explanation text as another structural list.
+        let plan = NotesMarkdownConverter.inlinePlan(text.trimmingCharacters(in: .newlines))
+        let rendered = literal ? text : prefix + plan.text + "\n"
         let paragraphText = NSMutableAttributedString(string: rendered, attributes: attributes)
         if !literal {
-            for bold in plan.boldRanges where bold.end > bold.start {
+            for bold in plan.bold where bold.end > bold.start {
                 paragraphText.addAttribute(.font, value: documentFont(size: font.pointSize, bold: true),
-                    range: NSRange(location: prefix.utf16.count + bold.start - 3, length: bold.end - bold.start))
+                    range: NSRange(location: prefix.utf16.count + bold.start, length: bold.end - bold.start))
             }
         }
         output.append(paragraphText)

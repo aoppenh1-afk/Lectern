@@ -177,8 +177,8 @@ struct NotesListScanner {
 }
 
 /// Rewrites model-generated notes into Lectern's canonical Markdown before
-/// validation, storage, and rendering. Canonicalizes list structure and daf
-/// amud-marker placement while preserving fenced blocks.
+/// validation, storage, and rendering. Canonicalizes list structure and
+/// legacy daf amud-marker placement while preserving fenced blocks.
 enum NotesMarkdownNormalizer {
     static func normalize(_ markdown: String) -> String {
         var text = markdown.replacingOccurrences(of: "\r\n", with: "\n")
@@ -247,11 +247,11 @@ enum NotesMarkdownNormalizer {
     }
 }
 
-/// The student's LTR citation convention puts the amud mark before "דף".
+/// Repair the old display workaround to normal logical citation order.
 /// Restrict repairs to explicit daf + canonical Hebrew numeral + dot/colon.
 enum NotesDafCitation {
     private static let citation = try! NSRegularExpression(
-        pattern: #"(?<![א-ת.:])דף[ \t]+([א-ת״׳"']{1,8})([.:])(?![.:])"#)
+        pattern: #"(?<![א-ת.:])([.:])דף[ \t]+([א-ת״׳"']{1,8})(?![א-ת״׳"'.:])"#)
     private static let numerals: Set<String> = Set((1...999).map { number in
         var remaining = number
         var result = ""
@@ -287,12 +287,12 @@ enum NotesDafCitation {
         let source = text as NSString
         var result = text
         for match in citation.matches(in: text, range: NSRange(location: 0, length: source.length)).reversed() {
-            let numeral = source.substring(with: match.range(at: 1))
+            let numeral = source.substring(with: match.range(at: 2))
                 .filter { ("א"..."ת").contains($0) }
             guard numerals.contains(numeral), let range = Range(match.range, in: result) else { continue }
-            let mark = source.substring(with: match.range(at: 2))
-            let reference = source.substring(with: NSRange(location: match.range.location, length: match.range.length - 1))
-            result.replaceSubrange(range, with: mark + reference)
+            let mark = source.substring(with: match.range(at: 1))
+            let reference = source.substring(with: NSRange(location: match.range.location + 1, length: match.range.length - 1))
+            result.replaceSubrange(range, with: reference + mark)
         }
         return result
     }

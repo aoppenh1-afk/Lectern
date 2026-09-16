@@ -1,6 +1,28 @@
 import AppKit
+import CoreText
 import Foundation
 import PDFKit
+
+// Check visual positions, not just stored Unicode order, for a source label
+// followed by a separate Hebrew explanation in the same LTR outline item.
+let mixedExample = "- **גמ׳ סנהדרין דף נח:-ס.** קודם מתן תורה, פרו ורבו applied to all mankind"
+let mixedPlan = NotesMarkdownConverter.plan(markdown: mixedExample)
+let native = NotesMarkdownConverter.directionalInline(String(mixedExample.dropFirst(2)))
+precondition(String(native.characters) == mixedPlan.text, "Native and exported notes must agree on direction")
+let mixedLine = CTLineCreateWithAttributedString(NSAttributedString(string: mixedPlan.text,
+    attributes: [.font: NSFont.systemFont(ofSize: 18)]))
+func x(_ word: String) -> CGFloat {
+    let range = (mixedPlan.text as NSString).range(of: word)
+    precondition(range.location != NSNotFound, "Missing word: \(word)")
+    return CTLineGetOffsetForStringIndex(mixedLine, range.location + 1, nil)
+}
+precondition(x("גמ׳") > x("סנהדרין") && x("סנהדרין") > x("דף")
+    && x("דף") > x("נח") && x("נח") > x("ס."), "Source must read RTL internally")
+precondition(x("קודם") > x("מתן") && x("מתן") > x("תורה")
+    && x("תורה") > x("פרו") && x("פרו") > x("ורבו"), "Hebrew explanation must read RTL across its comma")
+precondition(x("גמ׳") < x("ורבו") && x("קודם") < x("applied"),
+    "Source, Hebrew explanation, and English continuation must stay in LTR block order")
+print("PASS: mixed Hebrew source and explanation render RTL inside an LTR outline")
 
 let suppliedOutput = CommandLine.arguments.dropFirst().first.map {
     URL(fileURLWithPath: $0, isDirectory: true)
@@ -41,6 +63,9 @@ let pdfURL = output.appendingPathComponent("lecture.pdf")
 let docxURL = output.appendingPathComponent("lecture.docx")
 
 try await MainActor.run {
+    let mixedDocument = LectureDocumentRenderer.attributedDocument(from: mixedExample)
+    precondition(mixedDocument.string.contains(mixedPlan.text),
+        "Document renderer must retain the same source/explanation boundaries as Docs and native notes")
     let document = LectureDocumentRenderer.attributedDocument(from: markdown)
     let full = NSRange(location: 0, length: document.length)
     var failures: [String] = []
@@ -51,7 +76,7 @@ try await MainActor.run {
             failures.append("Export text must be fixed black")
         }
     }
-    precondition(document.string.contains("(:\u{200E}דף ל״ו\u{200E})"), "Daf amud mark must precede the reference")
+    precondition(document.string.contains("(\u{200E}דף ל״ו:\u{200E})"), "Daf amud mark must follow its numeral")
     let label = (document.string as NSString).range(of: "חנניה")
     let font = document.attribute(.font, at: label.location, effectiveRange: nil) as! NSFont
     if !NSFontManager.shared.traits(of: font).contains(.boldFontMask) { failures.append("Inline Hebrew bold was lost") }

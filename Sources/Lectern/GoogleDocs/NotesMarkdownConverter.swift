@@ -177,6 +177,39 @@ enum NotesMarkdownConverter {
         )
     }
 
+    /// Format inline content without interpreting a leading number as a list.
+    static func inlinePlan(_ markdown: String) -> (text: String, bold: [(start: Int, end: Int)]) {
+        let inline = flattenInline(NotesDafCitation.normalize(removingDirectionControls(markdown)))
+        let anchored = anchorHebrewRuns(in: inline.text, boldRanges: inline.bold)
+        return (anchored.text, anchored.bold)
+    }
+
+    /// Apply the export boundary rules to native notes without losing inline styles.
+    static func directionalInline(_ markdown: String) -> AttributedString {
+        let clean = NotesDafCitation.normalize(removingDirectionControls(markdown))
+        let original = (try? AttributedString(markdown: clean, options:
+            AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+            ?? AttributedString(clean)
+        let text = String(original.characters)
+        let bold = original.runs.compactMap { run -> (start: Int, end: Int)? in
+            guard run.inlinePresentationIntent?.contains(.stronglyEmphasized) == true else { return nil }
+            return (String(original.characters[..<run.range.lowerBound]).utf16.count,
+                    String(original.characters[..<run.range.upperBound]).utf16.count)
+        }
+        let anchored = anchorHebrewRuns(in: text, boldRanges: bold)
+        var result = AttributedString()
+        var previous = original.startIndex
+        for offset in anchored.insertions {
+            let stringIndex = String.Index(utf16Offset: offset, in: text)
+            guard let index = AttributedString.Index(stringIndex, within: original) else { continue }
+            result.append(original[previous..<index])
+            result.append(AttributedString("\u{200E}"))
+            previous = index
+        }
+        result.append(original[previous...])
+        return result
+    }
+
     // MARK: - Parse
 
     private enum Kind {
@@ -334,17 +367,24 @@ enum NotesMarkdownConverter {
     private static func anchorHebrewRuns(
         in text: String,
         boldRanges: [(start: Int, end: Int)]
-    ) -> (text: String, bold: [(start: Int, end: Int)]) {
+    ) -> (text: String, bold: [(start: Int, end: Int)], insertions: [Int]) {
         let textLength = text.utf16.count
-        // Bold changes presentation, not Hebrew word order. Splitting a phrase
-        // at a bold boundary would reorder its parts within the LTR paragraph.
-        let segments = hebrewSegments(in: text, from: 0, to: textLength)
+        // A leading bold organizing label is a separate LTR block from its
+        // explanation. Emphasis within the explanation keeps its phrase intact.
+        let labelEnd = boldRanges.first.flatMap { bold -> Int? in
+            let prefix = utf16Substring(text, from: 0, to: bold.start)
+            return prefix.trimmingCharacters(in: .whitespaces).isEmpty ? bold.end : nil
+        }
+        let boundaries = [0] + (labelEnd.map { [$0] } ?? []) + [textLength]
+        let segments = zip(boundaries, boundaries.dropFirst()).flatMap {
+            hebrewSegments(in: text, from: $0.0, to: $0.1)
+        }
 
         // Google Docs does not reliably honor RLI/PDI isolates: adjacent Hebrew
         // labels reorder and brackets mirror despite an LTR paragraph. U+200E
         // has the direction of an English letter but no visible glyph or width.
-        // Mark both edges so punctuation and numbers stay in the LTR context.
-        // Verified in Docs with "חנניה: נותנים" and "גירסא 1 (רש״י ורוב ראשונים)".
+        // Mark phrase edges to keep the surrounding blocks in LTR order.
+        // Hebrew-internal commas and citation punctuation stay within the run.
         var output = ""
         var previousEnd = 0
         for segment in segments {
@@ -362,7 +402,7 @@ enum NotesMarkdownConverter {
             let shiftedEnd = bold.end + insertionOffsets.count(where: { $0 < bold.end })
             return (shiftedStart, shiftedEnd)
         }
-        return (output, adjustedBold)
+        return (output, adjustedBold, insertionOffsets)
     }
 
     private static func hebrewSegments(
@@ -384,6 +424,13 @@ enum NotesMarkdownConverter {
             segmentStart = nil
         }
 
+        // Citation punctuation stays with the Hebrew citation, including both
+        // endpoints of a range. Ordinary sentence colons still separate labels.
+        let citation = try! NSRegularExpression(
+            pattern: #"דף[ \t]+[א-ת״׳]+[.:]?(?:[-–][א-ת״׳]+[.:]?)?"#)
+        let citationRanges = citation.matches(in: text,
+            range: NSRange(location: lowerBound, length: upperBound - lowerBound)).map(\.range)
+
         let scalars = Array(text[lowerIndex..<upperIndex].unicodeScalars)
         for (index, scalar) in scalars.enumerated() {
             let scalarEnd = offset + scalar.utf16.count
@@ -395,10 +442,15 @@ enum NotesMarkdownConverter {
                 && isHebrew(scalars[index - 1]) && isHebrew(scalars[index + 1]) {
                 // Legacy ASCII abbreviation quotes belong inside the word.
                 lastHebrewEnd = scalarEnd
+            } else if citationRanges.contains(where: { NSLocationInRange(offset, $0) }) {
+                lastHebrewEnd = scalarEnd
+            } else if scalar == ",", segmentStart != nil,
+                      scalars.dropFirst(index + 1).first(where: { !CharacterSet.whitespaces.contains($0) }).map(isHebrew) == true {
+                // A comma between Hebrew clauses belongs to the RTL passage.
+                lastHebrewEnd = scalarEnd
             } else if !CharacterSet.whitespaces.contains(scalar) {
-                // Sentence punctuation, paired brackets, and numbers belong to
-                // the LTR sentence. Never swallow one side of a bracket pair,
-                // or join comma/semicolon-separated Hebrew phrases into one run.
+                // Other sentence punctuation, paired brackets, and numbers
+                // belong to the surrounding LTR sentence.
                 finishSegment()
             }
             offset = scalarEnd

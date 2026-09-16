@@ -386,10 +386,7 @@ struct NotesContentView: View {
     /// Inline markdown (bold, italic, code) without block-level interpretation,
     /// since blocks were already split by the parser.
     private func inlineMarkdown(_ content: String) -> Text {
-        var attributed = (try? AttributedString(
-            markdown: content,
-            options: AttributedString.MarkdownParsingOptions(
-                interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(content)
+        var attributed = NotesMarkdownConverter.directionalInline(content)
         // Shiur notes are English sentences that often open with a Hebrew
         // source name. Without a fixed base direction the whole line is laid
         // out right-to-left and the English words render in reverse order.

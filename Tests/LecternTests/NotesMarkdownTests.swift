@@ -1,22 +1,22 @@
 import XCTest
 
 final class NotesMarkdownTests: XCTestCase {
-    func testDafReferencesUseLeadingAmudMarks() {
-        let input = "- **גמ׳ דף לו:** on שבת (דף ל״ו.) and דף קיט:; רש״י: explanation"
-        let expected = "- **גמ׳ :דף לו** on שבת (.דף ל״ו) and :דף קיט; רש״י: explanation"
+    func testDafReferencesUseLogicalAmudMarks() {
+        let input = "- **גמ׳ :דף לו** on שבת (.דף ל״ו) and :דף קיט; רש״י: explanation"
+        let expected = "- **גמ׳ דף לו:** on שבת (דף ל״ו.) and דף קיט:; רש״י: explanation"
         XCTAssertEqual(NotesDafCitation.normalize(input), expected)
         XCTAssertEqual(NotesMarkdownNormalizer.normalize(input), expected)
         XCTAssertEqual(NotesDafCitation.normalize(expected), expected)
         let plan = NotesMarkdownConverter.plan(markdown: input)
-        XCTAssertEqual(Self.visible(plan.text), "גמ׳ :דף לו on שבת (.דף ל״ו) and :דף קיט; רש״י: explanation")
-        XCTAssertTrue(plan.text.contains(":\u{200E}דף לו\u{200E}"))
+        XCTAssertEqual(Self.visible(plan.text), "גמ׳ דף לו: on שבת (דף ל״ו.) and דף קיט:; רש״י: explanation")
+        XCTAssertTrue(plan.text.contains("דף לו:\u{200E}"))
         let bold = plan.boldRanges[0]
         XCTAssertEqual(Self.visible((plan.text as NSString).substring(with:
-            NSRange(location: bold.start - 1, length: bold.end - bold.start))), "גמ׳ :דף לו")
+            NSRange(location: bold.start - 1, length: bold.end - bold.start))), "גמ׳ דף לו:")
     }
 
     func testDafFormattingLeavesOtherPunctuationAndCodeAlone() {
-        let text = "דף הבא: explanation; דף לו; רש״י: 1/3; דף לו ע״ב; (:דף לו)\n`דף לו:`\n```\nדף לו.\n```"
+        let text = "דף הבא: explanation; דף לו; רש״י: 1/3; דף לו ע״ב; (דף לו:)\n`דף לו:`\n```\nדף לו.\n```"
         XCTAssertEqual(NotesDafCitation.normalize(text), text)
     }
 
@@ -211,7 +211,7 @@ final class NotesMarkdownTests: XCTestCase {
 
         XCTAssertEqual(
             lines[1],
-            "\u{200E}משנה\u{200E}: \u{200E}בפרק במה טומנין\u{200E} (:\u{200E}דף מז\u{200E}): Distinguishes between two classes."
+            "\u{200E}משנה\u{200E}: \u{200E}בפרק במה טומנין\u{200E} (\u{200E}דף מז:\u{200E}): Distinguishes between two classes."
         )
         XCTAssertEqual(lines[2], "\t\u{200E}גזירה שמא ירתיח\u{200E} (\u{200E}שבת\u{200E})")
         XCTAssertEqual(
@@ -260,7 +260,7 @@ final class NotesMarkdownTests: XCTestCase {
 
         XCTAssertEqual(
             plan.text,
-            "\u{200E}שיטת שאר ראשונים\u{200E} (\u{200E}תוס׳\u{200E}, \u{200E}ריטב״א\u{200E}): "
+            "\u{200E}שיטת שאר ראשונים\u{200E} (\u{200E}תוס׳, ריטב״א\u{200E}): "
                 + "\u{200E}שהייה\u{200E} and \u{200E}הטמנה\u{200E} "
                 + "are two entirely separate realms with distinct mechanisms"
         )
@@ -282,14 +282,14 @@ final class NotesMarkdownTests: XCTestCase {
         XCTAssertEqual(plan.text, "On \u{200E}שבת\u{200E} (\u{200E}שלא יוסיף הבל בשבת\u{200E})")
     }
 
-    func testGoogleDocsKeepsCommasSemicolonsAndFractionsInLTRContext() {
+    func testGoogleDocsKeepsHebrewCommasRTLAndEnglishPunctuationLTR() {
         let plan = NotesMarkdownConverter.plan(
             markdown: "- שבת (רש״י: 1/3 cooked; רמב״ם: 1/2 cooked), הטמנה, שהייה"
         )
         XCTAssertEqual(
             plan.text,
             "\u{200E}שבת\u{200E} (\u{200E}רש״י\u{200E}: 1/3 cooked; "
-                + "\u{200E}רמב״ם\u{200E}: 1/2 cooked), \u{200E}הטמנה\u{200E}, \u{200E}שהייה\u{200E}"
+                + "\u{200E}רמב״ם\u{200E}: 1/2 cooked), \u{200E}הטמנה, שהייה\u{200E}"
         )
     }
 
@@ -299,7 +299,7 @@ final class NotesMarkdownTests: XCTestCase {
             "רבא (מימרא 1): הטמנה on שבת itself",
             "Q: why did חז״ל say אין טומנין on ערב שבת?",
             "On שבת (\"ולא חיישינן אם מתבשל והולך בשבת\")",
-            "ברייתא (חנניה [:דף כ])",
+            "ברייתא (חנניה [דף כ])",
             "רש\"י, תוס' (ד\"ה במה): 1/3",
         ]
         for example in examples {
@@ -309,7 +309,7 @@ final class NotesMarkdownTests: XCTestCase {
             for scalar in plan.text.unicodeScalars {
                 if scalar.value == 0x200E {
                     inside.toggle()
-                } else if "()[]{}:,;?/0123456789".unicodeScalars.contains(scalar) {
+                } else if "()[]{}:;?/0123456789".unicodeScalars.contains(scalar) {
                     XCTAssertFalse(inside, "Punctuation or number inside Hebrew boundary marks: \(example)")
                 }
             }
@@ -361,13 +361,25 @@ final class NotesMarkdownTests: XCTestCase {
     }
 
     func testGoogleDocsBoldInsideHebrewDoesNotSplitThePhrase() {
-        let plan = NotesMarkdownConverter.plan(markdown: "- **אין** טומנין on שבת")
+        let plan = NotesMarkdownConverter.plan(markdown: "- אין **טומנין** on שבת")
         XCTAssertEqual(plan.text, "\u{200E}אין טומנין\u{200E} on \u{200E}שבת\u{200E}")
         let bold = plan.boldRanges[0]
         XCTAssertEqual(
             (plan.text as NSString).substring(with: NSRange(location: bold.start - 1, length: bold.end - bold.start)),
-            "אין"
+            "טומנין"
         )
+    }
+
+    func testNativeDirectionPreservesInlineStylesAndMatchesExport() {
+        let markdown = "**גמ׳ סנהדרין דף נח:-ס.** קודם מתן תורה, פרו ורבו applied to *all mankind*"
+        let native = NotesMarkdownConverter.directionalInline(markdown)
+        XCTAssertEqual(String(native.characters), NotesMarkdownConverter.plan(markdown: "- " + markdown).text)
+        let bold = native.runs.filter { $0.inlinePresentationIntent?.contains(.stronglyEmphasized) == true }
+            .map { String(native.characters[$0.range]) }.joined()
+        let italic = native.runs.filter { $0.inlinePresentationIntent?.contains(.emphasized) == true }
+            .map { String(native.characters[$0.range]) }.joined()
+        XCTAssertEqual(bold, "גמ׳ סנהדרין דף נח:-ס.")
+        XCTAssertEqual(italic, "all mankind")
     }
 
     func testBuiltAppContainsCompleteNotesSkillForBothLanguageBranches() throws {
@@ -449,7 +461,7 @@ final class NotesMarkdownTests: XCTestCase {
             ("**חנניה:** נותנים means חזרה", "\u{200E}חנניה\u{200E}: \u{200E}נותנים\u{200E} means \u{200E}חזרה\u{200E}"),
             ("חנניה; חכמים", "\u{200E}חנניה\u{200E}; \u{200E}חכמים\u{200E}"),
             ("**גירסא 1 (רש״י ורוב ראשונים)**", "\u{200E}גירסא\u{200E} 1 (\u{200E}רש״י ורוב ראשונים\u{200E})"),
-            ("**משנה (דף ל״ו:)**", "\u{200E}משנה\u{200E} (:\u{200E}דף ל״ו\u{200E})"),
+            ("**משנה (דף ל״ו:)**", "\u{200E}משנה\u{200E} (\u{200E}דף ל״ו:\u{200E})"),
             ("**רמב״ם (פירוש המשניות):** in the printed version", "\u{200E}רמב״ם\u{200E} (\u{200E}פירוש המשניות\u{200E}): in the printed version"),
         ]
         for (markdown, expected) in examples {
