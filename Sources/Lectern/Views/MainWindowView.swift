@@ -123,7 +123,7 @@ struct MainWindowView: View {
                 .foregroundStyle(LecternTheme.ink)
             }
             .buttonStyle(.plain)
-            .disabled(selectedLecture == nil || generation.activeJob != nil)
+            .disabled(selectedLecture == nil || selectedLecture.map { generation.job(for: $0.persistentModelID) != nil } == true)
             .opacity(selectedLecture == nil ? 0.45 : 1)
             .help("Generate cleaned transcript, notes, flashcards, quiz")
 
@@ -178,7 +178,7 @@ struct MainWindowView: View {
                 HStack(spacing: 6) {
                     ProgressView()
                         .controlSize(.mini)
-                    Text("Generating \(generation.activeJob?.remaining.first?.title.lowercased() ?? "") in the background…")
+                    Text("Generating study materials for \(generation.activeJobs.count) lecture(s)…")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -699,6 +699,8 @@ struct MainWindowView: View {
             Divider()
             Button("Delete Lecture", role: .destructive) {
                 if selectedLecture == lecture { selectedLecture = nil }
+                transcription.cancel(lectureID: lecture.persistentModelID)
+                generation.cancel(lectureID: lecture.persistentModelID)
                 capture.discardLectureRecording(lecture)
                 modelContext.delete(lecture)
                 try? modelContext.save()

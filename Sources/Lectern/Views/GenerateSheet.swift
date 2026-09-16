@@ -85,7 +85,7 @@ struct GenerateSheet: View {
         }
         .onChange(of: viewState) { old, new in
             guard old == .running, new != .running else { return }
-            if generation.lastError == nil {
+            if generation.errors[lecture.persistentModelID] == nil {
                 dismiss()
             } else {
                 finished = true
@@ -96,7 +96,7 @@ struct GenerateSheet: View {
     private enum ViewState { case selection, running, finished }
 
     private var viewState: ViewState {
-        if generation.activeJob != nil { return .running }
+        if generation.job(for: lecture.persistentModelID) != nil { return .running }
         return finished ? .finished : .selection
     }
 
@@ -809,7 +809,7 @@ struct GenerateSheet: View {
                     .strokeBorder(cardBorder, lineWidth: 1)
             )
 
-            if let error = generation.lastError {
+            if let error = generation.errors[lecture.persistentModelID] {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .font(.system(size: 12))
                     .foregroundStyle(LecternTheme.warningTint)
@@ -822,8 +822,8 @@ struct GenerateSheet: View {
 
             HStack(spacing: 10) {
                 Spacer()
-                Button("Cancel generation", role: .destructive) {
-                    generation.cancel()
+                CancelJobButton(isCancelling: generation.isCancelling(lecture.persistentModelID)) {
+                    generation.cancel(lectureID: lecture.persistentModelID)
                     dismiss()
                 }
                 Button("Close") { dismiss() }
@@ -835,7 +835,7 @@ struct GenerateSheet: View {
     private enum StageState { case queued, active, done }
 
     private func stageState(_ kind: GenerationJobKind) -> StageState {
-        guard let remaining = generation.activeJob?.remaining else { return .queued }
+        guard let remaining = generation.job(for: lecture.persistentModelID)?.remaining else { return .queued }
         if remaining.first == kind { return .active }
         if remaining.contains(kind) { return .queued }
         return .done
@@ -916,15 +916,15 @@ struct GenerateSheet: View {
     private var completionView: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                Image(systemName: generation.lastError == nil ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                Image(systemName: generation.errors[lecture.persistentModelID] == nil ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                     .font(.system(size: 22))
-                    .foregroundStyle(generation.lastError == nil ? LecternTheme.successTint : LecternTheme.warningTint)
+                    .foregroundStyle(generation.errors[lecture.persistentModelID] == nil ? LecternTheme.successTint : LecternTheme.warningTint)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(generation.lastError == nil ? "Materials ready" : "Finished with errors")
+                    Text(generation.errors[lecture.persistentModelID] == nil ? "Materials ready" : "Finished with errors")
                         .font(.system(size: 17, weight: .bold, design: .serif))
                         .foregroundStyle(LecternTheme.ink)
-                    if let error = generation.lastError {
+                    if let error = generation.errors[lecture.persistentModelID] {
                         Text(error)
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)

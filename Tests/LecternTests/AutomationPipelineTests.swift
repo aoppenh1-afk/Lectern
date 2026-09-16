@@ -212,12 +212,13 @@ struct AutomationPipelineTests {
         let service = GenerationService(modelContainer: container, completionNotifier: SilentNotifier())
         let profile = AgentProfile(id: "fixture", title: "Fixture", command: "/bin/sleep 2")
         let job = Task { try await service.generateDirectly(lecture: first, kinds: [.cleanedTranscript], profile: profile) }
-        for _ in 0..<100 where service.activeJob == nil {
+        for _ in 0..<100 where service.job(for: first.persistentModelID) == nil {
             try await Task.sleep(for: .milliseconds(1))
         }
-        #expect(service.activeJob?.lectureTitle == "Automatic")
+        #expect(service.job(for: first.persistentModelID)?.lectureTitle == "Automatic")
         service.generate(lecture: second, kinds: [.cleanedTranscript], profile: profile)
-        #expect(service.activeJob?.lectureTitle == "Automatic")
+        #expect(service.job(for: first.persistentModelID)?.lectureTitle == "Automatic")
+        #expect(service.job(for: second.persistentModelID)?.lectureTitle == "Manual")
         service.cancel()
         job.cancel()
         _ = await job.result

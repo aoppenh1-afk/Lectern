@@ -4,6 +4,8 @@ import SwiftUI
 struct TranscriptionSettingsPane: View {
     @Environment(TranscriptionPreferences.self) private var preferences
 
+    @AppStorage(AISessionPool.settingsKey) private var maximumSessions = AISessionPool.defaultLimit
+
     @State private var editingConnection: TranscriptionConnection?
     @State private var showingNewConnection = false
     @State private var testingID: UUID?
@@ -16,6 +18,15 @@ struct TranscriptionSettingsPane: View {
         @Bindable var preferences = preferences
 
         VStack(alignment: .leading, spacing: 16) {
+            SurfaceCard(padding: 16) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Concurrent AI sessions").font(.headline)
+                    Stepper("Maximum sessions: \(maximumSessions)", value: $maximumSessions, in: 1...20)
+                    Text("Shared by Gemini ACP transcription and study-material generation. Default: 5. Extra requests wait for a free session. Local models run one at a time. Lowering the limit lets running sessions finish.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             transcriptionSourceCard(preferences: preferences)
             localModelsCard
             connectionsCard

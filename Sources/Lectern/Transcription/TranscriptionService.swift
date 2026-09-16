@@ -7,36 +7,39 @@ import SwiftData
 @MainActor
 @Observable
 final class TranscriptionService {
-    private(set) var isRunning = false
-    private(set) var activeLectureTitle: String?
+    struct Progress {
+        var message: String?
+        var subtitle: String?
+    }
+    var isRunning: Bool { !activeTasks.isEmpty }
     private(set) var lastError: String?
-    /// Live hero state for the active lecture. Mirrors the persisted
-    /// `Lecture.statusMessage`/subtitle writes so the transcribing hero
-    /// repaints on every fallback hop instead of only after the job ends.
-    private(set) var activeID: PersistentIdentifier?
-    private(set) var activeStatusMessage: String?
-    private(set) var activeSubtitle: String?
+    private(set) var progressByLecture: [PersistentIdentifier: Progress] = [:]
 
     private let modelContainer: ModelContainer
     private let preferences: TranscriptionPreferences
     private let completionNotifier: any CompletionNotifying
-    private let engine = TranscriptionEngine()
+    private let engine: any LocalTranscribing
     private let whisperEngine = WhisperTranscriptionEngine()
     private let externalEngine: ExternalTranscriptionEngine
-    private let jobStore = TranscriptionJobStore()
-    private var pendingIDs: [PersistentIdentifier] = []
-    private var activeTask: Task<Void, Never>?
+    private let jobStore: TranscriptionJobStore
+    private var activeTasks: [PersistentIdentifier: Task<Void, Never>] = [:]
+    private let localPool = AISessionPool(limit: 1)
 
     init(
         modelContainer: ModelContainer,
         preferences: TranscriptionPreferences,
-        completionNotifier: any CompletionNotifying = SystemCompletionNotifier.shared
+        completionNotifier: any CompletionNotifying = SystemCompletionNotifier.shared,
+        engine: any LocalTranscribing = TranscriptionEngine(),
+        externalEngine: ExternalTranscriptionEngine? = nil,
+        jobStore: TranscriptionJobStore = TranscriptionJobStore()
     ) {
         self.modelContainer = modelContainer
         self.preferences = preferences
         self.completionNotifier = completionNotifier
+        self.engine = engine
+        self.jobStore = jobStore
         let antigravityProfile = AgentProfiles.profile(id: AgentProfiles.antigravityID)
-        self.externalEngine = ExternalTranscriptionEngine(
+        self.externalEngine = externalEngine ?? ExternalTranscriptionEngine(
             antigravity: antigravityProfile.map { AntigravityACPClient.configured(for: $0) } ?? AntigravityACPClient()
         )
     }
@@ -44,51 +47,65 @@ final class TranscriptionService {
     /// Enqueue a lecture after the user has requested transcription, or resume
     /// a transcription job that was already running when the app closed.
     func enqueue(lectureID: PersistentIdentifier) {
-        guard activeID != lectureID,
-              !pendingIDs.contains(lectureID) else {
-            return
-        }
+        guard activeTasks[lectureID] == nil else { return }
         completionNotifier.prepare(for: .transcription)
-        pendingIDs.append(lectureID)
-        drainQueue()
+        progressByLecture[lectureID] = Progress(message: "Waiting to transcribe…", subtitle: "Starts when a session is available.")
+        activeTasks[lectureID] = Task { await self.run(lectureID) }
     }
 
     func isQueuedOrRunning(lectureID: PersistentIdentifier) -> Bool {
-        activeID == lectureID || pendingIDs.contains(lectureID)
+        activeTasks[lectureID]?.isCancelled == false
+    }
+
+    func isCancelling(lectureID: PersistentIdentifier) -> Bool {
+        activeTasks[lectureID]?.isCancelled == true
+    }
+
+    /// Also used before deleting a lecture.
+    func cancel(lectureID: PersistentIdentifier) {
+        activeTasks[lectureID]?.cancel()
+    }
+
+    func cancelTranscription(for lecture: Lecture) {
+        cancel(lectureID: lecture.persistentModelID)
+        lecture.status = lecture.hasCompletedRawTranscript ? .ready : .recorded
+        lecture.statusMessage = "Transcription cancelled"
+        try? modelContainer.mainContext.save()
+    }
+
+    private func canUpdate(_ lecture: Lecture) -> Bool {
+        lecture.modelContext != nil && !lecture.isDeleted
+    }
+
+    private func checkJob(_ lecture: Lecture) throws {
+        try Task.checkCancellation()
+        guard canUpdate(lecture) else { throw CancellationError() }
     }
 
     /// Stops queued and active work. Active external commands receive task
     /// cancellation, which also tears down their complete process tree.
     func cancelAll() {
-        pendingIDs.removeAll()
-        activeTask?.cancel()
+        for task in activeTasks.values { task.cancel() }
     }
 
     /// Mirror a persisted status write into live `@Observable` state so the
     /// transcribing hero repaints immediately for the active lecture, even
     /// when SwiftData observation alone would only surface after the job.
     private func publishLiveStatus(message: String?, subtitle: String?, for lecture: Lecture) {
+        guard canUpdate(lecture) else { return }
         lecture.statusMessage = message
-        if activeID == lecture.persistentModelID {
-            activeStatusMessage = message
-            if let subtitle { activeSubtitle = subtitle }
-        }
+        let id = lecture.persistentModelID
+        progressByLecture[id] = Progress(message: message, subtitle: subtitle ?? progressByLecture[id]?.subtitle)
         try? modelContainer.mainContext.save()
     }
 
     /// Mirror a message-only update (e.g. progress percent) without touching
     /// the live subtitle, which already names the running model/connection.
     private func publishLiveMessage(_ message: String, for lecture: Lecture) {
+        guard canUpdate(lecture) else { return }
         lecture.statusMessage = message
-        if activeID == lecture.persistentModelID {
-            activeStatusMessage = message
-        }
+        progressByLecture[lecture.persistentModelID]?.message = message
         try? modelContainer.mainContext.save()
-    }
-
-    private func clearLiveStatus() {
-        activeStatusMessage = nil
-        activeSubtitle = nil
     }
 
     /// Scan the store for lectures that need transcription and enqueue them.
@@ -148,7 +165,8 @@ final class TranscriptionService {
         connectionID: UUID? = nil,
         builtInModelID: String? = nil
     ) {
-        guard lecture.recording != nil,
+        guard activeTasks[lecture.persistentModelID] == nil,
+              lecture.recording != nil,
               lecture.status == .recorded ||
               lecture.status == .ready ||
               lecture.status == .failed else {
@@ -168,33 +186,37 @@ final class TranscriptionService {
 
     // MARK: - Queue
 
-    private func drainQueue() {
-        guard !isRunning else { return }
-        guard let nextID = pendingIDs.first else { return }
-        pendingIDs.removeFirst()
-        isRunning = true
-        activeID = nextID
-        activeTask = Task { await self.run(nextID) }
-    }
-
     private func run(_ id: PersistentIdentifier) async {
         await performJob(id)
-
-        if pendingIDs.isEmpty {
-            await engine.unload()
+        activeTasks[id] = nil
+        progressByLecture[id] = nil
+        if activeTasks.isEmpty {
+            // Use a fresh task because cancellation must not skip model cleanup.
+            let pool = localPool
+            let engine = engine
+            await Task {
+                try? await pool.withPermit { await engine.unload() }
+            }.value
         }
-        isRunning = false
-        activeID = nil
-        activeLectureTitle = nil
-        clearLiveStatus()
-        activeTask = nil
-        drainQueue()
     }
 
     private func performJob(_ id: PersistentIdentifier) async {
+        guard !Task.isCancelled else { return }
         let context = modelContainer.mainContext
-        guard let lecture = context.model(for: id) as? Lecture,
-              let recordingPath = lecture.recording?.filePath else {
+        // A queued lecture may have been deleted before this task starts.
+        // model(for:) can return a fault for a missing row; reading its recording
+        // then traps inside SwiftData instead of returning nil.
+        var descriptor = FetchDescriptor<Lecture>(predicate: #Predicate { $0.persistentModelID == id })
+        descriptor.fetchLimit = 1
+        let lecture: Lecture
+        do {
+            guard let existing = try context.fetch(descriptor).first, !existing.isDeleted else { return }
+            lecture = existing
+        } catch {
+            lastError = "Could not load queued lecture: \(error.localizedDescription)"
+            return
+        }
+        guard let recordingPath = lecture.recording?.filePath else {
             return
         }
         let existingArtifact = lecture.artifact(of: .rawTranscript)
@@ -202,9 +224,7 @@ final class TranscriptionService {
             return
         }
 
-        activeLectureTitle = lecture.title
         lastError = nil
-        clearLiveStatus()
 
         let language = lecture.language
         let plan = TranscriptionJobPlan.resolve(
@@ -281,7 +301,8 @@ final class TranscriptionService {
 
         let checkpoint = TranscriptionCheckpointState()
         let persistProgress: @MainActor @Sendable ([TranscriptSegment], Double) -> Void = { partialSegments, fraction in
-            guard lecture.status == .transcribing,
+            guard self.canUpdate(lecture), self.activeTasks[lecture.persistentModelID]?.isCancelled == false,
+                  lecture.status == .transcribing,
                   checkpoint.shouldPersist(fraction) else {
                 return
             }
@@ -298,6 +319,7 @@ final class TranscriptionService {
         }
 
         do {
+            try checkJob(lecture)
             switch plan {
             case .askEachTime:
                 break
@@ -316,6 +338,7 @@ final class TranscriptionService {
                         selectedConnection: connection,
                         recoverCompletedResult: artifact.content.isEmpty
                     )
+                    try checkJob(lecture)
                     apply(result, to: artifact, lecture: lecture, selectedConnection: connection)
                 } catch {
                     try Task.checkCancellation()
@@ -331,6 +354,7 @@ final class TranscriptionService {
                           ) else {
                         throw error
                     }
+                    try checkJob(lecture)
                     applyLocalFallback(
                         fallback,
                         to: artifact,
@@ -347,6 +371,7 @@ final class TranscriptionService {
                         model: model,
                         progress: persistProgress
                     )
+                    try checkJob(lecture)
                     artifact.content = Self.markdown(from: segments)
                     artifact.modelInfo = modelInfo
                     lecture.transcriptProviderRaw = TranscriptionProviderID.local.rawValue
@@ -365,6 +390,7 @@ final class TranscriptionService {
                         excluding: model,
                         progress: persistProgress
                     ) {
+                        try checkJob(lecture)
                         applyLocalFallback(
                             fallback,
                             to: artifact,
@@ -373,6 +399,7 @@ final class TranscriptionService {
                             primaryError: error.localizedDescription
                         )
                     } else {
+                        try checkJob(lecture)
                         guard preferences.allowFallbackProviders,
                               preferences.allowCloudFallbackAfterLocalFailure,
                               let connection = preferences.defaultConnection else {
@@ -385,6 +412,7 @@ final class TranscriptionService {
                             initialFailure: error.localizedDescription,
                             recoverCompletedResult: artifact.content.isEmpty
                         )
+                        try checkJob(lecture)
                         apply(result, to: artifact, lecture: lecture, selectedConnection: connection)
                     }
                 }
@@ -405,6 +433,7 @@ final class TranscriptionService {
                         selectedConnection: connection,
                         recoverCompletedResult: artifact.content.isEmpty
                     )
+                    try checkJob(lecture)
                     apply(result, to: artifact, lecture: lecture, selectedConnection: connection)
                 } catch {
                     try Task.checkCancellation()
@@ -420,6 +449,7 @@ final class TranscriptionService {
                           ) else {
                         throw error
                     }
+                    try checkJob(lecture)
                     applyLocalFallback(
                         fallback,
                         to: artifact,
@@ -430,17 +460,24 @@ final class TranscriptionService {
                 }
             }
 
+            try checkJob(lecture)
             artifact.generatedAt = Date()
             lecture.status = .ready
             lecture.statusMessage = nil
-            clearLiveStatus()
             try? context.save()
             completionNotifier.deliver(.transcriptionFinished(lectureTitle: lecture.title))
         } catch is CancellationError {
-            publishLiveMessage("Transcription paused", for: lecture)
+            if canUpdate(lecture), lecture.status == .transcribing {
+                lecture.status = .recorded
+                publishLiveMessage("Transcription cancelled", for: lecture)
+            }
         } catch let error as ExternalTranscriptionError where error.code == .cancelled {
-            publishLiveMessage("Transcription paused", for: lecture)
+            if canUpdate(lecture), lecture.status == .transcribing {
+                lecture.status = .recorded
+                publishLiveMessage("Transcription cancelled", for: lecture)
+            }
         } catch {
+            guard !Task.isCancelled, canUpdate(lecture) else { return }
             lecture.status = .failed
             lecture.statusMessage = error.localizedDescription
             lastError = "Transcription failed: \(error.localizedDescription)"
@@ -459,6 +496,7 @@ final class TranscriptionService {
         excluding failed: BuiltInTranscriptionModel?,
         progress: @escaping @MainActor @Sendable ([TranscriptSegment], Double) -> Void
     ) async throws -> (model: BuiltInTranscriptionModel, segments: [TranscriptSegment], failures: [String])? {
+        try checkJob(lecture)
         guard preferences.allowFallbackProviders else { return nil }
         let candidates = preferences.localFallbackModels(excluding: failed).filter(isLocalModelReady)
         guard !candidates.isEmpty else { return nil }
@@ -470,6 +508,7 @@ final class TranscriptionService {
                 for: lecture
             )
             await Task.yield()
+            try checkJob(lecture)
             do {
                 let segments = try await transcribeLocally(
                     recordingPath: recordingPath,
@@ -477,6 +516,7 @@ final class TranscriptionService {
                     model: model,
                     progress: progress
                 )
+                try checkJob(lecture)
                 return (model, segments, failures)
             } catch {
                 try Task.checkCancellation()
@@ -521,11 +561,25 @@ final class TranscriptionService {
         model: BuiltInTranscriptionModel,
         progress: @escaping @MainActor @Sendable ([TranscriptSegment], Double) -> Void
     ) async throws -> [TranscriptSegment] {
+        try await localPool.withPermit { @MainActor in
+            try await self.transcribeLocalSession(recordingPath: recordingPath, lecture: lecture,
+                                                  model: model, progress: progress)
+        }
+    }
+
+    private func transcribeLocalSession(
+        recordingPath: String,
+        lecture: Lecture,
+        model: BuiltInTranscriptionModel,
+        progress: @escaping @MainActor @Sendable ([TranscriptSegment], Double) -> Void
+    ) async throws -> [TranscriptSegment] {
+        try checkJob(lecture)
         switch model {
         case .parakeet:
             if !engine.isModelCached {
                 _ = try await ModelDownloader().download(repoId: TranscriptionEngine.repoId)
             }
+            try checkJob(lecture)
             return try await engine.transcribe(
                 fileURL: URL(fileURLWithPath: recordingPath),
                 progress: progress
@@ -541,11 +595,13 @@ final class TranscriptionService {
                     for: lecture
                 )
                 try await whisperEngine.downloadModel { fraction in
-                    guard lecture.status == .transcribing else { return }
+                    guard self.canUpdate(lecture), self.activeTasks[lecture.persistentModelID]?.isCancelled == false,
+                          lecture.status == .transcribing else { return }
                     let percent = Int((fraction * 100).rounded())
                     self.publishLiveMessage("Downloading Whisper model: \(percent)%", for: lecture)
                 }
             }
+            try checkJob(lecture)
             return try await whisperEngine.transcribe(
                 fileURL: URL(fileURLWithPath: recordingPath),
                 durationSeconds: lecture.duration,
@@ -563,12 +619,14 @@ final class TranscriptionService {
         initialFailure: String? = nil,
         recoverCompletedResult: Bool
     ) async throws -> TranscriptionResult {
+        try checkJob(lecture)
         let audioIdentity = Self.audioIdentity(path: recordingPath)
         let recoveredJob = await jobStore.recoverableJob(
             recordingPath: recordingPath,
             sourceAudioHash: audioIdentity,
             includeCompleted: recoverCompletedResult
         )
+        try checkJob(lecture)
         var job = recoveredJob ?? PersistentTranscriptionJob(
             recordingPath: recordingPath,
             sourceAudioHash: audioIdentity,
@@ -614,6 +672,7 @@ final class TranscriptionService {
         let startIndex = min(job.currentAttemptIndex, max(0, plan.count - 1))
 
         for index in startIndex..<plan.count {
+            try checkJob(lecture)
             let connection = plan[index]
             if index > 0, connection.costTier.isPaid, preferences.askBeforePaidFallback {
                 throw ExternalTranscriptionError(
@@ -632,6 +691,7 @@ final class TranscriptionService {
                 ))
             }
             await jobStore.upsert(job)
+            try checkJob(lecture)
             lecture.transcriptProviderRaw = connection.provider.rawValue
             lecture.transcriptConnectionName = connection.runningDisplayName
             lecture.transcriptModelID = connection.modelID
@@ -649,6 +709,7 @@ final class TranscriptionService {
                 for: lecture
             )
             await Task.yield()
+            try checkJob(lecture)
 
             let resumeID = job.attempts[index].providerJobID
             let request = ExternalTranscriptionRequest(
@@ -666,6 +727,7 @@ final class TranscriptionService {
                     await store.update(id: jobID, state: update.state, providerJobID: update.providerJobID)
                 }
                 if let persisted = await jobStore.job(id: jobID) { job = persisted }
+                try checkJob(lecture)
                 job.state = .completed
                 job.completedAt = Date()
                 job.completedResult = result
@@ -673,6 +735,7 @@ final class TranscriptionService {
                 job.attempts[index].providerJobID = result.providerInfo.providerJobID
                 await jobStore.upsert(job)
 
+                try checkJob(lecture)
                 let failedNames = job.attempts.prefix(index).map { attempt in
                     TranscriptionProviderCatalog.provider(attempt.provider)?.name ?? attempt.provider.rawValue
                 }

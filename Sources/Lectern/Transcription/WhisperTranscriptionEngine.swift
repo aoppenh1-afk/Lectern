@@ -88,6 +88,7 @@ final class WhisperTranscriptionEngine: @unchecked Sendable {
     func downloadModel(
         progress: (@MainActor @Sendable (Double) -> Void)? = nil
     ) async throws {
+        try Task.checkCancellation()
         guard !isModelCached else { return }
         let destination = Self.modelURL
         try FileManager.default.createDirectory(
@@ -97,38 +98,47 @@ final class WhisperTranscriptionEngine: @unchecked Sendable {
 
         var observation: NSKeyValueObservation?
         defer { observation?.invalidate() }
-        let temporary: URL = try await withCheckedThrowingContinuation { continuation in
-            let task = URLSession.shared.downloadTask(with: Self.modelDownloadURL) { url, response, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
+        let cancellation = TranscriptionCancellation()
+        defer { cancellation.onCancel(nil) }
+        let temporary: URL = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let task = URLSession.shared.downloadTask(with: Self.modelDownloadURL) { url, response, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+                    guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                          let url else {
+                        let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                        continuation.resume(throwing: Self.error("Model download failed (HTTP \(code))."))
+                        return
+                    }
+                    // The completion handler deletes the file when it returns, so
+                    // claim it before resuming.
+                    let holding = url.deletingLastPathComponent()
+                        .appendingPathComponent(UUID().uuidString + ".bin")
+                    do {
+                        try FileManager.default.moveItem(at: url, to: holding)
+                        continuation.resume(returning: holding)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
                 }
-                guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-                      let url else {
-                    let code = (response as? HTTPURLResponse)?.statusCode ?? -1
-                    continuation.resume(throwing: Self.error("Model download failed (HTTP \(code))."))
-                    return
+                observation = task.progress.observe(\.fractionCompleted) { taskProgress, _ in
+                    guard let progress else { return }
+                    let fraction = taskProgress.fractionCompleted
+                    Task { @MainActor in
+                        progress(fraction)
+                    }
                 }
-                // The completion handler deletes the file when it returns, so
-                // claim it before resuming.
-                let holding = url.deletingLastPathComponent()
-                    .appendingPathComponent(UUID().uuidString + ".bin")
-                do {
-                    try FileManager.default.moveItem(at: url, to: holding)
-                    continuation.resume(returning: holding)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
+                cancellation.onCancel { task.cancel() }
+                task.resume()
             }
-            observation = task.progress.observe(\.fractionCompleted) { taskProgress, _ in
-                guard let progress else { return }
-                let fraction = taskProgress.fractionCompleted
-                Task { @MainActor in
-                    progress(fraction)
-                }
-            }
-            task.resume()
+        } onCancel: {
+            cancellation.cancel()
         }
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        try Task.checkCancellation()
 
         try? FileManager.default.removeItem(at: destination)
         do {
@@ -149,38 +159,47 @@ final class WhisperTranscriptionEngine: @unchecked Sendable {
         durationSeconds: Double,
         progress: (@MainActor @Sendable ([TranscriptSegment], Double) -> Void)? = nil
     ) async throws -> [TranscriptSegment] {
+        try Task.checkCancellation()
         guard let cli = Self.locateCLI() else { throw Self.cliMissing }
         guard isModelCached else {
             throw Self.error("The Whisper model has not been downloaded yet.")
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
-            queue.async { [self] in
-                do {
-                    let audio = try preparedAudio(from: fileURL)
-                    defer {
-                        if audio.isTemporary {
-                            try? FileManager.default.removeItem(at: audio.url)
+        let cancellation = TranscriptionCancellation()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                queue.async { [self] in
+                    do {
+                        try cancellation.check()
+                        let audio = try preparedAudio(from: fileURL, cancellation: cancellation)
+                        defer {
+                            if audio.isTemporary {
+                                try? FileManager.default.removeItem(at: audio.url)
+                            }
                         }
+                        let segments = try run(
+                            cli: cli,
+                            audioURL: audio.url,
+                            durationSeconds: durationSeconds,
+                            cancellation: cancellation,
+                            progress: progress
+                        )
+                        continuation.resume(returning: segments)
+                    } catch {
+                        continuation.resume(throwing: error)
                     }
-                    let segments = try run(
-                        cli: cli,
-                        audioURL: audio.url,
-                        durationSeconds: durationSeconds,
-                        progress: progress
-                    )
-                    continuation.resume(returning: segments)
-                } catch {
-                    continuation.resume(throwing: error)
                 }
             }
+        } onCancel: {
+            cancellation.cancel()
         }
     }
 
-    private func run(
+    func run(
         cli: URL,
         audioURL: URL,
         durationSeconds: Double,
+        cancellation: TranscriptionCancellation,
         progress: (@MainActor @Sendable ([TranscriptSegment], Double) -> Void)?
     ) throws -> [TranscriptSegment] {
         let signpostID = OSSignpostID(log: Self.signpostLog)
@@ -211,14 +230,21 @@ final class WhisperTranscriptionEngine: @unchecked Sendable {
         stdout.fileHandleForReading.readabilityHandler = { handle in
             collector.ingest(handle.availableData)
         }
+        defer { stdout.fileHandleForReading.readabilityHandler = nil }
 
+        try cancellation.check()
         try process.run()
+        cancellation.onCancel {
+            if process.isRunning { process.terminate() }
+        }
+        defer { cancellation.onCancel(nil) }
         let stderrData = stderr.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         stdout.fileHandleForReading.readabilityHandler = nil
         collector.ingest(stdout.fileHandleForReading.readDataToEndOfFile())
         collector.finishLine()
 
+        try cancellation.check()
         guard process.terminationStatus == 0 else {
             let log = String(decoding: stderrData, as: UTF8.self)
             let tail = log.split(separator: "\n").suffix(4).joined(separator: " ")
@@ -318,7 +344,8 @@ final class WhisperTranscriptionEngine: @unchecked Sendable {
 
     /// whisper-cli reads wav/mp3/flac/ogg. Anything else (m4a imports) is
     /// converted to 16 kHz mono WAV with the system's afconvert.
-    private func preparedAudio(from source: URL) throws -> (url: URL, isTemporary: Bool) {
+    private func preparedAudio(from source: URL, cancellation: TranscriptionCancellation) throws -> (url: URL, isTemporary: Bool) {
+        try cancellation.check()
         let supported: Set<String> = ["wav", "mp3", "flac", "ogg"]
         if supported.contains(source.pathExtension.lowercased()) {
             return (source, false)
@@ -332,11 +359,22 @@ final class WhisperTranscriptionEngine: @unchecked Sendable {
             "-f", "WAVE", "-d", "LEI16@16000", "-c", "1",
             source.path, converted.path,
         ]
+        var succeeded = false
+        defer {
+            cancellation.onCancel(nil)
+            if !succeeded { try? FileManager.default.removeItem(at: converted) }
+        }
+        try cancellation.check()
         try process.run()
+        cancellation.onCancel {
+            if process.isRunning { process.terminate() }
+        }
         process.waitUntilExit()
+        try cancellation.check()
         guard process.terminationStatus == 0 else {
             throw Self.error("Couldn't convert the audio for Whisper (afconvert status \(process.terminationStatus)).")
         }
+        succeeded = true
         return (converted, true)
     }
 

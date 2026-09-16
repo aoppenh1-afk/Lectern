@@ -30,6 +30,7 @@ struct LectureDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 hero
                 statusArea
+                generationStatusArea
                 transcriptProvenance
                 tabBar
                 artifactContent
@@ -148,7 +149,7 @@ struct LectureDetailView: View {
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(LecternTheme.accent)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Recording saved")
+                        Text(lecture.statusMessage ?? "Recording saved")
                             .font(.system(size: 13, weight: .medium))
                         Text("Transcription will start only when you choose it.")
                             .font(.system(size: 11))
@@ -161,6 +162,8 @@ struct LectureDetailView: View {
                     }
                     .prominentAction()
                     .tint(LecternTheme.accent)
+                    .disabled(transcription.isQueuedOrRunning(lectureID: lecture.persistentModelID)
+                              || transcription.isCancelling(lectureID: lecture.persistentModelID))
                     transcriptionChoiceMenu(label: "Choose transcriber")
                 }
             }
@@ -178,6 +181,9 @@ struct LectureDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
+                    CancelJobButton(isCancelling: transcription.isCancelling(lectureID: lecture.persistentModelID)) {
+                        transcription.cancelTranscription(for: lecture)
+                    }
                 }
             }
         case .failed:
@@ -200,11 +206,32 @@ struct LectureDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private var generationStatusArea: some View {
+        if let job = generation.job(for: lecture.persistentModelID) {
+            SurfaceCard(padding: 14) {
+                HStack(spacing: 12) {
+                    ProgressView().controlSize(.small)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Generating study materials")
+                            .font(.system(size: 13, weight: .medium))
+                        Text(job.remaining.map(\.title).joined(separator: ", "))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    CancelJobButton(isCancelling: generation.isCancelling(lecture.persistentModelID)) {
+                        generation.cancel(lectureID: lecture.persistentModelID)
+                    }
+                }
+            }
+        }
+    }
+
     /// Title for the transcribing hero. Prefers the service's live state so a
     /// fallback hop repaints immediately; falls back to the persisted message.
     private var liveStatusMessage: String {
-        if transcription.activeID == lecture.persistentModelID,
-           let live = transcription.activeStatusMessage, !live.isEmpty {
+        if let live = transcription.progressByLecture[lecture.persistentModelID]?.message, !live.isEmpty {
             return live
         }
         return lecture.statusMessage ?? "Transcribing on-device"
@@ -214,8 +241,7 @@ struct LectureDetailView: View {
     /// for local plans, so prefer the service's live subtitle which tracks the
     /// actual running attempt (e.g. Antigravity vs on-device fallback).
     private var liveTranscribingSubtitle: String {
-        if transcription.activeID == lecture.persistentModelID,
-           let live = transcription.activeSubtitle, !live.isEmpty {
+        if let live = transcription.progressByLecture[lecture.persistentModelID]?.subtitle, !live.isEmpty {
             return live
         }
         return transcribingSubtitle

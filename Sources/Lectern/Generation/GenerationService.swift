@@ -13,9 +13,13 @@ final class GenerationService {
         var remaining: [GenerationJobKind]
     }
 
-    private(set) var activeJob: ActiveJob?
+    private(set) var activeJobs: [PersistentIdentifier: ActiveJob] = [:]
+    private(set) var errors: [PersistentIdentifier: String] = [:]
+    var activeJob: ActiveJob? { activeJobs.values.first }
+    func job(for id: PersistentIdentifier) -> ActiveJob? { activeJobs[id] }
+    func isCancelling(_ id: PersistentIdentifier) -> Bool { generationTasks[id]?.isCancelled == true }
     private(set) var lastError: String?
-    private var generationTask: Task<Void, Never>?
+    private var generationTasks: [PersistentIdentifier: Task<Void, Error>] = [:]
 
     private let modelContainer: ModelContainer
     private let completionNotifier: any CompletionNotifying
@@ -56,33 +60,18 @@ final class GenerationService {
                   thinkingLevel: ThinkingLevel = .medium,
                   modelOverride: String? = nil,
                   quizFocus: String? = nil) {
-        guard activeJob == nil else { return }
-        let ordered = GenerationJobKind.ordered.filter { kinds.contains($0) }
-        guard !ordered.isEmpty else { return }
+        _ = start(lecture: lecture, kinds: kinds, profile: profile, quizOptions: quizOptions,
+                  thinkingLevel: thinkingLevel, modelOverride: modelOverride, quizFocus: quizFocus)
+    }
 
-        activeJob = ActiveJob(lectureTitle: lecture.title, remaining: ordered)
-        lastError = nil
-        completionNotifier.prepare(for: .generation)
-
-        generationTask = Task {
-            await run(lectureID: lecture.persistentModelID,
-                      lectureTitle: lecture.title,
-                      kinds: ordered,
-                      profile: profile,
-                      quizOptions: quizOptions,
-                      thinkingLevel: thinkingLevel,
-                      modelOverride: modelOverride,
-                      quizFocus: quizFocus)
-        }
+    func cancel(lectureID: PersistentIdentifier) {
+        generationTasks[lectureID]?.cancel()
     }
 
     func cancel() {
-        guard generationTask != nil else { return }
-        lastError = nil
-        generationTask?.cancel()
+        for task in generationTasks.values { task.cancel() }
     }
 
-    /// Runs generation synchronously within an async context, serialized with other generation jobs.
     func generateDirectly(
         lecture: Lecture,
         kinds: [GenerationJobKind],
@@ -92,61 +81,48 @@ final class GenerationService {
         modelOverride: String? = nil,
         quizFocus: String? = nil
     ) async throws {
-        while activeJob != nil {
-            try Task.checkCancellation()
-            try await Task.sleep(for: .milliseconds(250))
+        try Task.checkCancellation()
+        guard let task = start(lecture: lecture, kinds: kinds, profile: profile, quizOptions: quizOptions,
+                               thinkingLevel: thinkingLevel, modelOverride: modelOverride, quizFocus: quizFocus) else { return }
+        try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
         }
-
-        let ordered = GenerationJobKind.ordered.filter { kinds.contains($0) }
-        guard !ordered.isEmpty else { return }
-
-        activeJob = ActiveJob(lectureTitle: lecture.title, remaining: ordered)
-        lastError = nil
-        defer { activeJob = nil }
-
-        try await executeGenerationCore(
-            lectureID: lecture.persistentModelID,
-            lectureTitle: lecture.title,
-            kinds: ordered,
-            profile: profile,
-            quizOptions: quizOptions,
-            thinkingLevel: thinkingLevel,
-            modelOverride: modelOverride,
-            quizFocus: quizFocus
-        )
     }
 
-    // MARK: - Job runner
-
-    private func run(lectureID: PersistentIdentifier,
-                     lectureTitle: String,
-                     kinds: [GenerationJobKind],
-                     profile: AgentProfile,
-                     quizOptions: QuizOptions,
-                     thinkingLevel: ThinkingLevel,
-                     modelOverride: String?,
-                     quizFocus: String?) async {
-        defer {
-            activeJob = nil
-            generationTask = nil
+    private func start(lecture: Lecture, kinds: [GenerationJobKind], profile: AgentProfile,
+                       quizOptions: QuizOptions, thinkingLevel: ThinkingLevel,
+                       modelOverride: String?, quizFocus: String?) -> Task<Void, Error>? {
+        let id = lecture.persistentModelID
+        if let existing = generationTasks[id] { return existing }
+        let ordered = GenerationJobKind.ordered.filter { kinds.contains($0) }
+        guard !ordered.isEmpty else { return nil }
+        let title = lecture.title
+        activeJobs[id] = ActiveJob(lectureTitle: title, remaining: ordered)
+        errors[id] = nil
+        lastError = nil
+        completionNotifier.prepare(for: .generation)
+        let task = Task<Void, Error> {
+            defer {
+                activeJobs[id] = nil
+                generationTasks[id] = nil
+            }
+            do {
+                try await executeGenerationCore(lectureID: id, lectureTitle: title, kinds: ordered,
+                                                profile: profile, quizOptions: quizOptions,
+                                                thinkingLevel: thinkingLevel, modelOverride: modelOverride,
+                                                quizFocus: quizFocus)
+            } catch {
+                if Task.isCancelled || error is CancellationError { throw CancellationError() }
+                let message = "\(profile.title): \(error.localizedDescription)"
+                errors[id] = message
+                lastError = message
+                throw error
+            }
         }
-
-        do {
-            try await executeGenerationCore(
-                lectureID: lectureID,
-                lectureTitle: lectureTitle,
-                kinds: kinds,
-                profile: profile,
-                quizOptions: quizOptions,
-                thinkingLevel: thinkingLevel,
-                modelOverride: modelOverride,
-                quizFocus: quizFocus
-            )
-        } catch is CancellationError {
-            lastError = nil
-        } catch {
-            lastError = "\(profile.title): \(error.localizedDescription)"
-        }
+        generationTasks[id] = task
+        return task
     }
 
     private func executeGenerationCore(
@@ -159,8 +135,11 @@ final class GenerationService {
         modelOverride: String?,
         quizFocus: String?
     ) async throws {
+        try Task.checkCancellation()
         let context = modelContainer.mainContext
-        guard let lecture = context.model(for: lectureID) as? Lecture,
+        var descriptor = FetchDescriptor<Lecture>(predicate: #Predicate { $0.persistentModelID == lectureID })
+        descriptor.fetchLimit = 1
+        guard let lecture = try context.fetch(descriptor).first, !lecture.isDeleted,
               let rawTranscript = lecture.artifact(of: .rawTranscript)?.content else {
             throw NSError(
                 domain: "GenerationService",
@@ -175,7 +154,7 @@ final class GenerationService {
         let rawSource = sourceWithReferences(transcript: rawTranscript, lecture: lecture)
 
         if kinds.contains(.cleanedTranscript) {
-            activeJob?.remaining = kinds
+            activeJobs[lectureID]?.remaining = kinds
             let cleaned = try await Self.requestOutput(
                 kind: .cleanedTranscript,
                 transcript: rawSource,
@@ -190,6 +169,7 @@ final class GenerationService {
                 supplementaryInputs: supplementaryInputs
             ).content.trimmingCharacters(in: .whitespacesAndNewlines)
             try Task.checkCancellation()
+            guard lecture.modelContext != nil, !lecture.isDeleted else { throw CancellationError() }
             upsertArtifact(kind: .cleanedTranscript,
                            content: cleaned,
                            modelInfo: profile.title,
@@ -201,7 +181,7 @@ final class GenerationService {
         let transcript = lecture.artifact(of: .cleanedTranscript)?.content ?? rawTranscript
         let generationSource = sourceWithReferences(transcript: transcript, lecture: lecture)
         let independentKinds = kinds.filter { $0 != .cleanedTranscript }
-        activeJob?.remaining = independentKinds
+        activeJobs[lectureID]?.remaining = independentKinds
 
         let outputs = try await withThrowingTaskGroup(of: GeneratedOutput.self) { group in
             for kind in independentKinds {
@@ -225,11 +205,12 @@ final class GenerationService {
             var completed: [GeneratedOutput] = []
             for try await output in group {
                 completed.append(output)
-                activeJob?.remaining.removeAll { $0 == output.kind }
+                activeJobs[lectureID]?.remaining.removeAll { $0 == output.kind }
             }
             return completed
         }
         try Task.checkCancellation()
+        guard lecture.modelContext != nil, !lecture.isDeleted else { throw CancellationError() }
 
         for output in outputs.sorted(by: { orderedIndex($0.kind) < orderedIndex($1.kind) }) {
             switch output.kind {
@@ -416,53 +397,55 @@ final class GenerationService {
             return GeneratedOutput(kind: kind, content: output)
         }
 
-        let connection = try await ACPConnection.connect(profile: profile)
-        defer { connection.shutdown() }
-        let session = try await newSession(
-            connection: connection,
-            profile: profile,
-            workspaceDirectory: workspaceDirectory
-        )
-        await connection.applyGenerationSettings(
-            session: session,
-            model: modelOverride,
-            thinkingLevel: thinkingLevel.rawValue
-        )
+        return try await AISessionPool.shared.withPermit {
+            let connection = try await ACPConnection.connect(profile: profile)
+            defer { connection.shutdown() }
+            let session = try await newSession(
+                connection: connection,
+                profile: profile,
+                workspaceDirectory: workspaceDirectory
+            )
+            await connection.applyGenerationSettings(
+                session: session,
+                model: modelOverride,
+                thinkingLevel: thinkingLevel.rawValue
+            )
 
-        var output = try await connection.prompt(sessionID: session.id, text: effortHint + prompt)
-        if kind == .flashcards, parseCards(output) == nil {
-            output = try await connection.prompt(
-                sessionID: session.id,
-                text: "Your previous reply was not a strict JSON array of {\"front\",\"back\"} objects. Respond again with ONLY the JSON array, no fences or commentary."
-            )
-        } else if kind == .quiz, parseQuestions(output) == nil {
-            output = try await connection.prompt(
-                sessionID: session.id,
-                text: "Your previous reply was not a strict JSON array of quiz question objects. Respond again with ONLY the JSON array in the specified schema, no fences or commentary."
-            )
-        } else if kind == .notes {
-            output = NotesMarkdownNormalizer.normalize(output)
-            var violations = NotesOutputValidator.violations(
-                in: output,
-                source: transcript,
-                language: language
-            )
-            if !violations.isEmpty {
-                output = NotesMarkdownNormalizer.normalize(try await connection.prompt(
+            var output = try await connection.prompt(sessionID: session.id, text: effortHint + prompt)
+            if kind == .flashcards, parseCards(output) == nil {
+                output = try await connection.prompt(
                     sessionID: session.id,
-                    text: Prompts.notesRepair(violations: violations)
-                ))
-                violations = NotesOutputValidator.violations(
+                    text: "Your previous reply was not a strict JSON array of {\"front\",\"back\"} objects. Respond again with ONLY the JSON array, no fences or commentary."
+                )
+            } else if kind == .quiz, parseQuestions(output) == nil {
+                output = try await connection.prompt(
+                    sessionID: session.id,
+                    text: "Your previous reply was not a strict JSON array of quiz question objects. Respond again with ONLY the JSON array in the specified schema, no fences or commentary."
+                )
+            } else if kind == .notes {
+                output = NotesMarkdownNormalizer.normalize(output)
+                var violations = NotesOutputValidator.violations(
                     in: output,
                     source: transcript,
                     language: language
                 )
+                if !violations.isEmpty {
+                    output = NotesMarkdownNormalizer.normalize(try await connection.prompt(
+                        sessionID: session.id,
+                        text: Prompts.notesRepair(violations: violations)
+                    ))
+                    violations = NotesOutputValidator.violations(
+                        in: output,
+                        source: transcript,
+                        language: language
+                    )
+                }
+                guard violations.isEmpty else {
+                    throw InvalidNotesOutput(violations: violations)
+                }
             }
-            guard violations.isEmpty else {
-                throw InvalidNotesOutput(violations: violations)
-            }
+            return GeneratedOutput(kind: kind, content: output)
         }
-        return GeneratedOutput(kind: kind, content: output)
     }
 
     private nonisolated static func newSession(connection: ACPConnection,

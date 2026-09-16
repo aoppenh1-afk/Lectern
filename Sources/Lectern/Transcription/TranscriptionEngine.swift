@@ -49,10 +49,43 @@ enum TranscriptionPerformancePolicy: String, CaseIterable, Identifiable {
     }
 }
 
+protocol LocalTranscribing: Sendable {
+    var isModelCached: Bool { get }
+    func transcribe(fileURL: URL, progress: (@MainActor @Sendable ([TranscriptSegment], Double) -> Void)?) async throws -> [TranscriptSegment]
+    func unload() async
+}
+
+/// Bridges Swift task cancellation to synchronous model work and subprocesses.
+final class TranscriptionCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+    private var handler: (@Sendable () -> Void)?
+
+    func cancel() {
+        let action = lock.withLock {
+            cancelled = true
+            return handler
+        }
+        action?()
+    }
+
+    func onCancel(_ action: (@Sendable () -> Void)?) {
+        let alreadyCancelled = lock.withLock {
+            handler = action
+            return cancelled
+        }
+        if alreadyCancelled { action?() }
+    }
+
+    func check() throws {
+        if lock.withLock({ cancelled }) { throw CancellationError() }
+    }
+}
+
 /// Owns model loading, thermal pacing, long-form progress, and model lifetime.
 /// Callers provide a file URL and receive transcript segments. They do not
 /// need to know about model windows or compute scheduling.
-final class TranscriptionEngine: @unchecked Sendable {
+final class TranscriptionEngine: LocalTranscribing, @unchecked Sendable {
     static let repoId = "mweinbach1/parakeet-tdt-0.6b-v3-coreml"
 
     /// Parakeet TDT stride: hopLength 160 x encoder subsampling 8.
@@ -89,73 +122,83 @@ final class TranscriptionEngine: @unchecked Sendable {
         fileURL: URL,
         progress: (@MainActor @Sendable ([TranscriptSegment], Double) -> Void)? = nil
     ) async throws -> [TranscriptSegment] {
+        try Task.checkCancellation()
         let policy = TranscriptionPerformancePolicy.current
         try await ensureLoaded(policy: policy)
 
-        return try await withCheckedThrowingContinuation { continuation in
-            queue.async { [self] in
-                guard let transcriber, let tokenizer else {
-                    continuation.resume(throwing: Self.engineUnavailable)
-                    return
-                }
+        try Task.checkCancellation()
+        let cancellation = TranscriptionCancellation()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                queue.async { [self] in
+                    guard let transcriber, let tokenizer else {
+                        continuation.resume(throwing: Self.engineUnavailable)
+                        return
+                    }
 
-                let progressAccumulator = TranscriptionProgressAccumulator(
-                    tokenizer: tokenizer,
-                    progress: progress
-                )
-                let signpostID = OSSignpostID(log: Self.signpostLog)
-                os_signpost(
-                    .begin,
-                    log: Self.signpostLog,
-                    name: "Lecture transcription",
-                    signpostID: signpostID,
-                    "policy=%{public}s",
-                    policy.rawValue
-                )
-
-                do {
-                    let result = try transcriber.transcribe(
-                        audioURL: fileURL,
-                        overlapSeconds: 1,
-                        beforeChunk: { [thermalGate] in
-                            thermalGate.waitUntilSafe()
-                        },
-                        progress: { update in
-                            os_signpost(
-                                .event,
-                                log: Self.signpostLog,
-                                name: "Transcription chunk complete",
-                                "chunk=%{public}d progress=%{public}.3f",
-                                update.chunkIndex,
-                                update.fractionCompleted
-                            )
-                            progressAccumulator.receive(update)
-                        }
+                    let progressAccumulator = TranscriptionProgressAccumulator(
+                        tokenizer: tokenizer,
+                        progress: progress
                     )
-                    let segments = Self.buildSegments(
-                        tokenIDs: result.tokenIds,
-                        frameIndices: result.frameIndices,
-                        durations: result.durations,
-                        tokenizer: tokenizer
-                    )
+                    let signpostID = OSSignpostID(log: Self.signpostLog)
                     os_signpost(
-                        .end,
-                        log: Self.signpostLog,
-                        name: "Lecture transcription",
-                        signpostID: signpostID
-                    )
-                    continuation.resume(returning: segments)
-                } catch {
-                    os_signpost(
-                        .end,
+                        .begin,
                         log: Self.signpostLog,
                         name: "Lecture transcription",
                         signpostID: signpostID,
-                        "failed"
+                        "policy=%{public}s",
+                        policy.rawValue
                     )
-                    continuation.resume(throwing: error)
+
+                    do {
+                        try cancellation.check()
+                        let result = try transcriber.transcribe(
+                            audioURL: fileURL,
+                            overlapSeconds: 1,
+                            beforeChunk: { [thermalGate] in
+                                try cancellation.check()
+                                try thermalGate.waitUntilSafe(cancellation: cancellation)
+                            },
+                            progress: { update in
+                                os_signpost(
+                                    .event,
+                                    log: Self.signpostLog,
+                                    name: "Transcription chunk complete",
+                                    "chunk=%{public}d progress=%{public}.3f",
+                                    update.chunkIndex,
+                                    update.fractionCompleted
+                                )
+                                progressAccumulator.receive(update)
+                            }
+                        )
+                        try cancellation.check()
+                        let segments = Self.buildSegments(
+                            tokenIDs: result.tokenIds,
+                            frameIndices: result.frameIndices,
+                            durations: result.durations,
+                            tokenizer: tokenizer
+                        )
+                        os_signpost(
+                            .end,
+                            log: Self.signpostLog,
+                            name: "Lecture transcription",
+                            signpostID: signpostID
+                        )
+                        continuation.resume(returning: segments)
+                    } catch {
+                        os_signpost(
+                            .end,
+                            log: Self.signpostLog,
+                            name: "Lecture transcription",
+                            signpostID: signpostID,
+                            "failed"
+                        )
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
+        } onCancel: {
+            cancellation.cancel()
         }
     }
 
@@ -382,12 +425,14 @@ private final class TranscriptionThermalGate: @unchecked Sendable {
         }
     }
 
-    func waitUntilSafe() {
+    func waitUntilSafe(cancellation: TranscriptionCancellation) throws {
         condition.lock()
+        defer { condition.unlock() }
         while Self.shouldPause(ProcessInfo.processInfo.thermalState) {
-            _ = condition.wait(until: Date(timeIntervalSinceNow: 5))
+            try cancellation.check()
+            _ = condition.wait(until: Date(timeIntervalSinceNow: 0.25))
         }
-        condition.unlock()
+        try cancellation.check()
     }
 
     private static func shouldPause(

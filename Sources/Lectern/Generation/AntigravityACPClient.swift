@@ -113,6 +113,20 @@ struct AntigravityACPClient: Sendable {
         skills: Set<LecternAgentSkill> = [],
         jsonSchema: String? = nil
     ) async throws -> String {
+        try await AISessionPool.shared.withPermit {
+            try await runSession(prompt: prompt, modelID: modelID, thinkingLevel: thinkingLevel,
+                                 inputs: inputs, skills: skills, jsonSchema: jsonSchema)
+        }
+    }
+
+    private func runSession(
+        prompt: String,
+        modelID: String = AntigravityACPClient.modelID,
+        thinkingLevel: ThinkingLevel = .high,
+        inputs: [WorkspaceInput] = [],
+        skills: Set<LecternAgentSkill> = [],
+        jsonSchema: String? = nil
+    ) async throws -> String {
         let connection = try await connectionFactory()
         defer { connection.shutdown() }
 

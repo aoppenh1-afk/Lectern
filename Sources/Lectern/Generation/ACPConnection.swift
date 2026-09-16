@@ -54,6 +54,7 @@ final class ACPConnection: @unchecked Sendable {
     private let mutex = Mutex()
     private var nextRequestID = 1
     private var pending: [Int: PendingCall] = [:]
+    private var isClosed = false
     private var chunkBuffers: [String: StringAccumulator] = [:]
 
     private let process: Process
@@ -463,6 +464,7 @@ final class ACPConnection: @unchecked Sendable {
 
     func shutdown() {
         let waiters: [PendingCall] = mutex.with {
+            isClosed = true
             let all = Array(pending.values)
             pending.removeAll()
             return all
@@ -481,6 +483,7 @@ final class ACPConnection: @unchecked Sendable {
     // MARK: - Wire plumbing
 
     private func request(method: String, params: [String: Any]) async throws -> Any {
+        try Task.checkCancellation()
         let id: Int = mutex.with {
             let id = nextRequestID
             nextRequestID += 1
@@ -497,13 +500,28 @@ final class ACPConnection: @unchecked Sendable {
         mutablePayload.append(0x0A)
         let payload = mutablePayload
 
-        return try await withCheckedThrowingContinuation { continuation in
-            let call = PendingCall(continuation: continuation)
-            mutex.with { pending[id] = call }
-
-            writeQueue.async { [stdinHandle] in
-                stdinHandle.write(payload)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let call = PendingCall(continuation: continuation)
+                let registered = mutex.with {
+                    guard !isClosed else { return false }
+                    pending[id] = call
+                    return true
+                }
+                guard registered else {
+                    continuation.resume(throwing: ACPError.connectionClosed)
+                    return
+                }
+                writeQueue.async { [self] in
+                    guard !mutex.with({ isClosed }) else { return }
+                    do { try stdinHandle.write(contentsOf: payload) }
+                    catch { shutdown() }
+                }
             }
+        } onCancel: {
+            // Each generation request owns its connection. Do not wait for an
+            // unresponsive agent to acknowledge session/cancel.
+            self.shutdown()
         }
     }
 
@@ -614,6 +632,7 @@ final class ACPConnection: @unchecked Sendable {
 
     private func processDidExit() {
         let waiters: [PendingCall] = mutex.with {
+            isClosed = true
             let values = Array(pending.values)
             pending.removeAll()
             return values
@@ -652,8 +671,10 @@ final class ACPConnection: @unchecked Sendable {
         var mutablePayload = serialized
         mutablePayload.append(0x0A)
         let payload = mutablePayload
-        writeQueue.async { [stdinHandle] in
-            stdinHandle.write(payload)
+        writeQueue.async { [self] in
+            guard !mutex.with({ isClosed }) else { return }
+            do { try stdinHandle.write(contentsOf: payload) }
+            catch { shutdown() }
         }
     }
 

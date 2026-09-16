@@ -237,12 +237,20 @@ final class ShiurAutomationService {
                 item.state = .transcribing
                 try? modelContainer.mainContext.save()
 
-                transcriptionService.enqueue(lectureID: lecture.persistentModelID)
+                let lectureID = lecture.persistentModelID
+                transcriptionService.enqueue(lectureID: lectureID)
 
                 // Wait for transcription to finish
-                while transcriptionService.isQueuedOrRunning(lectureID: lecture.persistentModelID) {
+                while transcriptionService.isQueuedOrRunning(lectureID: lectureID) {
                     do { try await Task.sleep(for: .milliseconds(250)) }
                     catch { return }
+                }
+
+                guard lecture.modelContext != nil, !lecture.isDeleted else {
+                    item.state = .failed
+                    item.stateMessage = "Associated lecture was deleted."
+                    try? modelContainer.mainContext.save()
+                    return
                 }
 
                 if lecture.status == .failed {
