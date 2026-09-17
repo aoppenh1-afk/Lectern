@@ -93,11 +93,7 @@ jobs:
           set -euo pipefail
           scripts/release-dev.sh
 
-      - name: Remove signing keychain
-        if: always()
-        run: |
-          if [[ -f "$RUNNER_TEMP/lectern-signing.pem" ]]; then
-            sudo -n security remove-trusted-cert -d "$RUNNER_TEMP/lectern-signing.pem" || true
-          fi
-          security delete-keychain "$RUNNER_TEMP/lectern-signing.keychain-db" || true
-          rm -f "$RUNNER_TEMP/lectern-signing.p12" "$RUNNER_TEMP/lectern-signing.pem"
+      # GitHub destroys this hosted runner VM, including its signing keychain
+      # and certificate trust, after the job. Explicit security cleanup can
+      # hang waiting for macOS authorization after the release is published.
+      # Revisit cleanup if this job ever moves to a self-hosted runner.
