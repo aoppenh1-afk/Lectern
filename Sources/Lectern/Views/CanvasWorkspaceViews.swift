@@ -254,7 +254,7 @@ struct CanvasCalendarView: View {
         // Hand-laid row: the stock toggle hugs its label, so a Spacer pins
         // every switch to the trailing edge. The switch itself ignores taps
         // and the whole row toggles as one button.
-        Button { isOn.wrappedValue.toggle() } {
+        Button(action: { isOn.wrappedValue.toggle() }) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .medium))
