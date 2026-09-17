@@ -363,43 +363,146 @@ struct CanvasCalendarView: View {
     }
 
     private var weekView: some View {
-        ScrollView(.vertical) {
-            HStack(alignment: .top, spacing: 0) {
-                ForEach(weekDates, id: \.self) { day in
-                    VStack(spacing: 0) {
-                        HStack(spacing: 6) {
-                            VStack(spacing: 3) { Text(day.formatted(.dateTime.weekday(.abbreviated))).font(.system(size: 10, weight: .semibold)); Text(day.formatted(.dateTime.day())).font(.system(size: 18, design: .serif)) }
-                            Spacer()
-                            Button {
-                                sheetInitialDate = day
-                                showingEventSheet = true
-                            } label: {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .foregroundStyle(.secondary)
-                                    .padding(5)
-                                    .background(Color.primary.opacity(0.05), in: Circle())
+        GeometryReader { geo in
+            let columnWidth = max(152, geo.size.width / 7)
+            let dates = weekDates
+            VStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(Array(dates.enumerated()), id: \.element) { index, day in
+                        weekDayHeader(day)
+                            .frame(width: columnWidth, alignment: .top)
+                            .overlay(alignment: .trailing) {
+                                if index < dates.count - 1 {
+                                    Rectangle().fill(LecternTheme.hairline).frame(width: 0.5)
+                                }
                             }
-                            .buttonStyle(.plain)
-                            .help("Add an event on \(day.formatted(date: .abbreviated, time: .omitted))")
-                        }.padding(10)
-                        Divider()
-                        let dayEvents = scopedEvents.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
-                        let dayAssignments = scopedAssignments.filter { $0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
-                        let dayFinals = scopedFinals.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
-                        let dayAcademic = scopedAcademic.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
-                        VStack(spacing: 8) {
-                            ForEach(dayAcademic) { AcademicAgendaRow(entry: $0) }
-                            ForEach(dayFinals) { FinalExamAgendaRow(final: $0) }
-                            ForEach(dayEvents) { eventRow($0) }
-                            ForEach(dayAssignments) { AssignmentAgendaRow(assignment: $0) }
-                            if dayAcademic.isEmpty && dayFinals.isEmpty && dayEvents.isEmpty && dayAssignments.isEmpty { Text("No events").font(.system(size: 10)).foregroundStyle(.tertiary).padding(.top, 30) }
-                        }.padding(8)
                     }
-                    .frame(minWidth: 150, maxWidth: .infinity, minHeight: 570, alignment: .top)
-                    .overlay(alignment: .trailing) { Divider() }
+                }
+                Divider()
+                ScrollView(.vertical, showsIndicators: true) {
+                    HStack(alignment: .top, spacing: 0) {
+                        ForEach(Array(dates.enumerated()), id: \.element) { index, day in
+                            weekDayColumn(day)
+                                .frame(width: columnWidth, alignment: .top)
+                                .overlay(alignment: .trailing) {
+                                    if index < dates.count - 1 {
+                                        Rectangle()
+                                            .fill(LecternTheme.hairline)
+                                            .frame(width: 0.5)
+                                            .frame(maxHeight: .infinity)
+                                    }
+                                }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+        }
+        .frame(minHeight: 580)
+    }
+
+    private func weekDayHeader(_ day: Date) -> some View {
+        let isToday = Calendar.current.isDateInToday(day)
+        return HStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(day.formatted(.dateTime.weekday(.abbreviated)))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(isToday ? LecternTheme.accent : .secondary)
+                Text(day.formatted(.dateTime.day()))
+                    .font(.system(size: 20, design: .serif))
+                    .fontWeight(isToday ? .bold : .regular)
+                    .foregroundStyle(LecternTheme.ink)
+                    .padding(5)
+                    .background(isToday ? LecternTheme.accent.opacity(0.14) : .clear, in: Circle())
+            }
+            Spacer(minLength: 4)
+            Button {
+                sheetInitialDate = day
+                showingEventSheet = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(6)
+                    .background(Color.primary.opacity(0.05), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .help("Add an event on \(day.formatted(date: .abbreviated, time: .omitted))")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
+        .background(isToday ? LecternTheme.accent.opacity(0.06) : .clear)
+    }
+
+    private func weekDayColumn(_ day: Date) -> some View {
+        let dayEvents = scopedEvents.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
+        let dayAssignments = scopedAssignments.filter { $0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
+        let dayFinals = scopedFinals.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
+        let dayAcademic = scopedAcademic.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
+        return VStack(alignment: .leading, spacing: 8) {
+            ForEach(dayAcademic) { entry in
+                WeekCard(
+                    tint: academicTint(entry.kind),
+                    timeText: "All day",
+                    title: entry.title,
+                    subtitle: "YU calendar",
+                    icon: academicIcon(entry.kind)
+                )
+            }
+            ForEach(dayFinals) { final in
+                WeekCard(
+                    tint: LecternTheme.recordTint,
+                    timeText: final.startAt.formatted(date: .omitted, time: .shortened),
+                    title: final.title,
+                    subtitle: [final.courseName, "Registrar"].joined(separator: " · "),
+                    icon: "graduationcap",
+                    badge: "Final"
+                )
+            }
+            ForEach(dayEvents) { event in
+                weekEventCard(event)
+            }
+            ForEach(dayAssignments) { assignment in
+                WeekCard(
+                    tint: LecternTheme.warningTint,
+                    timeText: assignment.dueAt.map { "Due \($0.formatted(date: .omitted, time: .shortened))" } ?? "Due",
+                    title: assignment.title,
+                    subtitle: assignment.courseName,
+                    icon: assignment.isComplete ? "checkmark.circle.fill" : "checklist"
+                )
+            }
+            if dayAcademic.isEmpty && dayFinals.isEmpty && dayEvents.isEmpty && dayAssignments.isEmpty {
+                Text("No events")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 24)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, minHeight: 520, alignment: .top)
+    }
+
+    @ViewBuilder
+    private func weekEventCard(_ event: CanvasEvent) -> some View {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: event.startAt)
+        let isAllDay = event.endAt == nil && parts.hour == 0 && parts.minute == 0
+        let timeText = isAllDay ? "All day" : event.startAt.formatted(date: .omitted, time: .shortened)
+        let subtitle = [event.courseName, event.locationName].compactMap { $0 }.joined(separator: " · ")
+        let card = WeekCard(
+            tint: eventTint(event),
+            timeText: timeText,
+            title: event.title,
+            subtitle: subtitle.isEmpty ? nil : subtitle,
+            icon: event.eventCategory.icon,
+            badge: event.isManual ? "Personal" : nil
+        )
+        if event.isManual {
+            Button { editingEvent = event } label: { card }
+                .buttonStyle(.plain)
+                .help("Edit personal event")
+        } else {
+            card
         }
     }
 
@@ -2296,6 +2399,65 @@ struct StudioPage<Content: View>: View {
             content
         }
         .padding(28).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(LecternTheme.panelFill)
+    }
+}
+
+/// Compact card for the 7-day week grid. Narrow columns cannot fit the
+/// full-width day agenda rows (78pt time gutter + Spacer forces overflow),
+/// so this stacks time, title, and subtitle vertically with wrapping text.
+private struct WeekCard: View {
+    let tint: Color
+    let timeText: String
+    let title: String
+    var subtitle: String? = nil
+    var icon: String? = nil
+    var badge: String? = nil
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(tint)
+                .frame(width: 3)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    Text(timeText)
+                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    if let icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(tint)
+                    }
+                }
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(LecternTheme.ink)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if let badge {
+                    StatusChip(badge, tint)
+                }
+            }
+            .padding(.leading, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(LecternTheme.hairline))
     }
 }
 
