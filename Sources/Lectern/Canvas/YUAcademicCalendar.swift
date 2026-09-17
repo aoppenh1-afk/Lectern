@@ -215,17 +215,27 @@ enum YUAcademicCalendar {
     }
 
     /// Insert every entry once. Safe to call on every launch.
+    ///
+    /// Self-healing: an empty store reseeds even when the version flag says
+    /// done, so a failed first save can never leave the calendar blank
+    /// forever. The flag stamps only after a successful save, so a failed
+    /// save retries on the next launch.
     static func seedIfNeeded(modelContext: ModelContext, isYU: Bool,
                              defaults: UserDefaults = .standard) {
         guard isYU else { return }
-        guard defaults.integer(forKey: seededVersionKey) != seededVersion else { return }
         let existing = (try? modelContext.fetch(FetchDescriptor<YUAcademicEvent>())) ?? []
+        let hasSeededRows = existing.contains { $0.sourceRaw == sourceKey }
+        guard defaults.integer(forKey: seededVersionKey) != seededVersion || !hasSeededRows else { return }
         for stale in existing where stale.sourceRaw == sourceKey { modelContext.delete(stale) }
         for entry in entries {
             guard let date = date(for: entry) else { continue }
             modelContext.insert(YUAcademicEvent(title: entry.title, startAt: date, kind: entry.kind))
         }
-        try? modelContext.save()
-        defaults.set(seededVersion, forKey: seededVersionKey)
+        do {
+            try modelContext.save()
+            defaults.set(seededVersion, forKey: seededVersionKey)
+        } catch {
+            // Leave the flag unset so the next launch retries the seed.
+        }
     }
 }
