@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+tone_instructions: >-
+  Be concise and direct. Explain the concrete failure, triggering conditions,
+  and smallest useful fix. Prefer actionable findings over praise or style commentary.
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  collapse_walkthrough: true
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  in_progress_fortune: false
+  poem: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+  pre_merge_checks:
+    docstrings:
+      mode: 'off'
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+  path_filters:
+    - '!Lectern.xcodeproj/**'
+    - '!Vendor/**'
+    - '!videos/**'
+    - '!package-lock.json'
+    - '!**/Package.resolved'
+  path_instructions:
+    - path: '**/*'
+      instructions: >-
+        Prioritize correctness, data loss, security, and user-visible regressions.
+        Ground each finding in the changed code and its callers, with a concrete
+        failure scenario. Recommend tests for meaningful uncovered behavior.
+        Omit cosmetic refactors, naming preferences, and blanket requests for
+        comments or tests. README.md documents installation and release behavior;
+        project.yml is the source of truth for the generated Xcode project.
+    - path: 'Sources/Lectern/**/*.swift'
+      instructions: >-
+        Review Swift concurrency and actor isolation, task cancellation, and stale
+        asynchronous callbacks after switching courses or accounts. Check recording
+        start/stop transitions, audio resource cleanup, permission-denied paths,
+        and preservation of recordings when transcription fails. Check course and
+        account isolation, Keychain credential handling, and redaction in logs.
+        For updater changes, inspect checksum verification, archive handling,
+        rollback, and stable/dev channel selection. For export changes, preserve
+        mixed English/Hebrew text, paragraph direction, and document pagination.
+    - path: '**/*.mjs'
+      instructions: >-
+        For hosted connector code, prioritize account isolation, read versus sync
+        authorization, OAuth PKCE/state/redirect validation, token replay and
+        revocation, SQL parameterization, and atomic upload/delete behavior.
+        Use Tests/HostedMCP and docs/hosted-mcp.md for the intended contracts.
+        For website scripts, check safe release download URLs, offline fallbacks,
+        HTML escaping, keyboard interaction, and demo state transitions.
+    - path: 'scripts/**/*.sh'
+      instructions: >-
+        For build/release scripts, preserve the pinned original signing identity,
+        reject unsigned release artifacts, and verify signatures before packaging.
+        Check error propagation, quoting, checksum generation, and whether a
+        failure could leave an incomplete release published. Explicit ad-hoc
+        signing is allowed for disposable local builds; releases require the
+        original certificate. Consult README.md and scripts/release-signing.sh.
+    - path: '.github/workflows/**'
+      instructions: >-
+        Check token permissions, fork-PR trust boundaries, untrusted expression
+        interpolation into shell commands, and exposure of signing credentials.
+        Release jobs must use trusted main-branch code and the release-signing
+        environment. Check that tests fail the job and published artifacts match
+        the intended commit. Keep actions pinned to full commit SHAs.
+
+knowledge_base:
+  code_guidelines:
+    # AGENTS.md contains local MCP-tool requirements unavailable to this bot.
+    # The path instructions above supply CodeRabbit's review guidance.
+    enabled: false
+
+chat:
+  auto_reply: true

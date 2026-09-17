@@ -108,6 +108,9 @@ scripts/install-local.sh
 xcodebuild -scheme Lectern -destination 'platform=macOS' test
 ```
 
+See [GitHub automation](.github/README.md) for CI checks, security scans, dependency
+updates, and the checks that still need a local run.
+
 ## Publishing a release (maintainer)
 
 Releases currently use a persistent self-signed certificate. This preserves the designated requirement, but does not prevent repeated Keychain prompts: macOS also checks a per-build code-hash partition for self-signed apps. A stable certificate alone is insufficient.

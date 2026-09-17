@@ -6,6 +6,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: macos-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -17,7 +20,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - name: Show macOS / Xcode / SDK
         run: |
@@ -65,16 +70,26 @@ jobs:
             CODE_SIGN_IDENTITY=- \
             test
 
+      - name: Test Word and PDF exports
+        run: bash scripts/test-document-export.sh
+
   hosted-connector:
     name: Hosted connector
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run test:hosted
+      - name: Test website downloads and demo
+        run: |
+          node scripts/test-website-download.mjs
+          node scripts/test-website-state.mjs
+          node scripts/test-website-story.mjs
       - run: npm run build
