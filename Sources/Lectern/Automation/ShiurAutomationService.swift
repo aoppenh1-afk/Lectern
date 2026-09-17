@@ -18,6 +18,7 @@ final class ShiurAutomationService {
     private let transcriptionPreferences: TranscriptionPreferences
     private let generationService: GenerationService
     private let completionNotifier: any CompletionNotifying
+    private let defaults: UserDefaults
 
     private var activeSourceKeys: Set<String> = []
 
@@ -31,7 +32,8 @@ final class ShiurAutomationService {
         transcriptionService: TranscriptionService,
         transcriptionPreferences: TranscriptionPreferences,
         generationService: GenerationService,
-        completionNotifier: any CompletionNotifying = SystemCompletionNotifier.shared
+        completionNotifier: any CompletionNotifying = SystemCompletionNotifier.shared,
+        defaults: UserDefaults = .standard
     ) {
         self.modelContainer = modelContainer
         self.importService = importService ?? LectureImportService(modelContainer: modelContainer)
@@ -41,6 +43,7 @@ final class ShiurAutomationService {
         self.transcriptionPreferences = transcriptionPreferences
         self.generationService = generationService
         self.completionNotifier = completionNotifier
+        self.defaults = defaults
     }
 
     // MARK: - Subscriptions Check
@@ -282,7 +285,13 @@ final class ShiurAutomationService {
                 return
             }
 
-            if lecture.artifact(of: .notes) != nil {
+            // A previous or interrupted job may have saved only one artifact.
+            // Finish every requested output without replacing completed work.
+            let missingKinds: [GenerationJobKind] = [.cleanedTranscript, .notes].filter { kind in
+                let content = lecture.artifact(of: kind == .notes ? .notes : .cleanedTranscript)?.content ?? ""
+                return content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            if missingKinds.isEmpty {
                 item.state = .complete
                 item.stateMessage = nil
                 try? modelContainer.mainContext.save()
@@ -292,22 +301,22 @@ final class ShiurAutomationService {
             item.state = .generatingNotes
             try? modelContainer.mainContext.save()
 
-            let profileID = UserDefaults.standard.string(forKey: "generation.agentID") ?? AgentProfiles.codexID
-            guard let profile = AgentProfiles.profile(id: profileID) else {
+            let profileID = defaults.string(forKey: "generation.agentID") ?? AgentProfiles.codexID
+            guard let profile = AgentProfiles.profile(id: profileID, userDefaults: defaults) else {
                 item.state = .failed
                 item.stateMessage = "Default study agent is not configured. Set one in Settings › Agents."
                 try? modelContainer.mainContext.save()
                 return
             }
 
-            let thinkingLevelRaw = UserDefaults.standard.string(forKey: "generation.thinkingLevel")
+            let thinkingLevelRaw = defaults.string(forKey: "generation.thinkingLevel")
                 ?? ThinkingLevel.medium.rawValue
             let thinkingLevel = ThinkingLevel(rawValue: thinkingLevelRaw) ?? .medium
 
             do {
                 try await generationService.generateDirectly(
                     lecture: lecture,
-                    kinds: [.cleanedTranscript, .notes],
+                    kinds: missingKinds,
                     profile: profile,
                     thinkingLevel: thinkingLevel,
                     modelOverride: profile.model

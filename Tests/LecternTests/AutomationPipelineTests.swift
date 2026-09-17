@@ -36,7 +36,7 @@ struct AutomationPipelineTests {
                            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
     }
 
-    private func service(_ container: ModelContainer, batches: [[RemoteShiurItem]], onResolve: (@MainActor @Sendable () throws -> Void)? = nil) -> ShiurAutomationService {
+    private func service(_ container: ModelContainer, batches: [[RemoteShiurItem]], generationDefaults: UserDefaults = .standard, onResolve: (@MainActor @Sendable () throws -> Void)? = nil) -> ShiurAutomationService {
         let suite = "LecternAudit-" + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -47,7 +47,7 @@ struct AutomationPipelineTests {
             transcriptionService: TranscriptionService(modelContainer: container, preferences: preferences, completionNotifier: SilentNotifier()),
             transcriptionPreferences: preferences,
             generationService: GenerationService(modelContainer: container, completionNotifier: SilentNotifier()),
-            completionNotifier: SilentNotifier())
+            completionNotifier: SilentNotifier(), defaults: generationDefaults)
     }
 
     private func subscription(_ container: ModelContainer, backlog: Bool = false) -> ShiurSubscription {
@@ -150,6 +150,7 @@ struct AutomationPipelineTests {
         let lecture = Lecture(title: "Retry", capturedAt: Date(), status: .ready)
         lecture.sourceKey = "yutorah:1"
         lecture.artifacts.append(Artifact(kind: .rawTranscript, content: "Finished transcript", modelInfo: "Fixture"))
+        lecture.artifacts.append(Artifact(kind: .cleanedTranscript, content: "Cleaned transcript", modelInfo: "Fixture"))
         lecture.artifacts.append(Artifact(kind: .notes, content: "Finished notes", modelInfo: "Fixture"))
         container.mainContext.insert(lecture)
         let item = ShiurAutomationItem(sourceKey: "yutorah:1", shiurID: "1", title: "Retry", state: .failed, stateMessage: "Interrupted")
@@ -158,6 +159,49 @@ struct AutomationPipelineTests {
         #expect(item.state == .complete)
         #expect(item.stateMessage == nil)
         #expect(item.downloadAttempts == 0)
+    }
+
+    @Test(arguments: [true, false])
+    func completedTranscriptionHonorsGenerationToggle(generate: Bool) async throws {
+        let container = try container()
+        let suite = "AutomationGeneration-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        // An unknown profile fails immediately if the generation stage is reached.
+        defaults.set("missing-agent", forKey: "generation.agentID")
+        let lecture = Lecture(title: "Imported", capturedAt: Date(), status: .ready)
+        lecture.sourceKey = "yutorah:1"
+        lecture.artifacts.append(Artifact(kind: .rawTranscript, content: "Finished transcript", modelInfo: "Fixture"))
+        container.mainContext.insert(lecture)
+        let item = ShiurAutomationItem(sourceKey: "yutorah:1", shiurID: "1", title: "Imported",
+                                       state: .waitingForTranscription, autoGenerateNotes: generate)
+        container.mainContext.insert(item)
+        await service(container, batches: [], generationDefaults: defaults).processItem(item)
+        #expect(item.state == (generate ? .failed : .complete))
+        #expect(item.stateMessage == (generate
+            ? "Default study agent is not configured. Set one in Settings › Agents." : nil))
+        #expect(lecture.hasCompletedRawTranscript)
+    }
+
+    @Test(arguments: [ArtifactKind.notes, .cleanedTranscript])
+    func partialGenerationStillRequiresTheOtherArtifact(existingKind: ArtifactKind) async throws {
+        let container = try container()
+        let suite = "AutomationPartialGeneration-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("missing-agent", forKey: "generation.agentID")
+        let lecture = Lecture(title: "Partial generation", capturedAt: Date(), status: .ready)
+        lecture.sourceKey = "yutorah:1"
+        lecture.artifacts.append(Artifact(kind: .rawTranscript, content: "Finished transcript", modelInfo: "Fixture"))
+        lecture.artifacts.append(Artifact(kind: existingKind, content: "Existing output", modelInfo: "Fixture"))
+        container.mainContext.insert(lecture)
+        let item = ShiurAutomationItem(sourceKey: "yutorah:1", shiurID: "1", title: lecture.title,
+                                       state: .waitingForNotes)
+        container.mainContext.insert(item)
+        await service(container, batches: [], generationDefaults: defaults).processItem(item)
+        #expect(item.state == .failed)
+        #expect(item.stateMessage == "Default study agent is not configured. Set one in Settings › Agents.")
+        #expect(lecture.artifact(of: existingKind)?.content == "Existing output")
     }
 
     @Test func duplicateFeedEntriesCreateOneQueueItem() async throws {
