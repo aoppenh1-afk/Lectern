@@ -7,6 +7,7 @@ struct MenuBarPopoverView: View {
     /// StatusBarController uses this for the NSPopover contentSize so the
     /// hosted view and the popover window never disagree about the width.
     static let popoverWidth: CGFloat = 300
+    private static let contentWidth = popoverWidth - 28
 
     @Environment(CaptureController.self) private var capture
     @Environment(SurfacePreferences.self) private var surfacePreferences
@@ -28,7 +29,10 @@ struct MenuBarPopoverView: View {
                         .transition(.opacity)
                 }
             }
-            .frame(maxWidth: .infinity)
+            // Constrain the actual content before padding. An outer fixed frame
+            // alone can still let a child keep a wider intrinsic size and draw
+            // outside the popover after a segmented Picker invalidates layout.
+            .frame(width: Self.contentWidth, alignment: .leading)
             .padding(14)
         }
         .frame(width: Self.popoverWidth, alignment: .center)
