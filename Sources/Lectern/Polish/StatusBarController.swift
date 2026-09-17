@@ -105,8 +105,8 @@ final class StatusBarController {
     private func buildPopover() -> NSPopover {
         let pop = NSPopover()
         pop.behavior = .transient
-        pop.contentSize = NSSize(width: MenuBarPopoverView.popoverWidth, height: 360)
-        pop.contentViewController = NSHostingController(
+        let contentSize = NSSize(width: MenuBarPopoverView.popoverWidth, height: 360)
+        let hostingController = NSHostingController(
             rootView: AnyView(
                 MenuBarPopoverView()
                     .environment(capture)
@@ -114,6 +114,15 @@ final class StatusBarController {
                     .preferredColorScheme(surfacePreferences.appearance.colorScheme)
             )
         )
+
+        // This popover owns a fixed width. NSHostingController normally derives
+        // intrinsic/min/max constraints from the SwiftUI content; on Tahoe a
+        // Picker selection change can invalidate those constraints and make the
+        // hosted view request a wider size, which is then centered and clipped
+        // inside the unchanged NSPopover. Keep AppKit in charge of the bounds.
+        hostingController.sizingOptions = []
+        pop.contentViewController = hostingController
+        pop.contentSize = contentSize
         return pop
     }
 
