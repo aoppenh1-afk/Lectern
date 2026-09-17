@@ -162,6 +162,26 @@ final class YUFinalsScheduleTests: XCTestCase {
     }
 
     @MainActor
+    func testDashTwoVariantSharesDashOneFinal() {
+        // Microbiology matched both 261 and 262. Same slot, one final.
+        let course = Course(name: "Microbiology", colorHex: "#fff")
+        course.canvasID = 9
+        course.courseCode = "BIO-4023-261"
+        let sections = [
+            YUBannerSection(subject: "BIO", courseNumber: "4023", sequenceNumber: "261",
+                            partOfTerm: "YC1", campusDescription: "Wilf"),
+            YUBannerSection(subject: "BIO", courseNumber: "4023", sequenceNumber: "262",
+                            partOfTerm: "YC1", campusDescription: "Wilf"),
+        ]
+        let exam = YUBannerSyncService.finalExam(for: course, matchedSections: sections,
+                                                term: YUBannerTerm(code: "202609", description: "Fall 2026"))
+        let start = try! XCTUnwrap(exam?.startAt)
+        XCTAssertEqual(parts(start).month, 1)
+        XCTAssertEqual(parts(start).day, 4)
+        XCTAssertEqual(parts(start).hour, 13)
+    }
+
+    @MainActor
     func testConflictingSequencesYieldNoFinal() {
         let course = Course(name: "Accounting Principles I", colorHex: "#fff")
         course.courseCode = "ACC-1001-241"

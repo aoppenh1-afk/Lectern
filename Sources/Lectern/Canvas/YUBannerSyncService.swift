@@ -129,11 +129,13 @@ final class YUBannerSyncService {
     }
 
     /// One final per course. Multiple distinct Banner sequences means a bad
-    /// match, so the course gets no final rather than a guessed one.
+    /// match, so the course gets no final rather than a guessed one. Minus 2
+    /// and minus 3 variants share their minus 1 slot, so they fold together.
     static func finalExam(for course: Course, matchedSections: [YUBannerSection], term: YUBannerTerm) -> YUFinalExam? {
-        let distinctSequences = Set(matchedSections.compactMap(\.sequenceNumber))
-        if distinctSequences.count > 1 { return nil }
-        if let sequence = distinctSequences.first {
+        let sequences = matchedSections.compactMap(\.sequenceNumber)
+        let distinct = Set(sequences.map(YUFinalsSchedule.normalizedSection))
+        if distinct.count > 1 { return nil }
+        if let sequence = sequences.first {
             let section = matchedSections.first { $0.sequenceNumber == sequence }
             let subject = section?.subject ?? YUFinalsSchedule.parseCanvasCode(course.courseCode)?.subject
             let number = section?.courseNumber ?? YUFinalsSchedule.parseCanvasCode(course.courseCode)?.number

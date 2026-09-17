@@ -33,6 +33,10 @@ actor YUBannerClient {
 
     private let baseURL: URL
     private let session: URLSession
+    /// Manual cookie jar. Foundation's shared cookie storage silently drops
+    /// Banner's session cookies in some contexts, so the client carries the
+    /// JSESSIONID itself from the bind response to every search request.
+    private var cookieJar: [String: String] = [:]
 
     init(baseURL: URL = YUBannerClient.baseURL, session: URLSession? = nil) {
         self.baseURL = baseURL
@@ -46,6 +50,24 @@ actor YUBannerClient {
             config.timeoutIntervalForRequest = 30
             self.session = URLSession(configuration: config)
         }
+    }
+
+    private func storeCookies(from response: URLResponse, for url: URL) {
+        guard let http = response as? HTTPURLResponse else { return }
+        var fields: [String: String] = [:]
+        for (key, value) in http.allHeaderFields {
+            guard let name = key as? String, let text = value as? String else { continue }
+            fields[name] = text
+        }
+        for cookie in HTTPCookie.cookies(withResponseHeaderFields: fields, for: url) {
+            cookieJar[cookie.name] = "\(cookie.name)=\(cookie.value)"
+        }
+    }
+
+    private func applyCookies(to request: inout URLRequest) {
+        guard !cookieJar.isEmpty else { return }
+        request.setValue(cookieJar.values.sorted().joined(separator: "; "),
+                         forHTTPHeaderField: "Cookie")
     }
 
     // MARK: - Terms
@@ -90,10 +112,12 @@ actor YUBannerClient {
 
     /// Bind `termCode` into the Banner session. Mandatory before searchResults.
     func bindTerm(_ termCode: String) async throws {
+        cookieJar = [:]
         // Best effort: clear criteria left by an earlier run.
         var reset = URLRequest(url: baseURL.appending(path: "classSearch/resetDataForm"))
         reset.httpMethod = "POST"
-        _ = try? await session.data(for: reset)
+        if let (_, response) = try? await session.data(for: reset),
+           let url = reset.url { storeCookies(from: response, for: url) }
 
         var components = URLComponents(url: baseURL.appending(path: "term/search"), resolvingAgainstBaseURL: false)
         components?.queryItems = [.init(name: "mode", value: "search")]
@@ -101,9 +125,11 @@ actor YUBannerClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        applyCookies(to: &request)
         let body = "term=\(termCode)&studyPath=&studyPathText=&startDatepicker=&endDatepicker="
         request.httpBody = Data(body.utf8)
         let (_, response) = try await session.data(for: request)
+        storeCookies(from: response, for: url)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw YUBannerError.sessionBindFailed
         }
@@ -123,7 +149,9 @@ actor YUBannerClient {
         guard let url = components?.url else { throw YUBannerError.invalidResponse }
         var request = URLRequest(url: url)
         request.setValue("application/json, text/javascript, */*; q=0.01", forHTTPHeaderField: "Accept")
+        applyCookies(to: &request)
         let (data, response) = try await session.data(for: request)
+        storeCookies(from: response, for: url)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw YUBannerError.http(status: (response as? HTTPURLResponse)?.statusCode ?? 0)
         }

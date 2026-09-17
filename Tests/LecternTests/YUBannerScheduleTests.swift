@@ -17,6 +17,37 @@ final class YUBannerScheduleTests: XCTestCase {
         )
     }
 
+    func testRealBannerPayloadDecodesAndMatches() throws {
+        let url = Bundle(for: YUBannerScheduleTests.self)
+            .url(forResource: "banner-yu-sample", withExtension: "json")
+        let data = try Data(contentsOf: try XCTUnwrap(url))
+        struct Page: Decodable { let totalCount: Int?; let data: [YUBannerSection]? }
+        let page = try JSONDecoder().decode(Page.self, from: data)
+        let sections = page.data ?? []
+        XCTAssertFalse(sections.isEmpty)
+        XCTAssertTrue(sections.allSatisfy { !$0.meetings.isEmpty })
+        XCTAssertTrue(sections.allSatisfy { $0.sequenceNumber != nil })
+        let jhi = sections.filter { $0.subjectCourse == "JHI2430" }
+        XCTAssertEqual(jhi.count, 1)
+        XCTAssertEqual(jhi.first?.sequenceNumber, "331")
+        let meetings = YUBannerSchedule.match(canvasCode: "JHI-2430-331",
+                                              canvasName: "Drashot-Eastern European Jewry",
+                                              canvasInstructor: "Joshua Karlip",
+                                              sections: sections)
+        XCTAssertEqual(meetings.count, 1)
+        XCTAssertEqual(meetings.first?.startMinutes, 15 * 60)
+    }
+
+    func testLiveBannerFetch() async throws {
+        // Live check against the real registrar, skipped without network.
+        let client = YUBannerClient()
+        let terms = try await client.fetchTerms()
+        XCTAssertFalse(terms.isEmpty)
+        let fall = try XCTUnwrap(YUBannerSchedule.pickTerm(matching: "Fall 2026", from: terms))
+        let sections = try await client.fetchAllSections(termCode: fall.code, politenessNanoseconds: 0)
+        XCTAssertGreaterThan(sections.count, 1000)
+    }
+
     func testParsesBannerTimes() {
         XCTAssertEqual(YUClassMeeting.parseBannerTime("0900"), 540)
         XCTAssertEqual(YUClassMeeting.parseBannerTime("1330"), 810)
