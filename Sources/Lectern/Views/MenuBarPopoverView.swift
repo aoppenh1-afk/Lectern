@@ -1,12 +1,13 @@
+import AppKit
 import SwiftData
 import SwiftUI
 
 struct MenuBarPopoverView: View {
-    /// Fixed popover width. Must fit the 4-segment source picker
-    /// (Mic / Zoom / Zoom app / Zoom + mic) plus the content padding.
-    /// StatusBarController uses this for the NSPopover contentSize so the
-    /// hosted view and the popover window never disagree about the width.
-    static let popoverWidth: CGFloat = 300
+    /// One fixed popover geometry for every idle selection state.
+    /// 340 points leaves enough room for four equal source segments plus
+    /// the standard 14-point content margins without clipping.
+    static let popoverWidth: CGFloat = 340
+    private static let contentWidth = popoverWidth - 28
 
     @Environment(CaptureController.self) private var capture
     @Environment(SurfacePreferences.self) private var surfacePreferences
@@ -28,7 +29,7 @@ struct MenuBarPopoverView: View {
                         .transition(.opacity)
                 }
             }
-            .frame(maxWidth: .infinity)
+            .frame(width: Self.contentWidth, alignment: .leading)
             .padding(14)
         }
         .frame(width: Self.popoverWidth, alignment: .center)
@@ -69,45 +70,54 @@ struct MenuBarPopoverView: View {
                 }
                 .labelsHidden()
                 .controlSize(.small)
-                .frame(maxWidth: .infinity)
+                .frame(width: Self.contentWidth)
                 .onChange(of: selectedCourse) { _, course in
                     selectedLanguage = course?.language ?? .english
                 }
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Picker("Source", selection: Binding(
-                    get: { surfacePreferences.captureSource },
-                    set: { surfacePreferences.setCaptureSource($0) }
-                )) {
-                    ForEach(CaptureSource.allCases) { source in
-                        Text(source.shortTitle).tag(source)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .controlSize(.small)
-                .frame(maxWidth: .infinity)
+                EqualWidthSegmentedControl(
+                    titles: CaptureSource.allCases.map(\.shortTitle),
+                    selectedIndex: Binding(
+                        get: {
+                            CaptureSource.allCases.firstIndex(of: surfacePreferences.captureSource) ?? 0
+                        },
+                        set: { index in
+                            guard CaptureSource.allCases.indices.contains(index) else { return }
+                            surfacePreferences.setCaptureSource(CaptureSource.allCases[index])
+                        }
+                    ),
+                    accessibilityLabel: "Recording source"
+                )
+                .frame(width: Self.contentWidth, height: 24)
+
                 Text(sourceCaption)
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(3, reservesSpace: true)
+                    .frame(width: Self.contentWidth, alignment: .topLeading)
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Picker("Language", selection: $selectedLanguage) {
-                    ForEach(LectureLanguage.allCases) { language in
-                        Text(language.title).tag(language)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .controlSize(.small)
-                .frame(maxWidth: .infinity)
+                EqualWidthSegmentedControl(
+                    titles: LectureLanguage.allCases.map(\.title),
+                    selectedIndex: Binding(
+                        get: { LectureLanguage.allCases.firstIndex(of: selectedLanguage) ?? 0 },
+                        set: { index in
+                            guard LectureLanguage.allCases.indices.contains(index) else { return }
+                            selectedLanguage = LectureLanguage.allCases[index]
+                        }
+                    ),
+                    accessibilityLabel: "Lecture language"
+                )
+                .frame(width: Self.contentWidth, height: 24)
+
                 Text(selectedLanguage.caption)
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(2, reservesSpace: true)
+                    .frame(width: Self.contentWidth, alignment: .topLeading)
             }
 
             if let errorMessage = capture.errorMessage {
@@ -133,7 +143,7 @@ struct MenuBarPopoverView: View {
             }
             .prominentAction()
             .tint(LecternTheme.recordTint)
-            .frame(maxWidth: .infinity)
+            .frame(width: Self.contentWidth)
 
             Divider().opacity(0.5)
 
@@ -147,6 +157,7 @@ struct MenuBarPopoverView: View {
                 NSApplication.shared.terminate(nil)
             }
         }
+        .frame(width: Self.contentWidth, alignment: .leading)
     }
 
     private func popoverLink(_ title: String, systemImage: String,
@@ -166,6 +177,7 @@ struct MenuBarPopoverView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(role == .destructive ? AnyShapeStyle(LecternTheme.recordTint) : AnyShapeStyle(Color.primary))
+        .frame(width: Self.contentWidth)
     }
 
     // MARK: - Live
@@ -210,7 +222,7 @@ struct MenuBarPopoverView: View {
                     .padding(.vertical, 4)
             }
             .prominentAction()
-            .frame(maxWidth: .infinity)
+            .frame(width: Self.contentWidth)
 
             HStack(spacing: 6) {
                 TextField("Quick thought…", text: $bookmarkNote)
@@ -229,6 +241,7 @@ struct MenuBarPopoverView: View {
                 }
                 .help("Exam alert (Option-Command-B)")
             }
+            .frame(width: Self.contentWidth)
 
             if !capture.liveBookmarks.isEmpty {
                 Text("\(capture.liveBookmarks.count) bookmark\(capture.liveBookmarks.count == 1 ? "" : "s") saved")
@@ -241,6 +254,7 @@ struct MenuBarPopoverView: View {
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(width: Self.contentWidth, alignment: .leading)
     }
 
     private var sourceCaption: String {
@@ -266,5 +280,61 @@ struct MenuBarPopoverView: View {
     private func saveThought() {
         guard capture.addBookmark(note: bookmarkNote) else { return }
         bookmarkNote = ""
+    }
+}
+
+/// A native AppKit segmented control whose geometry is independent of selection.
+/// SwiftUI's segmented Picker can publish a changing intrinsic width on newer
+/// macOS releases; this control instead fills one explicit frame with equal
+/// segments so changing the selected item only moves the highlight.
+private struct EqualWidthSegmentedControl: NSViewRepresentable {
+    let titles: [String]
+    @Binding var selectedIndex: Int
+    let accessibilityLabel: String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(selectedIndex: $selectedIndex)
+    }
+
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let control = NSSegmentedControl(
+            labels: titles,
+            trackingMode: .selectOne,
+            target: context.coordinator,
+            action: #selector(Coordinator.changed(_:))
+        )
+        control.controlSize = .small
+        control.segmentDistribution = .fillEqually
+        control.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        control.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        control.setAccessibilityLabel(accessibilityLabel)
+        control.selectedSegment = selectedIndex
+        return control
+    }
+
+    func updateNSView(_ control: NSSegmentedControl, context: Context) {
+        context.coordinator.selectedIndex = $selectedIndex
+        if control.segmentCount != titles.count {
+            control.segmentCount = titles.count
+        }
+        for (index, title) in titles.enumerated() {
+            control.setLabel(title, forSegment: index)
+        }
+        control.segmentDistribution = .fillEqually
+        control.setAccessibilityLabel(accessibilityLabel)
+        control.selectedSegment = selectedIndex
+    }
+
+    final class Coordinator: NSObject {
+        var selectedIndex: Binding<Int>
+
+        init(selectedIndex: Binding<Int>) {
+            self.selectedIndex = selectedIndex
+        }
+
+        @objc func changed(_ sender: NSSegmentedControl) {
+            guard sender.selectedSegment >= 0 else { return }
+            selectedIndex.wrappedValue = sender.selectedSegment
+        }
     }
 }
