@@ -108,27 +108,38 @@ struct CanvasCalendarView: View {
     @State private var showingEventSheet = false
     @State private var sheetInitialDate = Date()
     @State private var editingEvent: CanvasEvent?
+    @State private var showingFilter = false
+    @AppStorage("calendar.filter.coursework") private var showCoursework = true
+    @AppStorage("calendar.filter.academic") private var showAcademic = true
+    @AppStorage("calendar.filter.manual") private var showManual = true
 
     private var scopedEvents: [CanvasEvent] {
         events.filter { event in
             // Manual events are the student's own and always stay visible,
             // regardless of the selected academic term.
-            if event.isManual { return true }
+            if event.isManual { return showManual }
+            guard showCoursework else { return false }
             return event.courseCanvasID.map(allowedCourseIDs.contains) ?? false
         }
         .sorted { $0.startAt < $1.startAt }
     }
-    private var scopedAssignments: [CanvasAssignment] { assignments.filter { allowedCourseIDs.contains($0.courseCanvasID) } }
+    private var scopedAssignments: [CanvasAssignment] {
+        assignments.filter { assignment in
+            if assignment.isManual { return showManual && allowedCourseIDs.contains(assignment.courseCanvasID) }
+            guard showCoursework else { return false }
+            return allowedCourseIDs.contains(assignment.courseCanvasID)
+        }
+    }
     /// Official UG calendar days. School-wide, so no course scoping.
     /// YU Canvas accounts only.
     private var scopedAcademic: [YUAcademicEvent] {
-        guard canvasConnection.isYUConnected else { return [] }
+        guard showAcademic, canvasConnection.isYUConnected else { return [] }
         return academicEvents.sorted { $0.startAt < $1.startAt }
     }
 
     /// Registrar finals for this term. YU Canvas accounts only.
     private var scopedFinals: [YUFinalExam] {
-        guard canvasConnection.isYUConnected else { return [] }
+        guard showAcademic, canvasConnection.isYUConnected else { return [] }
         return finals.filter { exam in
             guard let id = exam.courseCanvasID else { return false }
             return allowedCourseIDs.contains(id)
@@ -148,19 +159,42 @@ struct CanvasCalendarView: View {
                 .padding(.top, 26)
                 Spacer()
                 VStack(alignment: .trailing, spacing: 8) {
-                    Button {
-                        sheetInitialDate = anchorDate
-                        showingEventSheet = true
-                    } label: {
-                        Label("Add Event", systemImage: "plus")
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundStyle(.white)
+                    HStack(spacing: 8) {
+                        Button { showingFilter.toggle() } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "line.3.horizontal.decrease.circle")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Filter")
+                                    .font(.system(size: 12.5, weight: .semibold))
+                                if !showCoursework || !showAcademic || !showManual {
+                                    Circle().fill(LecternTheme.accent).frame(width: 7, height: 7)
+                                }
+                            }
+                            .foregroundStyle(LecternTheme.ink)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(LecternTheme.hairline))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Filter which calendars show")
+                        .popover(isPresented: $showingFilter, arrowEdge: .bottom) {
+                            filterPopover
+                        }
+                        Button {
+                            sheetInitialDate = anchorDate
+                            showingEventSheet = true
+                        } label: {
+                            Label("Add Event", systemImage: "plus")
+                                .font(.system(size: 12.5, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Add a personal event to your calendar")
                     }
-                    .buttonStyle(.plain)
-                    .help("Add a personal event to your calendar")
                     Picker("View", selection: $mode) { ForEach(Mode.allCases) { Text($0.rawValue).tag($0) } }
                         .pickerStyle(.segmented).frame(width: 250)
                 }
@@ -190,6 +224,49 @@ struct CanvasCalendarView: View {
             return "\(dates.first?.formatted(.dateTime.month(.wide).day()) ?? "") – \(dates.last?.formatted(.dateTime.month(.wide).day().year()) ?? "")"
         case .month: return anchorDate.formatted(.dateTime.month(.wide).year())
         }
+    }
+
+    private var filterPopover: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("SHOW IN CALENDAR")
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.top, 9)
+                .padding(.bottom, 3)
+            filterRow(icon: "checklist", tint: LecternTheme.accent,
+                      title: "Coursework Events", subtitle: "Canvas deadlines and class events",
+                      isOn: $showCoursework)
+            filterRow(icon: "building.columns", tint: LecternTheme.processingTint,
+                      title: "2026-2027 Academic Calendar", subtitle: "Registrar finals and official UG dates",
+                      isOn: $showAcademic)
+            filterRow(icon: "person", tint: .secondary,
+                      title: "Manually Added Events", subtitle: "Events you created",
+                      isOn: $showManual)
+        }
+        .padding(6)
+        .frame(width: 300)
+        .background(LecternTheme.paper)
+    }
+
+    private func filterRow(icon: String, tint: Color, title: String, subtitle: String,
+                           isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(tint)
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.system(size: 12.5, weight: .medium))
+                    Text(subtitle).font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+            }
+            .foregroundStyle(LecternTheme.ink)
+        }
+        .toggleStyle(.switch)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
     }
 
     private func move(_ direction: Int) {
