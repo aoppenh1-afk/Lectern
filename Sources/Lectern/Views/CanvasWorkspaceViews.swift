@@ -251,7 +251,10 @@ struct CanvasCalendarView: View {
 
     private func filterRow(icon: String, tint: Color, title: String, subtitle: String,
                            isOn: Binding<Bool>) -> some View {
-        Toggle(isOn: isOn) {
+        // Hand-laid row: the stock toggle hugs its label, so a Spacer pins
+        // every switch to the trailing edge. The switch itself ignores taps
+        // and the whole row toggles as one button.
+        Button { isOn.wrappedValue.toggle() } {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 12, weight: .medium))
@@ -261,11 +264,17 @@ struct CanvasCalendarView: View {
                     Text(title).font(.system(size: 12.5, weight: .medium))
                     Text(subtitle).font(.system(size: 10)).foregroundStyle(.secondary)
                 }
+                Spacer(minLength: 12)
+                Toggle("", isOn: isOn)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .allowsHitTesting(false)
             }
             .foregroundStyle(LecternTheme.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .toggleStyle(.switch)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .buttonStyle(.plain)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
     }
