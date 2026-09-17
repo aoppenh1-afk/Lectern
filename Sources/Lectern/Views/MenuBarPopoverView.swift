@@ -2,6 +2,12 @@ import SwiftData
 import SwiftUI
 
 struct MenuBarPopoverView: View {
+    /// Fixed popover width. Must fit the 4-segment source picker
+    /// (Mic / Zoom / Zoom app / Zoom + mic) plus the content padding.
+    /// StatusBarController uses this for the NSPopover contentSize so the
+    /// hosted view and the popover window never disagree about the width.
+    static let popoverWidth: CGFloat = 300
+
     @Environment(CaptureController.self) private var capture
     @Environment(SurfacePreferences.self) private var surfacePreferences
     @Environment(\.openWindow) private var openWindow
@@ -25,7 +31,7 @@ struct MenuBarPopoverView: View {
             .frame(maxWidth: .infinity)
             .padding(14)
         }
-        .frame(width: 252, alignment: .center)
+        .frame(width: Self.popoverWidth, alignment: .center)
     }
 
     // MARK: - Idle
