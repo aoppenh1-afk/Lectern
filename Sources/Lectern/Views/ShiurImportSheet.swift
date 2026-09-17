@@ -163,16 +163,16 @@ struct ShiurImportSheet: View {
 
             Divider()
 
-            HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Audio language")
                     .font(.system(size: 12.5, weight: .medium))
-                Spacer()
-                Picker("", selection: $selectedLanguage) {
+                Picker("Audio language", selection: $selectedLanguage) {
                     Text("English").tag(LectureLanguage.english)
                     Text("English + Hebrew").tag(LectureLanguage.hebrewEnglish)
                 }
+                .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(width: 200)
+                .frame(maxWidth: .infinity)
             }
 
             Divider()
