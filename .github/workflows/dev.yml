@@ -18,8 +18,9 @@ jobs:
   publish-dev:
     # Stable release commits ("Release x.y.z") are excluded; manual runs
     # always publish.
-    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Release ')
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Release '))
     name: Publish dev prerelease
+    environment: release-signing
     runs-on: macos-26
     timeout-minutes: 60
     permissions:
@@ -35,7 +36,7 @@ jobs:
       LECTERN_GOOGLE_CLIENT_SECRET: ${{ vars.LECTERN_GOOGLE_CLIENT_SECRET }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
@@ -47,7 +48,7 @@ jobs:
           set -euo pipefail
           umask 077
           if [[ -z "$SIGNING_P12_BASE64" || -z "$SIGNING_P12_PASSWORD" ]]; then
-            echo '::error::Configure LECTERN_SIGNING_P12_BASE64 and LECTERN_SIGNING_P12_PASSWORD using the original release certificate. Ad-hoc updates reset recording permissions.'
+            echo '::error::Configure LECTERN_SIGNING_P12_BASE64 and LECTERN_SIGNING_P12_PASSWORD in the release-signing environment using the original release certificate. Ad-hoc updates reset recording permissions.'
             exit 1
           fi
           KEYCHAIN_PATH="$RUNNER_TEMP/lectern-signing.keychain-db"
