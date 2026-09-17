@@ -5,15 +5,94 @@ final class AntigravityACPTests: XCTestCase {
     func testPinnedGoogleReleaseMatchesVerifiedT3CodeAsset() throws {
         let release = try XCTUnwrap(AntigravityACPRelease.current)
 
-        XCTAssertEqual(release.version, "agy_acp_server_20260818_01_RC01")
+        XCTAssertEqual(release.version, "agy_acp_server_1.1.1")
         XCTAssertEqual(
             release.url.absoluteString,
-            "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-agy_acp_server_20260818_01_RC01-darwin-arm64.zip"
+            "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-agy_acp_server_1.1.1-darwin-arm64.zip"
         )
-        XCTAssertEqual(release.sha256, "f122ca7e7030a27f9649da4cf1a7d80e12c48c5f6118ff35affc34d56cbf83dd")
-        XCTAssertEqual(release.archiveBytes, 314_500_221)
-        XCTAssertEqual(release.executable, .init(name: "agy_acp_server.par", bytes: 792_105_680))
-        XCTAssertEqual(release.harness, .init(name: "localharness_external", bytes: 101_551_680))
+        XCTAssertEqual(release.sha256, "fdfa915652cdb7ba8085cc8fffed072cbe009251aa2c951aabdda07a8c28a189")
+        XCTAssertEqual(release.archiveBytes, 316_014_828)
+        XCTAssertEqual(release.executable, .init(name: "agy_acp_server.par", bytes: 802_163_856))
+        XCTAssertEqual(release.harness, .init(name: "localharness_external", bytes: 116_766_704))
+    }
+
+    @MainActor
+    func testUpdateCheckReadsVersionWithoutLaunchingRuntime() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = AntigravityACPLayout(root: root)
+        let manager = AntigravityACPManager(layout: layout)
+        let release = try XCTUnwrap(AntigravityACPRelease.current)
+
+        await manager.checkForUpdates()
+        XCTAssertEqual(manager.updateState, .notInstalled)
+        XCTAssertNotNil(manager.lastUpdateCheck)
+
+        // These fixture files cannot run. A status check must only inspect them.
+        try writeInstalledFixture(layout: layout, version: "agy_acp_server_20260818_01_RC01")
+        await manager.checkForUpdates()
+        XCTAssertEqual(manager.updateState, .available(
+            installed: "agy_acp_server_20260818_01_RC01", available: release.version
+        ))
+        XCTAssertEqual(manager.authState, .unavailable)
+
+        try writeInstalledFixture(layout: layout, version: release.version)
+        await manager.checkForUpdates()
+        XCTAssertEqual(manager.updateState, .upToDate(version: release.version))
+
+        try Data("broken record".utf8).write(to: layout.activeRecord)
+        await manager.checkForUpdates()
+        guard case .failed = manager.updateState else { return XCTFail("Corruption must not look up to date.") }
+    }
+
+    func testFailedUpdateValidationKeepsPreviousRuntimeActive() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = AntigravityACPLayout(root: root)
+        let oldID = String(repeating: "a", count: 64)
+        let newID = String(repeating: "b", count: 64)
+        try writeInstalledFixture(layout: layout, version: "old", releaseID: oldID)
+        let activeRecord = try Data(contentsOf: layout.activeRecord)
+        try writeInstalledFixture(layout: layout, version: "new", releaseID: newID)
+        try activeRecord.write(to: layout.activeRecord)
+        let installer = AntigravityACPInstaller(layout: layout)
+        let release = AntigravityACPRelease(
+            version: "new", url: URL(string: "https://example.invalid/not-downloaded.zip")!,
+            sha256: newID, archiveBytes: 1,
+            executable: .init(name: "agy_acp_server.par", bytes: 4),
+            harness: .init(name: "localharness_external", bytes: 7)
+        )
+        do {
+            _ = try await installer.install(
+                release: release, forceReinstall: false, progress: { _, _ in }, phase: { _ in },
+                validate: { _ in throw CancellationError() }
+            )
+            XCTFail("Validation should fail.")
+        } catch is CancellationError {}
+        let installed = try await installer.resolve()
+        XCTAssertEqual(installed.version, "old")
+        XCTAssertEqual(try Data(contentsOf: layout.activeRecord), activeRecord)
+    }
+
+    private func writeInstalledFixture(
+        layout: AntigravityACPLayout, version: String, releaseID: String = String(repeating: "a", count: 64)
+    ) throws {
+        let directory = layout.versionsDirectory.appendingPathComponent(releaseID)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for (name, content) in [("agy_acp_server.par", "exec"), ("localharness_external", "harness")] {
+            let file = directory.appendingPathComponent(name)
+            try Data(content.utf8).write(to: file)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
+        }
+        let record: [String: Any] = [
+            "releaseId": releaseID, "version": version,
+            "executable": ["name": "agy_acp_server.par", "bytes": 4],
+            "harness": ["name": "localharness_external", "bytes": 7],
+        ]
+        try JSONSerialization.data(withJSONObject: record).write(
+            to: directory.appendingPathComponent(".install-complete.json")
+        )
+        try JSONSerialization.data(withJSONObject: ["releaseId": releaseID]).write(to: layout.activeRecord)
     }
 
     func testManagedLayoutKeepsRuntimeAndGoogleProfileInsideLectern() {
@@ -340,6 +419,80 @@ for raw in sys.stdin:
         } catch ACPConnection.ACPError.authRequired(let methods) {
             XCTAssertEqual(methods, ["oauth-personal"])
         }
+    }
+
+    func testNativeAndBrowserHelperSignInURLsOnStderr() async throws {
+        for prefix in ["Open the following link to authenticate the ACP server: ", "__LECTERN_ANTIGRAVITY_AUTH_URL__"] {
+            let script = #"""
+import json, sys, time
+for raw in sys.stdin:
+    request = json.loads(raw)
+    if request["method"] == "initialize":
+        print(json.dumps({"jsonrpc":"2.0","id":request["id"],"result":{"protocolVersion":1}}), flush=True)
+    elif request["method"] == "authenticate":
+        link = "\#(prefix)https://accounts.google.com/o/oauth2/v2/auth?response_type=code&state=state-123&redirect_uri=http%3A%2F%2F127.0.0.1%3A49152%2F\r\n"
+        sys.stderr.write(link[:35]); sys.stderr.flush()
+        time.sleep(0.02)
+        sys.stderr.write(link[35:]); sys.stderr.flush()
+"""#
+            let received = expectation(description: "Received validated URL from stderr")
+            let interactive = try await ACPConnection.connect(
+                executableURL: URL(fileURLWithPath: "/usr/bin/python3"),
+                arguments: ["-u", "-c", script], environment: ProcessInfo.processInfo.environment,
+                onAuthorizationURL: { _ in received.fulfill() }
+            )
+            let authentication = Task { try await interactive.authenticate(methodID: "oauth-personal") }
+            await fulfillment(of: [received], timeout: 5)
+            interactive.shutdown()
+            _ = await authentication.result
+
+            let normal = try await ACPConnection.connect(
+                executableURL: URL(fileURLWithPath: "/usr/bin/python3"),
+                arguments: ["-u", "-c", script], environment: ProcessInfo.processInfo.environment
+            )
+            let timeout = Task {
+                try? await Task.sleep(for: .seconds(5))
+                if !Task.isCancelled { normal.shutdown() }
+            }
+            defer { timeout.cancel(); normal.shutdown() }
+            do {
+                try await normal.authenticate(methodID: "oauth-personal")
+                XCTFail("Background connections must report sign-in required.")
+            } catch ACPConnection.ACPError.authRequired {} catch {
+                XCTFail("Expected sign-in required, got \(error)")
+            }
+        }
+    }
+
+    func testBoundedStderrLinesDiscardOversizeURLsAndRecover() {
+        let lines = LineBuffer(maximumLineBytes: 8)
+        XCTAssertTrue(lines.append(Data("123456789".utf8)).isEmpty)
+        XCTAssertEqual(lines.append(Data("tail\nokay\n".utf8)), [Data("okay".utf8)])
+    }
+
+    func testProcessExitCallbackCleansRuntimeFilesAfterShutdown() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let exited = expectation(description: "Process exited and cleaned its directory")
+        let script = #"""
+import json, sys
+for raw in sys.stdin:
+    request = json.loads(raw)
+    print(json.dumps({"jsonrpc":"2.0","id":request["id"],"result":{"protocolVersion":1}}), flush=True)
+"""#
+        let connection = try await ACPConnection.connect(
+            executableURL: URL(fileURLWithPath: "/usr/bin/python3"),
+            arguments: ["-u", "-c", script], environment: ProcessInfo.processInfo.environment,
+            onProcessExit: {
+                try? FileManager.default.removeItem(at: root)
+                exited.fulfill()
+            }
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.path))
+        connection.shutdown()
+        await fulfillment(of: [exited], timeout: 5)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.path))
     }
 
     func testManagedRuntimeLeaseBlocksRemovalUntilConnectionCloses() async throws {

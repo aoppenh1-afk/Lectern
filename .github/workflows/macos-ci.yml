@@ -36,6 +36,11 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      - name: Test release signing policy
+        run: |
+          bash scripts/test-release-signing.sh
+          bash scripts/test-dev-release-signing.sh
+
       - name: Build Lectern
         run: |
           set -euo pipefail

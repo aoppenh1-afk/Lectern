@@ -39,6 +39,37 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Import original release signing identity
+        env:
+          SIGNING_P12_BASE64: ${{ secrets.LECTERN_SIGNING_P12_BASE64 }}
+          SIGNING_P12_PASSWORD: ${{ secrets.LECTERN_SIGNING_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          if [[ -z "$SIGNING_P12_BASE64" || -z "$SIGNING_P12_PASSWORD" ]]; then
+            echo '::error::Configure LECTERN_SIGNING_P12_BASE64 and LECTERN_SIGNING_P12_PASSWORD using the original release certificate. Ad-hoc updates reset recording permissions.'
+            exit 1
+          fi
+          KEYCHAIN_PATH="$RUNNER_TEMP/lectern-signing.keychain-db"
+          P12_PATH="$RUNNER_TEMP/lectern-signing.p12"
+          CERT_PATH="$RUNNER_TEMP/lectern-signing.pem"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          printf '%s' "$SIGNING_P12_BASE64" | base64 --decode > "$P12_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P "$SIGNING_P12_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security find-certificate -c 'Lectern Release Signing' -p "$KEYCHAIN_PATH" > "$CERT_PATH"
+          source scripts/release-signing.sh
+          FINGERPRINT="$(openssl x509 -in "$CERT_PATH" -noout -fingerprint -sha1 | cut -d= -f2 | tr -d ':')"
+          [[ "$FINGERPRINT" == "$LECTERN_RELEASE_CERTIFICATE" ]] || { echo '::error::Wrong release certificate'; exit 1; }
+          security add-trusted-cert -r trustRoot -p codeSign -k "$KEYCHAIN_PATH" "$CERT_PATH"
+          REQUIRE_CODE_SIGN_IDENTITY=1 resolve_lectern_signing_identity
+          rm -f "$P12_PATH"
+
       - name: Show macOS / Xcode / SDK
         run: |
           set -euo pipefail
@@ -56,3 +87,9 @@ jobs:
         run: |
           set -euo pipefail
           scripts/release-dev.sh
+
+      - name: Remove signing keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/lectern-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/lectern-signing.p12" "$RUNNER_TEMP/lectern-signing.pem"

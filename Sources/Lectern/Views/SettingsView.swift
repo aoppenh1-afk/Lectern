@@ -916,6 +916,7 @@ private struct AgentsPane: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .disabled(antigravityACP.isBusy || antigravityACP.updateState == .checking)
                     }
                     .padding(16)
 
@@ -939,6 +940,35 @@ private struct AgentsPane: View {
                         }
                         .padding(.horizontal, 48)
                         .padding(.bottom, 14)
+                    }
+
+                    agentsDivider
+
+                    antigravitySection(
+                        icon: "arrow.down.circle",
+                        title: "Updates",
+                        message: updateMessage,
+                        detail: updateDetail
+                    ) {
+                        VStack(alignment: .trailing, spacing: 8) {
+                            if case .available = antigravityACP.updateState {
+                                Button("Update Antigravity") { antigravityACP.startInstallation() }
+                                    .buttonStyle(.borderedProminent)
+                            }
+                            Button("Check for updates") {
+                                Task { await antigravityACP.checkForUpdates() }
+                            }
+                        }
+                        .controlSize(.small)
+                        .disabled(antigravityACP.isBusy || antigravityACP.updateState == .checking)
+                    }
+
+                    if let error = antigravityACP.installationError {
+                        Text(error)
+                            .font(.system(size: 11))
+                            .foregroundStyle(LecternTheme.warningTint)
+                            .padding(.horizontal, 48)
+                            .padding(.bottom, 14)
                     }
 
                     agentsDivider
@@ -1078,6 +1108,32 @@ private struct AgentsPane: View {
         detections.first { $0.profileID == id }
     }
 
+    private var updateMessage: String {
+        switch antigravityACP.updateState {
+        case .unchecked: return "Updates have not been checked."
+        case .checking: return "Checking for updates…"
+        case .notInstalled: return "Install Antigravity to get started."
+        case .upToDate: return "Antigravity is up to date for this version of Lectern."
+        case .available: return "An Antigravity update is available."
+        case .unsupported: return "No managed runtime is available for this Mac."
+        case .failed: return "Could not check for updates."
+        }
+    }
+
+    private var updateDetail: String? {
+        switch antigravityACP.updateState {
+        case .available(let installed, let available):
+            return "Installed: \(installed) · Available: \(available)"
+        case .failed(let message): return message
+        default:
+            let explanation = "Checks the verified release included with Lectern. Newer releases arrive with Lectern updates."
+            if let checked = antigravityACP.lastUpdateCheck {
+                return "Checked \(checked.formatted(date: .abbreviated, time: .shortened)). \(explanation)"
+            }
+            return explanation
+        }
+    }
+
     private var runtimeMessage: String {
         switch antigravityACP.runtimeState {
         case .checking: return "Checking the managed runtime…"
@@ -1097,7 +1153,7 @@ private struct AgentsPane: View {
     private var runtimeDetail: String? {
         switch antigravityACP.runtimeState {
         case .notInstalled, .cancelled:
-            return "Downloads 315 MB directly from Google. Your existing agy CLI is separate and is not used."
+            return "Downloads 316 MB directly from Google. Your existing agy CLI is separate and is not used."
         case .ready(let version):
             return "Google release \(version) · SHA-256 verified"
         case .failed(let message):
@@ -1145,14 +1201,20 @@ private struct AgentsPane: View {
                 .controlSize(.small)
         case .ready:
             HStack(spacing: 6) {
-                Button("Reinstall Antigravity") {
-                    antigravityACP.startInstallation(reinstall: true)
+                if case .available = antigravityACP.updateState {
+                    EmptyView()
+                } else {
+                    Button("Reinstall Antigravity") {
+                        antigravityACP.startInstallation(reinstall: true)
+                    }
+                    .disabled(antigravityACP.hasActiveWork)
                 }
                 Button("Remove runtime", role: .destructive) {
                     confirmsRuntimeRemoval = true
                 }
             }
             .controlSize(.small)
+            .disabled(antigravityACP.isBusy || antigravityACP.updateState == .checking)
         case .checking:
             ProgressView().controlSize(.small)
         case .installing:

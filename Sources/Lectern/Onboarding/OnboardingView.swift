@@ -364,7 +364,7 @@ struct AntigravitySetupCard: View {
     private var runtimeDetail: String {
         switch antigravityACP.runtimeState {
         case .checking: return "Checking this Mac."
-        case .notInstalled: return "Downloads 315 MB directly from Google, then verifies the exact SHA-256 and runtime identity."
+        case .notInstalled: return "Downloads 316 MB directly from Google, then verifies the exact SHA-256 and runtime identity."
         case .installing(let phase, _, _):
             switch phase {
             case .downloading: return "Downloading Google's official ACP runtime."

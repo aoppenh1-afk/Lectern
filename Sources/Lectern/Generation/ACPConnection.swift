@@ -98,7 +98,8 @@ final class ACPConnection: @unchecked Sendable {
         environment: [String: String],
         workingDirectory: URL? = nil,
         onAuthorizationURL: (@Sendable (URL) -> Void)? = nil,
-        onClose: (@Sendable () -> Void)? = nil
+        onClose: (@Sendable () -> Void)? = nil,
+        onProcessExit: (@Sendable () -> Void)? = nil
     ) async throws -> ACPConnection {
         let process = Process()
         process.executableURL = executableURL
@@ -124,7 +125,8 @@ final class ACPConnection: @unchecked Sendable {
             stdinHandle: stdinPipe.fileHandleForWriting,
             stderrPipe: stderrPipe,
             onAuthorizationURL: onAuthorizationURL,
-            onClose: onClose
+            onClose: onClose,
+            onProcessExit: onProcessExit
         )
         connection.startReading(stdoutPipe.fileHandleForReading)
 
@@ -135,40 +137,45 @@ final class ACPConnection: @unchecked Sendable {
         }
         defer { initializeTimeout.cancel() }
 
-        let result = try await connection.request(
-            method: "initialize",
-            params: [
-                "protocolVersion": 1,
-                "clientCapabilities": [
-                    "fs": ["readTextFile": false, "writeTextFile": false],
-                    "terminal": false,
-                ],
-                "clientInfo": ["name": "lectern", "title": "Lectern", "version": "0.1.0"],
-            ]
-        )
+        do {
+            let result = try await connection.request(
+                method: "initialize",
+                params: [
+                    "protocolVersion": 1,
+                    "clientCapabilities": [
+                        "fs": ["readTextFile": false, "writeTextFile": false],
+                        "terminal": false,
+                    ],
+                    "clientInfo": ["name": "lectern", "title": "Lectern", "version": "0.1.0"],
+                ]
+            )
 
-        if let dict = result as? [String: Any] {
-            let info = dict["agentInfo"] as? [String: Any]
-            let capabilities = dict["agentCapabilities"] as? [String: Any]
-            let sessions = capabilities?["sessionCapabilities"] as? [String: Any]
-            let auth = capabilities?["auth"] as? [String: Any]
-            let methods = dict["authMethods"] as? [[String: Any]] ?? []
-            connection.mutex.with {
-                connection.identity = AgentIdentity(
-                    name: info?["name"] as? String ?? "agent",
-                    version: info?["version"] as? String ?? "?"
-                )
-                connection.initialization = Initialization(
-                    protocolVersion: dict["protocolVersion"] as? Int ?? 0,
-                    supportsLoadSession: capabilities?["loadSession"] as? Bool ?? false,
-                    supportsResume: capabilityIsSupported(sessions?["resume"]),
-                    supportsLogout: capabilityIsSupported(auth?["logout"]),
-                    authMethodIDs: methods.compactMap { $0["id"] as? String }
-                )
+            if let dict = result as? [String: Any] {
+                let info = dict["agentInfo"] as? [String: Any]
+                let capabilities = dict["agentCapabilities"] as? [String: Any]
+                let sessions = capabilities?["sessionCapabilities"] as? [String: Any]
+                let auth = capabilities?["auth"] as? [String: Any]
+                let methods = dict["authMethods"] as? [[String: Any]] ?? []
+                connection.mutex.with {
+                    connection.identity = AgentIdentity(
+                        name: info?["name"] as? String ?? "agent",
+                        version: info?["version"] as? String ?? "?"
+                    )
+                    connection.initialization = Initialization(
+                        protocolVersion: dict["protocolVersion"] as? Int ?? 0,
+                        supportsLoadSession: capabilities?["loadSession"] as? Bool ?? false,
+                        supportsResume: capabilityIsSupported(sessions?["resume"]),
+                        supportsLogout: capabilityIsSupported(auth?["logout"]),
+                        authMethodIDs: methods.compactMap { $0["id"] as? String }
+                    )
+                }
             }
-        }
 
-        return connection
+            return connection
+        } catch {
+            connection.shutdown()
+            throw error
+        }
     }
 
     /// ACP represents some capabilities as configuration objects rather than
@@ -184,27 +191,40 @@ final class ACPConnection: @unchecked Sendable {
         stdinHandle: FileHandle,
         stderrPipe: Pipe,
         onAuthorizationURL: (@Sendable (URL) -> Void)?,
-        onClose: (@Sendable () -> Void)?
+        onClose: (@Sendable () -> Void)?,
+        onProcessExit: (@Sendable () -> Void)?
     ) {
         self.process = process
         self.stdinHandle = stdinHandle
         self.onAuthorizationURL = onAuthorizationURL
         self.onClose = onClose
 
-        // Drain stderr (capped) so a chatty agent can never fill the pipe.
+        // ACP 1.1.1 emits OAuth links on stderr; the browser helper does too.
+        let stderrLines = LineBuffer(maximumLineBytes: 16_512)
         stderrPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             if data.isEmpty {
                 handle.readabilityHandler = nil
                 return
             }
-            if let text = String(data: data, encoding: .utf8) {
-                self?.stderrTail.append(text)
+            for line in stderrLines.append(data) {
+                self?.stdoutQueue.async { [weak self] in
+                    guard let self else { return }
+                    if !handleAuthorizationLine(line) {
+                        stderrTail.append(String(decoding: line, as: UTF8.self) + "\n")
+                    }
+                }
             }
         }
 
+        let exitCallback = ProcessExitCallback(onProcessExit)
         process.terminationHandler = { [weak self] _ in
             self?.processDidExit()
+            exitCallback.run()
+        }
+        if !process.isRunning {
+            processDidExit()
+            exitCallback.run()
         }
     }
 
@@ -541,24 +561,32 @@ final class ACPConnection: @unchecked Sendable {
         }
     }
 
-    private func handleLine(_ line: Data) {
-        if let text = String(data: line, encoding: .utf8) {
-            let prefix = "Open the following link to authenticate the ACP server: "
-            if text.hasPrefix(prefix),
-               let url = URL(string: String(text.dropFirst(prefix.count))) {
-                if let onAuthorizationURL {
-                    do {
-                        try AntigravityACPAuthorization.validate(url)
-                        onAuthorizationURL(url)
-                    } catch {
-                        failPendingAuthentication(message: error.localizedDescription)
-                    }
-                } else {
-                    failPendingAuthentication(message: nil)
-                }
-                return
+    private func handleAuthorizationLine(_ line: Data) -> Bool {
+        let text = String(decoding: line, as: UTF8.self).trimmingCharacters(in: .newlines)
+        let prefixes = [
+            "Open the following link to authenticate the ACP server: ",
+            "__LECTERN_ANTIGRAVITY_AUTH_URL__",
+        ]
+        guard let prefix = prefixes.first(where: { text.hasPrefix($0) }) else { return false }
+        // Never retain sign-in URLs in diagnostics, including malformed ones.
+        guard let url = URL(string: String(text.dropFirst(prefix.count))) else { return true }
+        do {
+            try AntigravityACPAuthorization.validate(url)
+            if let onAuthorizationURL {
+                onAuthorizationURL(url)
+            } else {
+                failPendingAuthentication(message: nil)
+                shutdown()
             }
+        } catch {
+            failPendingAuthentication(message: error.localizedDescription)
+            shutdown()
         }
+        return true
+    }
+
+    private func handleLine(_ line: Data) {
+        if handleAuthorizationLine(line) { return }
         guard let obj = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { return }
 
         let method = obj["method"] as? String
@@ -678,6 +706,22 @@ final class ACPConnection: @unchecked Sendable {
         }
     }
 
+    private final class ProcessExitCallback: @unchecked Sendable {
+        private let mutex = Mutex()
+        private var callback: (@Sendable () -> Void)?
+
+        init(_ callback: (@Sendable () -> Void)?) { self.callback = callback }
+
+        func run() {
+            let action = mutex.with {
+                let action = callback
+                callback = nil
+                return action
+            }
+            action?()
+        }
+    }
+
     /// Ring-buffer of recent agent stderr output, for diagnostics.
     final class StderrTail: @unchecked Sendable {
         private let mutex = Mutex()
@@ -793,6 +837,12 @@ final class Mutex: @unchecked Sendable {
 final class LineBuffer: @unchecked Sendable {
     private let mutex = Mutex()
     private var buffer = Data()
+    private let maximumLineBytes: Int?
+    private var droppingOversizeLine = false
+
+    init(maximumLineBytes: Int? = nil) {
+        self.maximumLineBytes = maximumLineBytes
+    }
 
     func append(_ data: Data) -> [Data] {
         mutex.with {
@@ -802,9 +852,15 @@ final class LineBuffer: @unchecked Sendable {
             while let newline = buffer.firstIndex(of: 0x0A) {
                 let line = buffer[buffer.startIndex..<newline]
                 buffer.removeSubrange(buffer.startIndex...newline)
-                if !line.isEmpty {
+                if !droppingOversizeLine, !line.isEmpty,
+                   maximumLineBytes.map({ line.count <= $0 }) ?? true {
                     lines.append(Data(line))
                 }
+                droppingOversizeLine = false
+            }
+            if let maximumLineBytes, buffer.count > maximumLineBytes {
+                buffer.removeAll(keepingCapacity: false)
+                droppingOversizeLine = true
             }
             return lines
         }

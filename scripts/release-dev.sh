@@ -12,9 +12,9 @@
 # pruned to the most recent KEEP_DEV_RELEASES.
 #
 # Requirements: clean git tree, `gh` signed in with access to the repo,
-# xcodegen on PATH. Code signing uses the persistent release certificate
-# when available and falls back to ad-hoc signing otherwise (dev only;
-# ad-hoc builds may re-prompt for Keychain access).
+# xcodegen on PATH, and the original release signing certificate in Keychain.
+# Dev updates must keep the same identity as stable updates so macOS can
+# recognize existing privacy grants across builds and channel switches.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -42,10 +42,9 @@ if [[ "$BRANCH" != "main" && -z "${LECTERN_DEV_ALLOW_BRANCH:-}" ]]; then
 fi
 
 source "$ROOT/scripts/release-signing.sh"
-if [[ -z "${LECTERN_SIGN_IDENTITY:-}" ]] && ! security find-identity -p codesigning -v 2>/dev/null | grep -Fq "$LECTERN_RELEASE_CERTIFICATE"; then
-  export LECTERN_SIGN_IDENTITY="-"
-  echo "Release certificate not found; dev build will be ad-hoc signed." >&2
-fi
+export REQUIRE_CODE_SIGN_IDENTITY=1
+SIGN_IDENTITY="$(resolve_lectern_signing_identity)"
+export LECTERN_SIGN_IDENTITY="$SIGN_IDENTITY"
 
 REPO="$(grep -E '^[[:space:]]*LecternUpdateRepository:' project.yml | sed -E 's/.*:[[:space:]]*//')"
 if [[ -z "$REPO" ]]; then
@@ -69,9 +68,7 @@ export LECTERN_DEV_SHA="$FULL_SHA"
 
 "$ROOT/scripts/build-app.sh"
 
-if [[ "${LECTERN_SIGN_IDENTITY:-}" != "-" ]]; then
-  verify_lectern_release_signature "$ROOT/dist/Lectern.app"
-fi
+verify_lectern_release_signature "$ROOT/dist/Lectern.app"
 
 ZIP="dist/Lectern-$TAG.zip"
 rm -f "$ZIP" "$ZIP.sha256"

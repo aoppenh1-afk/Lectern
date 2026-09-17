@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Shared signing policy. This fingerprint is public certificate metadata, not a secret.
-# Keep it stable: replacing the certificate changes Keychain authorization.
+# Keep it stable: replacing the certificate changes the identity macOS uses
+# for privacy grants and Keychain authorization.
 LECTERN_RELEASE_CERTIFICATE=3037A18F1050717B4C7916457A8C22F4AB6D5BA9
 LECTERN_RELEASE_REQUIREMENT='identifier "com.lectern.Lectern" and certificate root = H"3037a18f1050717b4c7916457a8c22f4ab6d5ba9"'
 
@@ -17,7 +18,7 @@ resolve_lectern_signing_identity() {
     return 1
   fi
   if [[ "$requested" != "$LECTERN_RELEASE_CERTIFICATE" && "$requested" != 'Lectern Release Signing' ]]; then
-    echo 'Error: Changing the release signing identity would reset Keychain authorization.' >&2
+    echo 'Error: Changing the release signing identity would reset privacy grants and Keychain authorization.' >&2
     return 1
   fi
   printf '%s\n' "$LECTERN_RELEASE_CERTIFICATE"

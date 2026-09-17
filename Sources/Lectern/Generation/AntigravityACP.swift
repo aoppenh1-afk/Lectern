@@ -16,16 +16,16 @@ struct AntigravityACPRelease: Equatable, Sendable {
     let executable: Member
     let harness: Member
 
-    /// Pinned to the Google registry release verified by T3 Code on 2026-09-02.
+    /// Pinned to the Google registry release verified by T3 Code on 2026-09-03.
     static var current: AntigravityACPRelease? {
         #if arch(arm64)
         AntigravityACPRelease(
-            version: "agy_acp_server_20260818_01_RC01",
-            url: URL(string: "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-agy_acp_server_20260818_01_RC01-darwin-arm64.zip")!,
-            sha256: "f122ca7e7030a27f9649da4cf1a7d80e12c48c5f6118ff35affc34d56cbf83dd",
-            archiveBytes: 314_500_221,
-            executable: .init(name: "agy_acp_server.par", bytes: 792_105_680),
-            harness: .init(name: "localharness_external", bytes: 101_551_680)
+            version: "agy_acp_server_1.1.1",
+            url: URL(string: "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-agy_acp_server_1.1.1-darwin-arm64.zip")!,
+            sha256: "fdfa915652cdb7ba8085cc8fffed072cbe009251aa2c951aabdda07a8c28a189",
+            archiveBytes: 316_014_828,
+            executable: .init(name: "agy_acp_server.par", bytes: 802_163_856),
+            harness: .init(name: "localharness_external", bytes: 116_766_704)
         )
         #else
         nil
@@ -482,6 +482,7 @@ actor AntigravityACPInstaller {
             }
             phase(.verifying)
             try await validate(existing)
+            try Task.checkCancellation()
             try activate(releaseID: release.sha256)
             return existing
         }
@@ -518,6 +519,7 @@ actor AntigravityACPInstaller {
             throw AntigravityACPError.downloadFailed("Could not download Antigravity from Google: \(error.localizedDescription)")
         }
 
+        try Task.checkCancellation()
         let archiveSize = try fileSize(archive)
         progress(archiveSize, release.archiveBytes)
         guard archiveSize == release.archiveBytes,
@@ -558,6 +560,7 @@ actor AntigravityACPInstaller {
         )
         phase(.verifying)
         try await validate(candidate)
+        try Task.checkCancellation()
 
         let record = ReleaseRecord(
             releaseId: release.sha256,
@@ -571,6 +574,12 @@ actor AntigravityACPInstaller {
 
         var backup: URL?
         if fileManager.fileExists(atPath: destination.path) {
+            // A connection may have acquired the runtime while the download awaited.
+            guard leases.isEmpty else {
+                throw AntigravityACPError.invalidInstallation(
+                    "Antigravity is currently in use. Stop active work before reinstalling it."
+                )
+            }
             let candidate = layout.versionsDirectory.appendingPathComponent(".previous-\(UUID().uuidString)")
             try fileManager.moveItem(at: destination, to: candidate)
             backup = candidate
@@ -703,6 +712,16 @@ final class AntigravityACPManager {
         case failed(String)
     }
 
+    enum UpdateState: Equatable {
+        case unchecked
+        case checking
+        case notInstalled
+        case upToDate(version: String)
+        case available(installed: String, available: String)
+        case unsupported
+        case failed(String)
+    }
+
     enum AuthState: Equatable {
         case unavailable
         case signedOut
@@ -717,6 +736,12 @@ final class AntigravityACPManager {
 
     private(set) var runtimeState: RuntimeState = .checking
     private(set) var authState: AuthState = .unavailable
+    private(set) var updateState: UpdateState = .unchecked
+    private(set) var lastUpdateCheck: Date?
+    private(set) var installationError: String?
+    private var isRefreshing = false
+    private var isRemoving = false
+    private var installationOperationID: UUID?
     private(set) var authDetail: String?
     private(set) var installation: AntigravityACPInstallation?
     private var authenticationConnection: ACPConnection?
@@ -736,28 +761,62 @@ final class AntigravityACPManager {
     var isSignedIn: Bool { authState == .signedIn }
     var hasActiveWork: Bool { !activeConnections.isEmpty }
 
+    var isBusy: Bool {
+        if isRefreshing || isRemoving || installationTask != nil || installationOperationID != nil { return true }
+        switch authState {
+        case .signingIn, .waitingForBrowser, .signingOut: return true
+        default: return false
+        }
+    }
+
+    /// Like T3 Code, updates use the verified release shipped with the app.
+    /// This check only reads the installation record; it never launches ACP.
+    func checkForUpdates() async {
+        guard !isBusy, updateState != .checking else { return }
+        updateState = .checking
+        guard let release = AntigravityACPRelease.current else {
+            updateState = .unsupported
+            return
+        }
+        do {
+            let installed = try await installer.resolve()
+            updateState = installed.version == release.version
+                ? .upToDate(version: installed.version)
+                : .available(installed: installed.version, available: release.version)
+            lastUpdateCheck = Date()
+        } catch AntigravityACPError.notInstalled {
+            updateState = .notInstalled
+            lastUpdateCheck = Date()
+        } catch {
+            updateState = .failed(error.localizedDescription)
+        }
+    }
+
     func startInstallation(reinstall: Bool = false) {
-        guard installationTask == nil else { return }
+        guard !isBusy, updateState != .checking else { return }
         installationTask = Task { @MainActor [weak self] in
             guard let self else { return }
             await install(reinstall: reinstall)
             installationTask = nil
+            await checkForUpdates()
         }
     }
 
     func cancelInstallation() {
         installationTask?.cancel()
-        installationTask = nil
-        runtimeState = .cancelled
-        authState = .unavailable
     }
 
     func refresh() async {
+        guard !isBusy, updateState != .checking else { return }
+        await checkForUpdates()
+        isRefreshing = true
+        defer { isRefreshing = false }
         runtimeState = .checking
         do {
             let resolved = try await installer.resolve()
             try AntigravityACPProfile.prepare(layout: layout)
-            try await validate(resolved)
+            // Installed releases were validated before activation. Avoid unpacking
+            // another PyInstaller process just to recheck its identity.
             installation = resolved
             runtimeState = .ready(version: resolved.version)
             await refreshAuthenticationStatus()
@@ -773,6 +832,12 @@ final class AntigravityACPManager {
     }
 
     func install(reinstall: Bool = false) async {
+        guard installationOperationID == nil else { return }
+        let operationID = UUID()
+        installationOperationID = operationID
+        defer { installationOperationID = nil }
+        installationError = nil
+        let previousAuthState = authState
         guard let release = AntigravityACPRelease.current else {
             runtimeState = .failed(AntigravityACPError.unsupportedPlatform.localizedDescription)
             return
@@ -784,14 +849,15 @@ final class AntigravityACPManager {
                 forceReinstall: reinstall,
                 progress: { downloaded, total in
                     Task { @MainActor [weak self] in
-                        self?.runtimeState = .installing(
+                        guard let self, self.installationOperationID == operationID else { return }
+                        self.runtimeState = .installing(
                             phase: .downloading, downloaded: downloaded, total: total
                         )
                     }
                 },
                 phase: { phase in
                     Task { @MainActor [weak self] in
-                        guard let self else { return }
+                        guard let self, self.installationOperationID == operationID else { return }
                         let bytes: (Int64, Int64)
                         if case .installing(_, let downloaded, let total) = runtimeState {
                             bytes = (downloaded, total)
@@ -810,33 +876,44 @@ final class AntigravityACPManager {
                     try await AntigravityACPManager.validateInstallation(candidate)
                 }
             )
+            installationOperationID = nil
             installation = installed
             runtimeState = .ready(version: installed.version)
             await refreshAuthenticationStatus()
         } catch {
-            if Task.isCancelled {
-                runtimeState = .cancelled
-                authState = .unavailable
+            if let installation {
+                // The installer activates only a fully validated download.
+                runtimeState = .ready(version: installation.version)
+                authState = previousAuthState
+                installationError = Task.isCancelled
+                    ? "Update cancelled. The installed runtime is still available."
+                    : error.localizedDescription
             } else {
-                runtimeState = .failed(error.localizedDescription)
+                runtimeState = Task.isCancelled ? .cancelled : .failed(error.localizedDescription)
                 authState = .unavailable
             }
         }
     }
 
     func remove() async {
+        guard !isBusy, updateState != .checking else { return }
+        isRemoving = true
+        defer { isRemoving = false }
         do {
             await stopActiveConnections()
             try await installer.removeManagedRuntime()
             installation = nil
             runtimeState = .notInstalled
             authState = .unavailable
+            updateState = .notInstalled
+            installationError = nil
         } catch {
             runtimeState = .failed(error.localizedDescription)
         }
     }
 
     func signIn() async {
+        guard !isBusy else { return }
         guard installation != nil else {
             authState = .failed(AntigravityACPError.notInstalled.localizedDescription)
             return
@@ -911,6 +988,7 @@ final class AntigravityACPManager {
     }
 
     func signOut() async {
+        guard !isBusy else { return }
         guard installation != nil else { return }
         authState = .signingOut
         do {
@@ -934,8 +1012,8 @@ final class AntigravityACPManager {
     ) async throws -> ACPConnection {
         let acquired = try await installer.acquire()
         let connectionID = UUID()
-        try AntigravityACPProfile.prepare(layout: layout)
         do {
+            try AntigravityACPProfile.prepare(layout: layout)
             let connection = try await Self.connect(
                 installation: acquired.installation,
                 layout: layout,
@@ -983,10 +1061,6 @@ final class AntigravityACPManager {
         }
     }
 
-    private func validate(_ installation: AntigravityACPInstallation) async throws {
-        try await Self.validateInstallation(installation)
-    }
-
     nonisolated private static func validateInstallation(
         _ installation: AntigravityACPInstallation
     ) async throws {
@@ -1016,18 +1090,33 @@ final class AntigravityACPManager {
         onClose: (@Sendable () -> Void)? = nil
     ) async throws -> ACPConnection {
         try AntigravityACPProfile.prepare(layout: layout)
-        let environment = AntigravityACPProfile.launchEnvironment(
+        let runtimeTemp = layout.acpProfileDirectory
+            .appendingPathComponent("tmp/run-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: runtimeTemp, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
+        )
+        var environment = AntigravityACPProfile.launchEnvironment(
             installation: installation,
             layout: layout
         )
-        return try await ACPConnection.connect(
-            executableURL: installation.executable,
-            arguments: [],
-            environment: environment,
-            workingDirectory: layout.profileDirectory,
-            onAuthorizationURL: onAuthorizationURL,
-            onClose: onClose
-        )
+        environment["TMPDIR"] = runtimeTemp.path
+        do {
+            return try await ACPConnection.connect(
+                executableURL: installation.executable,
+                arguments: [],
+                environment: environment,
+                workingDirectory: layout.profileDirectory,
+                onAuthorizationURL: onAuthorizationURL,
+                onClose: onClose,
+                onProcessExit: { try? FileManager.default.removeItem(at: runtimeTemp) }
+            )
+        } catch {
+            // Spawn failures have no process-exit callback.
+            if case ACPConnection.ACPError.spawnFailed = error {
+                try? FileManager.default.removeItem(at: runtimeTemp)
+            }
+            throw error
+        }
     }
 
     private static func authMessage(for error: Error) -> String {
