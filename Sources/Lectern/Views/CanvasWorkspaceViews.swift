@@ -265,6 +265,7 @@ struct CanvasCalendarView: View {
             .foregroundStyle(LecternTheme.ink)
         }
         .toggleStyle(.switch)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
     }
