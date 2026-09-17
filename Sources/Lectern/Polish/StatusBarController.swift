@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 final class StatusBarController {
     private static let autosaveName = "LecternMenuBarItem"
+    private static let popoverSize = NSSize(width: MenuBarPopoverView.popoverWidth, height: 360)
 
     private let capture: CaptureController
     private let surfacePreferences: SurfacePreferences
@@ -43,6 +44,9 @@ final class StatusBarController {
     @objc private func preferencesChanged() {
         MainActor.assumeIsolated {
             rebuild()
+            if let popover {
+                lockPopoverSize(popover)
+            }
         }
     }
 
@@ -102,18 +106,37 @@ final class StatusBarController {
         }
     }
 
+    private func popoverRootView() -> AnyView {
+        AnyView(
+            MenuBarPopoverView()
+                .environment(capture)
+                .environment(surfacePreferences)
+                .preferredColorScheme(surfacePreferences.appearance.colorScheme)
+        )
+    }
+
+    private func lockPopoverSize(_ pop: NSPopover) {
+        // NSPopover adopts the content view's size when a content controller is
+        // assigned, so set the fixed size after the controller is installed and
+        // re-assert it after state changes. This keeps the shell exactly the same
+        // size no matter which recording source/language is selected.
+        pop.contentSize = Self.popoverSize
+    }
+
     private func buildPopover() -> NSPopover {
         let pop = NSPopover()
         pop.behavior = .transient
-        pop.contentSize = NSSize(width: MenuBarPopoverView.popoverWidth, height: 360)
-        pop.contentViewController = NSHostingController(
-            rootView: AnyView(
-                MenuBarPopoverView()
-                    .environment(capture)
-                    .environment(surfacePreferences)
-                    .preferredColorScheme(surfacePreferences.appearance.colorScheme)
-            )
-        )
+
+        let hosting = NSHostingController(rootView: popoverRootView())
+        // The default .standardBounds option reflects SwiftUI's changing ideal,
+        // min, and max sizes back into AppKit. This popover is intentionally a
+        // fixed-size surface, so do not let child intrinsic-size changes resize
+        // its hosting view. Apple documents [] for fixed-frame hosting cases.
+        hosting.sizingOptions = []
+        hosting.preferredContentSize = Self.popoverSize
+
+        pop.contentViewController = hosting
+        lockPopoverSize(pop)
         return pop
     }
 
@@ -124,7 +147,9 @@ final class StatusBarController {
         } else {
             let pop = popover ?? buildPopover()
             self.popover = pop
+            lockPopoverSize(pop)
             pop.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            lockPopoverSize(pop)
             // Clicking the status item while another app is active shows the
             // popover but leaves it without key focus, forcing a second click
             // before controls respond. Activate and make key so the first
@@ -140,12 +165,11 @@ final class StatusBarController {
         guard surfacePreferences.popoverEnabled else { return }
         rebuild()
         if let hosting = popover?.contentViewController as? NSHostingController<AnyView> {
-            hosting.rootView = AnyView(
-                MenuBarPopoverView()
-                    .environment(capture)
-                    .environment(surfacePreferences)
-                    .preferredColorScheme(surfacePreferences.appearance.colorScheme)
-            )
+            hosting.rootView = popoverRootView()
+            hosting.preferredContentSize = Self.popoverSize
+        }
+        if let popover {
+            lockPopoverSize(popover)
         }
         if !capture.phase.isLive, popover?.isShown == true {
             // Give the user a beat to see the saved state before closing.
