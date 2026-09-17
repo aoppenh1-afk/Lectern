@@ -126,7 +126,9 @@ final class CanvasZoomReminderService {
                 let courseID = originalCourseID ?? old?.courseID
                     ?? (courseMatches.count == 1 ? courseMatches.first?.id : nil)
                 let syllabus = snapshot.courses.first { $0.id == courseID }?.syllabusBody?.canvasPlainText
-                let start = invitation.resolvedStart(courseID: courseID, events: events, syllabus: syllabus)
+                let bannerMeetings = bannerMeetings(for: courseID)
+                let start = invitation.resolvedStart(courseID: courseID, events: events, syllabus: syllabus,
+                                                     bannerMeetings: bannerMeetings)
                 guard start > Date().addingTimeInterval(-15 * 60) else { continue }
                 let reminder = Reminder(id: id, invitation: invitation, courseID: courseID ?? old?.courseID,
                                         startAt: start, sources: (old?.sources ?? []).union([sourceID]),
@@ -261,6 +263,11 @@ final class CanvasZoomReminderService {
         return (try? container.mainContext.fetch(FetchDescriptor<Course>()))?.first { $0.canvasID == id }
     }
 
+    private func bannerMeetings(for id: Int64?) -> [YUClassMeeting] {
+        guard connection.isYUConnected else { return [] }
+        return course(for: id)?.bannerMeetings ?? []
+    }
+
     private static func courseID(_ code: String?) -> Int64? {
         guard let code, code.hasPrefix("course_") else { return nil }
         return Int64(code.dropFirst(7))
@@ -328,7 +335,7 @@ private struct CanvasZoomJoinView: View {
                 detail("Time", icon: "clock", value: reminder.startAt.formatted(date: .omitted, time: .shortened))
                 detail("Meeting", icon: "video", value: reminder.invitation.topic)
                 if reminder.startAt != reminder.invitation.startAt {
-                    Text("Using the Canvas class schedule.")
+                    Text(scheduleSourceNote)
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -401,6 +408,13 @@ private struct CanvasZoomJoinView: View {
         }
         .font(.system(size: 13))
         .accessibilityElement(children: .combine)
+    }
+
+    private var scheduleSourceNote: String {
+        if !(course?.bannerMeetings.isEmpty ?? true) {
+            return "Using the YU registrar schedule."
+        }
+        return "Using the Canvas class schedule."
     }
 
     private func primaryAction() {

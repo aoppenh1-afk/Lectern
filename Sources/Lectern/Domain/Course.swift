@@ -24,6 +24,14 @@ final class Course {
     var canvasURL: String?
     var canvasUpdatedAt: Date?
 
+    /// YU Banner schedule, cross-checked from Canvas courses. All optional so
+    /// existing stores migrate without a mapping model. Meetings are JSON so
+    /// one course can hold a lecture plus a lab at different times.
+    var bannerTermCode: String?
+    var bannerSubjectCourse: String?
+    var bannerMeetingsData: Data?
+    var bannerUpdatedAt: Date?
+
     /// Default spoken language stamped onto lectures recorded into this
     /// course. Raw-string storage keeps the SwiftData migration lightweight.
     private var languageRaw: String = LectureLanguage.english.rawValue

@@ -96,26 +96,55 @@ struct StudioDropdown<Value: Hashable>: View {
 
 struct CanvasCalendarView: View {
     enum Mode: String, CaseIterable, Identifiable { case day = "Day", week = "Week", month = "Month"; var id: String { rawValue } }
+    @Environment(CanvasConnectionSettings.self) private var canvasConnection
     @Query(sort: \CanvasEvent.startAt) private var events: [CanvasEvent]
     @Query(sort: \CanvasAssignment.dueAt) private var assignments: [CanvasAssignment]
     @Query(sort: \Course.name) private var courses: [Course]
+    @Query(sort: \YUFinalExam.startAt) private var finals: [YUFinalExam]
+    @Query(sort: \YUAcademicEvent.startAt) private var academicEvents: [YUAcademicEvent]
     let allowedCourseIDs: Set<Int64>
     @State private var anchorDate = Date()
     @State private var mode: Mode = .month
     @State private var showingEventSheet = false
     @State private var sheetInitialDate = Date()
     @State private var editingEvent: CanvasEvent?
+    @State private var showingFilter = false
+    @AppStorage("calendar.filter.coursework") private var showCoursework = true
+    @AppStorage("calendar.filter.academic") private var showAcademic = true
+    @AppStorage("calendar.filter.manual") private var showManual = true
 
     private var scopedEvents: [CanvasEvent] {
         events.filter { event in
             // Manual events are the student's own and always stay visible,
             // regardless of the selected academic term.
-            if event.isManual { return true }
+            if event.isManual { return showManual }
+            guard showCoursework else { return false }
             return event.courseCanvasID.map(allowedCourseIDs.contains) ?? false
         }
         .sorted { $0.startAt < $1.startAt }
     }
-    private var scopedAssignments: [CanvasAssignment] { assignments.filter { allowedCourseIDs.contains($0.courseCanvasID) } }
+    private var scopedAssignments: [CanvasAssignment] {
+        assignments.filter { assignment in
+            if assignment.isManual { return showManual && allowedCourseIDs.contains(assignment.courseCanvasID) }
+            guard showCoursework else { return false }
+            return allowedCourseIDs.contains(assignment.courseCanvasID)
+        }
+    }
+    /// Official UG calendar days. School-wide, so no course scoping.
+    /// YU Canvas accounts only.
+    private var scopedAcademic: [YUAcademicEvent] {
+        guard showAcademic, canvasConnection.isYUConnected else { return [] }
+        return academicEvents.sorted { $0.startAt < $1.startAt }
+    }
+
+    /// Registrar finals for this term. YU Canvas accounts only.
+    private var scopedFinals: [YUFinalExam] {
+        guard showAcademic, canvasConnection.isYUConnected else { return [] }
+        return finals.filter { exam in
+            guard let id = exam.courseCanvasID else { return false }
+            return allowedCourseIDs.contains(id)
+        }.sorted { $0.startAt < $1.startAt }
+    }
 
     var body: some View {
         StudioPage(title: "Calendar", subtitle: "Your Fall 2026 schedule, Canvas deadlines, and personal events") {
@@ -130,19 +159,42 @@ struct CanvasCalendarView: View {
                 .padding(.top, 26)
                 Spacer()
                 VStack(alignment: .trailing, spacing: 8) {
-                    Button {
-                        sheetInitialDate = anchorDate
-                        showingEventSheet = true
-                    } label: {
-                        Label("Add Event", systemImage: "plus")
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundStyle(.white)
+                    HStack(spacing: 8) {
+                        Button { showingFilter.toggle() } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "line.3.horizontal.decrease.circle")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Filter")
+                                    .font(.system(size: 12.5, weight: .semibold))
+                                if !showCoursework || !showAcademic || !showManual {
+                                    Circle().fill(LecternTheme.accent).frame(width: 7, height: 7)
+                                }
+                            }
+                            .foregroundStyle(LecternTheme.ink)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(LecternTheme.hairline))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Filter which calendars show")
+                        .popover(isPresented: $showingFilter, arrowEdge: .bottom) {
+                            filterPopover
+                        }
+                        Button {
+                            sheetInitialDate = anchorDate
+                            showingEventSheet = true
+                        } label: {
+                            Label("Add Event", systemImage: "plus")
+                                .font(.system(size: 12.5, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Add a personal event to your calendar")
                     }
-                    .buttonStyle(.plain)
-                    .help("Add a personal event to your calendar")
                     Picker("View", selection: $mode) { ForEach(Mode.allCases) { Text($0.rawValue).tag($0) } }
                         .pickerStyle(.segmented).frame(width: 250)
                 }
@@ -172,6 +224,59 @@ struct CanvasCalendarView: View {
             return "\(dates.first?.formatted(.dateTime.month(.wide).day()) ?? "") – \(dates.last?.formatted(.dateTime.month(.wide).day().year()) ?? "")"
         case .month: return anchorDate.formatted(.dateTime.month(.wide).year())
         }
+    }
+
+    private var filterPopover: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("SHOW IN CALENDAR")
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.top, 9)
+                .padding(.bottom, 3)
+            filterRow(icon: "checklist", tint: LecternTheme.accent,
+                      title: "Coursework Events", subtitle: "Canvas deadlines and class events",
+                      isOn: $showCoursework)
+            filterRow(icon: "building.columns", tint: LecternTheme.processingTint,
+                      title: "2026-2027 Academic Calendar", subtitle: "Registrar finals and official UG dates",
+                      isOn: $showAcademic)
+            filterRow(icon: "person", tint: .secondary,
+                      title: "Manually Added Events", subtitle: "Events you created",
+                      isOn: $showManual)
+        }
+        .padding(6)
+        .frame(width: 300)
+        .background(LecternTheme.paper)
+    }
+
+    private func filterRow(icon: String, tint: Color, title: String, subtitle: String,
+                           isOn: Binding<Bool>) -> some View {
+        // Hand-laid row: the stock toggle hugs its label, so a Spacer pins
+        // every switch to the trailing edge. The switch itself ignores taps
+        // and the whole row toggles as one button.
+        Button(action: { isOn.wrappedValue.toggle() }) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(tint)
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.system(size: 12.5, weight: .medium))
+                    Text(subtitle).font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 12)
+                Toggle("", isOn: isOn)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .allowsHitTesting(false)
+            }
+            .foregroundStyle(LecternTheme.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
     }
 
     private func move(_ direction: Int) {
@@ -222,11 +327,19 @@ struct CanvasCalendarView: View {
     private func monthCell(_ day: Date) -> some View {
         let dayEvents = scopedEvents.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
         let dayAssignments = scopedAssignments.filter { $0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
+        let dayFinals = scopedFinals.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
+        let dayAcademic = scopedAcademic.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
         return VStack(alignment: .leading, spacing: 4) {
             Text(day.formatted(.dateTime.day())).font(.system(size: 11, weight: Calendar.current.isDateInToday(day) ? .bold : .regular))
                 .foregroundStyle(Calendar.current.isDate(day, equalTo: anchorDate, toGranularity: .month) ? LecternTheme.ink : Color.secondary.opacity(0.45))
                 .padding(5)
                 .background(Calendar.current.isDateInToday(day) ? LecternTheme.accent.opacity(0.14) : .clear, in: Circle())
+            ForEach(dayFinals.prefix(2)) { final in
+                calendarChip(final.title, color: LecternTheme.recordTint, icon: "graduationcap")
+            }
+            ForEach(dayAcademic.prefix(1)) { entry in
+                calendarChip(entry.title, color: academicTint(entry.kind), icon: academicIcon(entry.kind))
+            }
             ForEach(dayEvents.prefix(2)) { event in
                 if event.isManual {
                     Button { editingEvent = event } label: {
@@ -237,8 +350,11 @@ struct CanvasCalendarView: View {
                     calendarChip(event.title, color: LecternTheme.accent)
                 }
             }
+            let shownFinals = min(dayFinals.count, 2)
+            let shownAcademic = min(dayAcademic.count, 1)
             ForEach(dayAssignments.prefix(max(0, 3 - dayEvents.count))) { assignment in calendarChip(assignment.title, color: LecternTheme.warningTint) }
-            if dayEvents.count + dayAssignments.count > 3 { Text("+\(dayEvents.count + dayAssignments.count - 3) more").font(.system(size: 9)).foregroundStyle(.secondary) }
+            let overflow = dayEvents.count + dayAssignments.count + dayFinals.count + dayAcademic.count - 3 - shownFinals - shownAcademic
+            if overflow > 0 { Text("+\(overflow) more").font(.system(size: 9)).foregroundStyle(.secondary) }
             Spacer(minLength: 0)
         }
         .padding(7).frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
@@ -270,10 +386,14 @@ struct CanvasCalendarView: View {
                         Divider()
                         let dayEvents = scopedEvents.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
                         let dayAssignments = scopedAssignments.filter { $0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
+                        let dayFinals = scopedFinals.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
+                        let dayAcademic = scopedAcademic.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
                         VStack(spacing: 8) {
+                            ForEach(dayAcademic) { AcademicAgendaRow(entry: $0) }
+                            ForEach(dayFinals) { FinalExamAgendaRow(final: $0) }
                             ForEach(dayEvents) { eventRow($0) }
                             ForEach(dayAssignments) { AssignmentAgendaRow(assignment: $0) }
-                            if dayEvents.isEmpty && dayAssignments.isEmpty { Text("No events").font(.system(size: 10)).foregroundStyle(.tertiary).padding(.top, 30) }
+                            if dayAcademic.isEmpty && dayFinals.isEmpty && dayEvents.isEmpty && dayAssignments.isEmpty { Text("No events").font(.system(size: 10)).foregroundStyle(.tertiary).padding(.top, 30) }
                         }.padding(8)
                     }
                     .frame(minWidth: 150, maxWidth: .infinity, minHeight: 570, alignment: .top)
@@ -286,6 +406,8 @@ struct CanvasCalendarView: View {
     private func dayView(_ day: Date) -> some View {
         let dayEvents = scopedEvents.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
         let dayAssignments = scopedAssignments.filter { $0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
+        let dayFinals = scopedFinals.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
+        let dayAcademic = scopedAcademic.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
         return ScrollView {
             VStack(spacing: 0) {
                 HStack {
@@ -305,11 +427,14 @@ struct CanvasCalendarView: View {
                 .padding(.horizontal, 14)
                 .padding(.top, 12)
                 .padding(.bottom, 4)
+                ForEach(dayAcademic) { AcademicAgendaRow(entry: $0) }
+                    .padding(.horizontal, 14)
                 ForEach(0..<24, id: \.self) { hour in
                     HStack(alignment: .top, spacing: 16) {
                         Text(Calendar.current.date(from: DateComponents(hour: hour))?.formatted(date: .omitted, time: .shortened) ?? "")
                             .font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary).frame(width: 64, alignment: .trailing)
                         VStack(spacing: 6) {
+                            ForEach(dayFinals.filter { Calendar.current.component(.hour, from: $0.startAt) == hour }) { FinalExamAgendaRow(final: $0) }
                             ForEach(dayEvents.filter { Calendar.current.component(.hour, from: $0.startAt) == hour }) { eventRow($0) }
                             ForEach(dayAssignments.filter { ($0.dueAt.map { Calendar.current.component(.hour, from: $0) } ?? -1) == hour }) { AssignmentAgendaRow(assignment: $0) }
                             Divider()
@@ -2211,6 +2336,75 @@ private struct EventAgendaRow: View {
 private struct AssignmentAgendaRow: View {
     let assignment: CanvasAssignment
     var body: some View { HStack(spacing: 14) { Image(systemName: assignment.isComplete ? "checkmark.circle.fill" : "checklist").font(.system(size: 17)).foregroundStyle(assignment.isComplete ? LecternTheme.successTint : LecternTheme.warningTint).frame(width: 78); VStack(alignment: .leading, spacing: 3) { Text(assignment.title).font(.system(size: 13, weight: .semibold)); Text("\(assignment.courseName) · \(assignmentDetail(assignment))").font(.system(size: 11)).foregroundStyle(.secondary) }; Spacer() }.padding(14).studioPanel() }
+}
+
+/// Official UG calendar day. Read-only: dates come from the bundled calendar.
+private struct AcademicAgendaRow: View {
+    let entry: YUAcademicEvent
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading) {
+                Text("All day").font(.system(size: 12, weight: .semibold).monospacedDigit())
+                Text("YU calendar").font(.system(size: 10)).foregroundStyle(.secondary)
+            }.frame(width: 78, alignment: .leading)
+            Rectangle().fill(academicTint(entry.kind)).frame(width: 3, height: 42)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Image(systemName: academicIcon(entry.kind)).font(.system(size: 11, weight: .semibold))
+                    Text(entry.title).font(.system(size: 13, weight: .semibold))
+                }
+            }
+            Spacer()
+        }.padding(14).studioPanel()
+    }
+}
+
+private func academicTint(_ kind: YUAcademicKind) -> Color {
+    switch kind {
+    case .holiday: .orange
+    case .deadline: LecternTheme.accent
+    case .remote, .swap: .blue
+    case .exams, .noSchool: LecternTheme.processingTint
+    case .boundary, .admin, .observance: .secondary
+    }
+}
+
+private func academicIcon(_ kind: YUAcademicKind) -> String {
+    switch kind {
+    case .holiday: "moon.stars"
+    case .deadline: "alarm"
+    case .remote: "wifi"
+    case .swap: "arrow.left.arrow.right"
+    case .exams: "pencil"
+    case .noSchool: "suitcase"
+    case .boundary: "flag"
+    case .admin: "doc.text"
+    case .observance: "eye"
+    }
+}
+
+/// Registrar final exam row. Read-only: times come from the Wilf finals grid.
+private struct FinalExamAgendaRow: View {
+    let final: YUFinalExam
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading) {
+                Text(final.startAt.formatted(date: .omitted, time: .shortened)).font(.system(size: 12, weight: .semibold).monospacedDigit())
+                if let end = final.endAt { Text(end.formatted(date: .omitted, time: .shortened)).font(.system(size: 10)).foregroundStyle(.secondary) }
+            }.frame(width: 78, alignment: .leading)
+            Rectangle().fill(LecternTheme.recordTint).frame(width: 3, height: 42)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(final.title).font(.system(size: 13, weight: .semibold))
+                    StatusChip("Final", LecternTheme.recordTint)
+                }
+                Text([final.courseName, "Registrar"].joined(separator: " · "))
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+        }.padding(14).studioPanel()
+    }
 }
 
 private extension View {
