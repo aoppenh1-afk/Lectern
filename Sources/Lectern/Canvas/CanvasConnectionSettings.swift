@@ -68,6 +68,19 @@ final class CanvasConnectionSettings {
     }
 
     var isConnected: Bool { !domain.isEmpty && hasToken }
+    /// YU-only features (Banner times, finals) run solely for YU Canvas.
+    var isYUConnected: Bool { isConnected && Self.isYUHost(domain) }
+
+    /// Exact host match on yu.instructure.com. Case-insensitive, and tolerant
+    /// of a pasted URL with scheme or trailing slash.
+    nonisolated static func isYUHost(_ domain: String) -> Bool {
+        let trimmed = domain.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        if let url = try? CanvasClient.normalizedBaseURL(trimmed) {
+            return url.host?.lowercased() == "yu.instructure.com"
+        }
+        return trimmed.lowercased() == "yu.instructure.com"
+    }
     var maskedToken: String? { CanvasTokenStore.maskedSuffix(account: Self.tokenAccount) }
 
     func save(domain: String, token: String) throws {

@@ -57,7 +57,17 @@ struct CanvasZoomInvitation: Codable, Equatable, Sendable {
 
     /// Require the same course, date and a nearby, identifiable class event.
     /// Ambiguous evidence leaves the invitation unchanged.
-    func resolvedStart(courseID: Int64?, events: [ClassEvent], syllabus: String? = nil) -> Date {
+    /// Banner meetings come first. They hold the registrar time, so an early
+    /// Zoom invite moves to the real class start when Banner names one time.
+    func resolvedStart(courseID: Int64?, events: [ClassEvent], syllabus: String? = nil,
+                       bannerMeetings: [YUClassMeeting] = []) -> Date {
+        if !bannerMeetings.isEmpty {
+            let bannerTimes = Set(YUBannerSchedule.starts(on: startAt, meetings: bannerMeetings).filter {
+                abs($0.timeIntervalSince(startAt)) <= 60 * 60
+            })
+            if bannerTimes.count == 1, let time = bannerTimes.first { return time }
+            if bannerTimes.count > 1 { return startAt }
+        }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: timeZoneID) ?? .gmt
         let matches = events.filter { event in

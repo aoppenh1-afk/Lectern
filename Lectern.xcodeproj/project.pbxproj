@@ -15,12 +15,14 @@
 		0932FFD48E3317DAB25BAB3C /* CanvasClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832A27B2888EEE31FE3D4567 /* CanvasClientTests.swift */; };
 		097B599C3CD156F1FE5B4DD1 /* AntigravityACPTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */; };
 		0A4E6FA74143F510308DCD82 /* PillWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76FE69A65922487DBD5E43CA /* PillWindowController.swift */; };
+		0A6D776FA36C2438FC1EE8DE /* YUBannerScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A52EC7E25317184992745DA /* YUBannerScheduleTests.swift */; };
 		0BE6A96BF3F7762C36D2F872 /* LiveBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB85EBEEFA4C4DD64A6BA221 /* LiveBookmark.swift */; };
 		0C8CA21E7C40DA908FCC5EFF /* ParakeetTDT in Frameworks */ = {isa = PBXBuildFile; productRef = DE53F9C541D2A8F57BAAA142 /* ParakeetTDT */; };
 		0CC3D46E12FA12174FAF089F /* CaptureSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D877127DC8DE4B1DC47FD222 /* CaptureSourceTests.swift */; };
 		0DCCADE4DD372492A7D2DDE8 /* LecternCloudAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCEEE966BBD9604F65FB699F /* LecternCloudAuth.swift */; };
 		0E5075065DE9DAA2A5400B42 /* ACPConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF3D392A858A8A5FF43BE12F /* ACPConnection.swift */; };
 		0EA7814AC3CB85466CD5675D /* lectern-transcription in Resources */ = {isa = PBXBuildFile; fileRef = 19629351EB498E76FFBC6AF2 /* lectern-transcription */; };
+		0EF97055E58EA4E463230FD2 /* YUBannerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7EED21EB86DB6094528EFDF /* YUBannerClient.swift */; };
 		100C91EA7D7BBC17B0B5FFAE /* ChatMarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61B8478F30090A0838FA7BCC /* ChatMarkdownRenderer.swift */; };
 		11B676CDDFEDF8FCE083CA1F /* Color+Hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF40CBB383F0F13DB95789D6 /* Color+Hex.swift */; };
 		132314727F2516A98C2FD7BD /* YUTorahSourceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4992B00709F638881F00A8B3 /* YUTorahSourceProvider.swift */; };
@@ -30,6 +32,7 @@
 		14A64BE39ED16C6072DBDFAE /* LectureExportAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A0D799F1B023C3336AB825 /* LectureExportAvailability.swift */; };
 		14E043E466FE158C2935D6DF /* Prompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4803A2E0B42C392ED5460F0F /* Prompts.swift */; };
 		195EA20634018DCA43CF70BD /* GoogleDocsNotesBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6883F2E69A64C8505C606EE /* GoogleDocsNotesBar.swift */; };
+		19B6E18F327CE113BDBF8AFC /* YUFinalExam.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF5F8AD0523C9B706BEB2A80 /* YUFinalExam.swift */; };
 		1AEAEC864C58A8A0D7C1A215 /* AISessionPool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9555190D715A73B287877CCD /* AISessionPool.swift */; };
 		1C33F5D6C43A3BBF8832C56C /* LectureBundleExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04630DB60DD0FFC955B6207D /* LectureBundleExportSheet.swift */; };
 		1C3C15F5C25A61027BFA0C9A /* GoogleDocsAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3B3D88E2073E9336F15CEA /* GoogleDocsAuth.swift */; };
@@ -38,9 +41,11 @@
 		1EEF683B4D263A45FE4E6E94 /* Artifact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F4553C1CACE105140BCDE50 /* Artifact.swift */; };
 		1FD0871A05C063F20BD535DB /* ShiurSourceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F1D30F6F9F6D6F1E7515706 /* ShiurSourceProvider.swift */; };
 		209AC97B5A4C19D70CEF2353 /* ShiurImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C5B6AFA684E43B8FEA1573E /* ShiurImportSheet.swift */; };
+		21C13AE9476EFCA9E77EEFB3 /* YUFinalsSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB30B351B774CF546F7DCEA2 /* YUFinalsSchedule.swift */; };
 		21DE24DB5F083149A51666C0 /* YUTorahSubscriptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7DCD05473F0313914D4564 /* YUTorahSubscriptionTests.swift */; };
 		245A024BB2B4E7D289D59A9A /* ParakeetTDT in Frameworks */ = {isa = PBXBuildFile; productRef = 7B77D7F08E734597FB340D71 /* ParakeetTDT */; };
 		246D6AABE4A01260E36A1011 /* CanvasClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */; };
+		250B6EB5912C682A7137A23F /* YUFinalsSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB30B351B774CF546F7DCEA2 /* YUFinalsSchedule.swift */; };
 		25E0EBCA6B9B36768A41F813 /* YUTorahSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8E8D62B339AAE8CDACF807 /* YUTorahSearchIndex.swift */; };
 		262317A2F9B261FFB523B187 /* GoogleDocsSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA475B8E4EACE8E555128177 /* GoogleDocsSyncTests.swift */; };
 		26B56FA6D70AEFB77DB4E9D4 /* TranscriptionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D65BB56BA83F5089F0629283 /* TranscriptionSettingsView.swift */; };
@@ -50,10 +55,12 @@
 		29E1DD5CA82422CA54C9A6F8 /* YUTorahURLResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9867BCA00FA030004AA4F6F8 /* YUTorahURLResolver.swift */; };
 		29ED6A939F3CA5DDD70ACB21 /* SubscriptionEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8910AF0204135B690C41D851 /* SubscriptionEditorView.swift */; };
 		2A385138F07C43270952BCF4 /* ShiurAutomationItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A89B0C992EA7A3BF00F120 /* ShiurAutomationItem.swift */; };
+		2A3DA8CF7BEFAC56A66A1762 /* YUBannerSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35031CB1A1DB0F987108FD25 /* YUBannerSchedule.swift */; };
 		2A758ACD7F874541C300CFCA /* AppAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 12FB232D1DF2A102139A1ADD /* AppAuth */; };
 		2ADEDBC002DEC1E15D1A1CC5 /* MenuBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73BEE40BCC364B58C68CEB62 /* MenuBarPopoverView.swift */; };
 		2B8CAE77C8AB239E691547DB /* LecternBundleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A00E389C268DAA3F3B2249 /* LecternBundleService.swift */; };
 		2D3FB854C9E2918F5BEC2FF6 /* Enums.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07D6361409917C609942439F /* Enums.swift */; };
+		2D83C19676476EBCFA4846B2 /* YUFinalExam.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF5F8AD0523C9B706BEB2A80 /* YUFinalExam.swift */; };
 		2E10D203EDA55E68A2CCF5D7 /* AutomationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F90877A2EFEAC1CEB530347 /* AutomationScheduler.swift */; };
 		2F57D7B539A2A8D8024B910F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80840764862370BCD46CACE /* SettingsView.swift */; };
 		30ABE89FD405A650026CF2C9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C6B420A4BE2849FFBF039B1F /* Assets.xcassets */; };
@@ -79,6 +86,7 @@
 		42BDE0D399DE0E774CD3DCC5 /* LectureBundleExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04630DB60DD0FFC955B6207D /* LectureBundleExportSheet.swift */; };
 		43DAF4C03E006BEDC9ED2DA3 /* Prompts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4803A2E0B42C392ED5460F0F /* Prompts.swift */; };
 		4454D139E9116BCE149037BA /* LectureAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F195A8A3ED220D64F9F54D6 /* LectureAudioPlayer.swift */; };
+		44E36B3696E1A37E35F6FECD /* YUFinalsScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEFFE93A6E024028A8D2535C /* YUFinalsScheduleTests.swift */; };
 		45CD9772D6C4F694F70ECC83 /* LectureExportAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A0D799F1B023C3336AB825 /* LectureExportAvailability.swift */; };
 		46809B25B437046E955A106C /* TranscriptionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D65BB56BA83F5089F0629283 /* TranscriptionSettingsView.swift */; };
 		48C206E7348E4166EF00D67E /* YUTorahSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B431E6A4C6DD679E2D7C259 /* YUTorahSearchService.swift */; };
@@ -87,6 +95,7 @@
 		4BBF4BC45D57B67037B3D8EB /* SystemAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439DF4E05C878D8E23AA6E75 /* SystemAudioCapture.swift */; };
 		4BCD52D700A21B47DC5A6A35 /* AgentDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07DF18B64B18FC06E4CC2F90 /* AgentDetector.swift */; };
 		4C70DDFDC829C92E73B9E5C1 /* ReferenceAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C6AC1B3F5C73C9B7EF6CD77 /* ReferenceAttachment.swift */; };
+		4D05608A31562B6E7BEB0874 /* YUBannerSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16548935BD37C8BD9ACB0A66 /* YUBannerSyncService.swift */; };
 		4D9AEBD52937FD19A865A46C /* GenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE4FA9BA6277A22013E953E /* GenerationService.swift */; };
 		4E21F726771346036C0888F2 /* CourseChatWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EFC9513E7B49CB7D61BB270 /* CourseChatWorkspaceTests.swift */; };
 		4E6393AF5E0BF37C9D6B5B2A /* ShiurAutomationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264D4BFEED3B376DCCA86F0F /* ShiurAutomationService.swift */; };
@@ -132,6 +141,7 @@
 		6F51FC24AF770F80FDB1414E /* LecternBundleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A00E389C268DAA3F3B2249 /* LecternBundleService.swift */; };
 		71D0F30C0C4DB0C346EEE723 /* GoogleOAuthConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4423ED80F0768A3752F0DC45 /* GoogleOAuthConfigurationTests.swift */; };
 		7354896DDC4659DE0B74DC24 /* RemoteAudioDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F39B466BD1D9EADCD297E23 /* RemoteAudioDownloader.swift */; };
+		737C2D6A5AC5F6C9283AFFE3 /* YUAcademicCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA79872B4A72710DF3FEEFB7 /* YUAcademicCalendar.swift */; };
 		738476D698B44E747F8CC745 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F31D7E05008BB4C97BB3E77 /* StatusBarController.swift */; };
 		73E019E6325643CA84769460 /* UpdatePromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB3E3B37AF7F3949572FF90 /* UpdatePromptView.swift */; };
 		741FCEF61BD74C4AC3C40F5B /* CourseChatSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E288DC0E345CF315E2AFB88 /* CourseChatSession.swift */; };
@@ -139,6 +149,7 @@
 		769C8CF41FCE0C5A67B52A8E /* Recording.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */; };
 		76DFF5C7F10FCD387528F6F2 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 872C99F2068ADE2855DB440D /* ChatMessage.swift */; };
 		7716690C3BC5C47EA1DFC20E /* GenerateSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDCDE601FE52EA2EF91E5594 /* GenerateSheet.swift */; };
+		7742064DBC9078FE16750484 /* YUAcademicCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA79872B4A72710DF3FEEFB7 /* YUAcademicCalendar.swift */; };
 		774E46198FF81D34D8A71C78 /* MenuBarPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73BEE40BCC364B58C68CEB62 /* MenuBarPopoverView.swift */; };
 		79575C2E141B111B720DE15C /* YUTorahRSSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D853730E8F00F809FFF741FD /* YUTorahRSSParser.swift */; };
 		79A6A6E0658A39BDDB91CF63 /* YUTorahFuzzyMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12F61E67B7A6A360B9393A9D /* YUTorahFuzzyMatcher.swift */; };
@@ -156,6 +167,7 @@
 		81D17F0E685C57F8F22C00AF /* CanvasHTMLTextCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B59062BA24987B047FA43FD /* CanvasHTMLTextCache.swift */; };
 		822D17F6137D0CEC6245E31E /* CapturePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0999EBAFBCFF39D7F174D28 /* CapturePipeline.swift */; };
 		82688AA7EC72B3D17C7DE1B1 /* NotesContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51D3E04EE9E7EAE2AA0AA37 /* NotesContentView.swift */; };
+		83519E360A0990E0E0743476 /* YUBannerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7EED21EB86DB6094528EFDF /* YUBannerClient.swift */; };
 		83C3227214598844795493DD /* CourseSynthesisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627A2CDC9029D01B87C36A0C /* CourseSynthesisService.swift */; };
 		842D8599706A74FB64C53E5E /* GoogleOAuthConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 522F58B2452A56EBECCA5001 /* GoogleOAuthConfiguration.swift */; };
 		861EE2F4B3F2F6D1457CBCCE /* CourseChatSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E288DC0E345CF315E2AFB88 /* CourseChatSession.swift */; };
@@ -203,6 +215,7 @@
 		AB2FECAA6D4132BAFE9B08BA /* LectureImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A11419823C0A975075BD958 /* LectureImportService.swift */; };
 		ABA9FEA792D2E4749F8B5CFB /* BundleImportRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5799385903A5C07596ADBFF /* BundleImportRecoveryTests.swift */; };
 		ACA048B3824A159AAA10E94A /* AgentModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C260A0B06C75ACB5BBD3905 /* AgentModelCatalog.swift */; };
+		AD1F309C1FFE5AF6F8947FB9 /* YUBannerSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16548935BD37C8BD9ACB0A66 /* YUBannerSyncService.swift */; };
 		AD86591E3E90890763F6171D /* GoogleDocsError.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF820DB24255443A5561D031 /* GoogleDocsError.swift */; };
 		ADCF18761810159B2C10E977 /* RetentionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29CA61043373B5435D7F00F2 /* RetentionService.swift */; };
 		AE87750815836CE9030CEE46 /* CourseSynthesisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD87EB0581FBD62DD9CC2F0B /* CourseSynthesisView.swift */; };
@@ -213,6 +226,7 @@
 		B2B5DD82CADE26B8A6CBB443 /* CancelJobButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1176A7E1B94AD85086318ECC /* CancelJobButton.swift */; };
 		B47C909B210FCC74D89E8E43 /* CanvasZoomInvitation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B4267DED0F3263C662ECD1F /* CanvasZoomInvitation.swift */; };
 		B5E2B6A82B90454D78C45EA4 /* ExportAvailabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2ECE882547DAE6ABCD5EC51 /* ExportAvailabilityTests.swift */; };
+		B7A1C7B5E0D3BDF5F11F7FF6 /* YUBannerSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35031CB1A1DB0F987108FD25 /* YUBannerSchedule.swift */; };
 		B939ECE1EC73DF3FCE35CB4D /* GoogleDocsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBF49011BFA6F50BCA8A7598 /* GoogleDocsClient.swift */; };
 		B95C93ED8ECDBB991A1C9336 /* Flashcard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC884E8F1288033F883B48CF /* Flashcard.swift */; };
 		BAE06F9E7A1E483EB1DC7E6B /* lectern-notes in Resources */ = {isa = PBXBuildFile; fileRef = F3FD1E9EF38766D4450E2180 /* lectern-notes */; };
@@ -247,6 +261,7 @@
 		D157831E158E1241D5E064D9 /* RecordingFileLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DEC6C81E9D90FFBE3C748F /* RecordingFileLedger.swift */; };
 		D24BCCE8824C7C7E71EA3526 /* YUTorahSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE3C5081C885AB547B647B4 /* YUTorahSearchView.swift */; };
 		D29E99952FAF0067A32EE720 /* LectureChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC2F44F19A8CD8C4379AC82 /* LectureChatView.swift */; };
+		D6FF932DFA12DA10522A8EDA /* YUAcademicCalendarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4B3824CB1D4AC6708E4167 /* YUAcademicCalendarTests.swift */; };
 		D70150D05BE3678C91D5E626 /* TranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439436382A9383B21132AFA7 /* TranscriptionService.swift */; };
 		D850E1E9B74B2D1B0CBF2E16 /* CanvasClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */; };
 		D990E2BB9EF4969A3CB445F4 /* LectureDocumentExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 061C2A9944E44D8A633CC026 /* LectureDocumentExportService.swift */; };
@@ -304,6 +319,7 @@
 		0D84E4A48FF99CD3572145F4 /* CanvasHTMLTextCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasHTMLTextCacheTests.swift; sourceTree = "<group>"; };
 		1176A7E1B94AD85086318ECC /* CancelJobButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CancelJobButton.swift; sourceTree = "<group>"; };
 		12F61E67B7A6A360B9393A9D /* YUTorahFuzzyMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahFuzzyMatcher.swift; sourceTree = "<group>"; };
+		16548935BD37C8BD9ACB0A66 /* YUBannerSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUBannerSyncService.swift; sourceTree = "<group>"; };
 		165645A8C3854D55C5824601 /* CompletionNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionNotifier.swift; sourceTree = "<group>"; };
 		16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasClient.swift; sourceTree = "<group>"; };
 		173E4DFE6F66E08BE4A8C3C5 /* Recording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recording.swift; sourceTree = "<group>"; };
@@ -324,12 +340,14 @@
 		2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LecternBundleOptions.swift; sourceTree = "<group>"; };
 		264D4BFEED3B376DCCA86F0F /* ShiurAutomationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiurAutomationService.swift; sourceTree = "<group>"; };
 		29CA61043373B5435D7F00F2 /* RetentionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetentionService.swift; sourceTree = "<group>"; };
+		2A52EC7E25317184992745DA /* YUBannerScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUBannerScheduleTests.swift; sourceTree = "<group>"; };
 		2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionNotificationTests.swift; sourceTree = "<group>"; };
 		2B528438D307A5B4FB6EAF1B /* LecternApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LecternApp.swift; sourceTree = "<group>"; };
 		2F195A8A3ED220D64F9F54D6 /* LectureAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureAudioPlayer.swift; sourceTree = "<group>"; };
 		2F90877A2EFEAC1CEB530347 /* AutomationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationScheduler.swift; sourceTree = "<group>"; };
 		31FE176891F8FD111C81F219 /* CanvasWorkspaceViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasWorkspaceViews.swift; sourceTree = "<group>"; };
 		34F7FB7A56BFCB60D82FC6D0 /* WhisperTranscriptionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperTranscriptionEngine.swift; sourceTree = "<group>"; };
+		35031CB1A1DB0F987108FD25 /* YUBannerSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUBannerSchedule.swift; sourceTree = "<group>"; };
 		35A92C58BA4F8412B20A3504 /* GoogleDocsSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsSyncService.swift; sourceTree = "<group>"; };
 		363051532AA63A00332E82D7 /* SurfacePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfacePreferences.swift; sourceTree = "<group>"; };
 		39ACF53C363072F06D09190A /* WAVMixdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WAVMixdown.swift; sourceTree = "<group>"; };
@@ -398,12 +416,14 @@
 		A763F772641D5D2F5F79CDB9 /* CanvasSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasSettingsView.swift; sourceTree = "<group>"; };
 		A80840764862370BCD46CACE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A9D3AE061392BC596F79D58F /* MCPSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSettingsView.swift; sourceTree = "<group>"; };
+		AF5F8AD0523C9B706BEB2A80 /* YUFinalExam.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUFinalExam.swift; sourceTree = "<group>"; };
 		B1636BFF993825C1A1D7F801 /* LectureImportPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureImportPicker.swift; sourceTree = "<group>"; };
 		B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACPTests.swift; sourceTree = "<group>"; };
 		B3217A5B8A37DD8207DD0478 /* AnkiConnectClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnkiConnectClient.swift; sourceTree = "<group>"; };
 		B564AF96344848C71EE09258 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		B67FCCE28F74E8E6AC84F215 /* LaunchAtLoginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginManager.swift; sourceTree = "<group>"; };
 		BA475B8E4EACE8E555128177 /* GoogleDocsSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsSyncTests.swift; sourceTree = "<group>"; };
+		BB30B351B774CF546F7DCEA2 /* YUFinalsSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUFinalsSchedule.swift; sourceTree = "<group>"; };
 		BB85EBEEFA4C4DD64A6BA221 /* LiveBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveBookmark.swift; sourceTree = "<group>"; };
 		BBF49011BFA6F50BCA8A7598 /* GoogleDocsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsClient.swift; sourceTree = "<group>"; };
 		BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACPClient.swift; sourceTree = "<group>"; };
@@ -427,12 +447,15 @@
 		D877127DC8DE4B1DC47FD222 /* CaptureSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSourceTests.swift; sourceTree = "<group>"; };
 		DAEF1816A1425DA0E733D8F2 /* GenerationConcurrencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationConcurrencyTests.swift; sourceTree = "<group>"; };
 		DC884E8F1288033F883B48CF /* Flashcard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Flashcard.swift; sourceTree = "<group>"; };
+		DEFFE93A6E024028A8D2535C /* YUFinalsScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUFinalsScheduleTests.swift; sourceTree = "<group>"; };
 		DF820DB24255443A5561D031 /* GoogleDocsError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsError.swift; sourceTree = "<group>"; };
 		E4A00E389C268DAA3F3B2249 /* LecternBundleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LecternBundleService.swift; sourceTree = "<group>"; };
 		E5496C48DE5EDC0027745A0E /* DiagramRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagramRenderer.swift; sourceTree = "<group>"; };
 		E5799385903A5C07596ADBFF /* BundleImportRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleImportRecoveryTests.swift; sourceTree = "<group>"; };
 		E7DC166705C567DFF81BC6B6 /* mermaid.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = mermaid.min.js; sourceTree = "<group>"; };
+		E7EED21EB86DB6094528EFDF /* YUBannerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUBannerClient.swift; sourceTree = "<group>"; };
 		E84584CA17279DC67909F94C /* AppUpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdaterTests.swift; sourceTree = "<group>"; };
+		EA79872B4A72710DF3FEEFB7 /* YUAcademicCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUAcademicCalendar.swift; sourceTree = "<group>"; };
 		EC7DCD05473F0313914D4564 /* YUTorahSubscriptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSubscriptionTests.swift; sourceTree = "<group>"; };
 		EDCDE601FE52EA2EF91E5594 /* GenerateSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerateSheet.swift; sourceTree = "<group>"; };
 		EE4BD4460EFC76CC20503256 /* TranscriptionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionEngine.swift; sourceTree = "<group>"; };
@@ -442,6 +465,7 @@
 		F2ECE882547DAE6ABCD5EC51 /* ExportAvailabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportAvailabilityTests.swift; sourceTree = "<group>"; };
 		F3FD1E9EF38766D4450E2180 /* lectern-notes */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "lectern-notes"; path = ".agents/skills/lectern-notes"; sourceTree = SOURCE_ROOT; };
 		F8619FA1667F92064816560B /* Lectern.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lectern.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FB4B3824CB1D4AC6708E4167 /* YUAcademicCalendarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUAcademicCalendarTests.swift; sourceTree = "<group>"; };
 		FB56BD82F43139025F591D2F /* Course.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Course.swift; sourceTree = "<group>"; };
 		FF40CBB383F0F13DB95789D6 /* Color+Hex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Hex.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -478,6 +502,12 @@
 				85118E4C36171306169DA123 /* CanvasSyncService.swift */,
 				5B4267DED0F3263C662ECD1F /* CanvasZoomInvitation.swift */,
 				2470516AC63AAE0B25C2D906 /* CanvasZoomReminderService.swift */,
+				EA79872B4A72710DF3FEEFB7 /* YUAcademicCalendar.swift */,
+				E7EED21EB86DB6094528EFDF /* YUBannerClient.swift */,
+				35031CB1A1DB0F987108FD25 /* YUBannerSchedule.swift */,
+				16548935BD37C8BD9ACB0A66 /* YUBannerSyncService.swift */,
+				AF5F8AD0523C9B706BEB2A80 /* YUFinalExam.swift */,
+				BB30B351B774CF546F7DCEA2 /* YUFinalsSchedule.swift */,
 			);
 			path = Canvas;
 			sourceTree = "<group>";
@@ -665,6 +695,9 @@
 				47F3381A1B1C6B6A3BBD716F /* TranscriptionConcurrentACPTests.swift */,
 				518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */,
 				19D56AFC425AC6CD11467211 /* TranscriptionQueueTests.swift */,
+				FB4B3824CB1D4AC6708E4167 /* YUAcademicCalendarTests.swift */,
+				2A52EC7E25317184992745DA /* YUBannerScheduleTests.swift */,
+				DEFFE93A6E024028A8D2535C /* YUFinalsScheduleTests.swift */,
 				EC7DCD05473F0313914D4564 /* YUTorahSubscriptionTests.swift */,
 				5BFBAE3C002FC74BE3DCC442 /* ZoomJoinFollowUpTests.swift */,
 				70F43C2783FA3C249FCCC19F /* Fixtures */,
@@ -1111,6 +1144,15 @@
 				E8ECF29E985AE8D447DD99EE /* UpdatePromptView.swift in Sources */,
 				26E2896F3FB97360C64941D4 /* WAVMixdown.swift in Sources */,
 				026153284DA71838A2F76C30 /* WhisperTranscriptionEngine.swift in Sources */,
+				737C2D6A5AC5F6C9283AFFE3 /* YUAcademicCalendar.swift in Sources */,
+				D6FF932DFA12DA10522A8EDA /* YUAcademicCalendarTests.swift in Sources */,
+				83519E360A0990E0E0743476 /* YUBannerClient.swift in Sources */,
+				2A3DA8CF7BEFAC56A66A1762 /* YUBannerSchedule.swift in Sources */,
+				0A6D776FA36C2438FC1EE8DE /* YUBannerScheduleTests.swift in Sources */,
+				AD1F309C1FFE5AF6F8947FB9 /* YUBannerSyncService.swift in Sources */,
+				2D83C19676476EBCFA4846B2 /* YUFinalExam.swift in Sources */,
+				21C13AE9476EFCA9E77EEFB3 /* YUFinalsSchedule.swift in Sources */,
+				44E36B3696E1A37E35F6FECD /* YUFinalsScheduleTests.swift in Sources */,
 				79A6A6E0658A39BDDB91CF63 /* YUTorahFuzzyMatcher.swift in Sources */,
 				EBC4E12AA8D9064BD96F9A94 /* YUTorahMediaResolver.swift in Sources */,
 				955C2C8A4948BF5F7DAF00A5 /* YUTorahModels.swift in Sources */,
@@ -1243,6 +1285,12 @@
 				73E019E6325643CA84769460 /* UpdatePromptView.swift in Sources */,
 				03664229D7047071F5825D0F /* WAVMixdown.swift in Sources */,
 				99CAFA2488E7C92937ACA175 /* WhisperTranscriptionEngine.swift in Sources */,
+				7742064DBC9078FE16750484 /* YUAcademicCalendar.swift in Sources */,
+				0EF97055E58EA4E463230FD2 /* YUBannerClient.swift in Sources */,
+				B7A1C7B5E0D3BDF5F11F7FF6 /* YUBannerSchedule.swift in Sources */,
+				4D05608A31562B6E7BEB0874 /* YUBannerSyncService.swift in Sources */,
+				19B6E18F327CE113BDBF8AFC /* YUFinalExam.swift in Sources */,
+				250B6EB5912C682A7137A23F /* YUFinalsSchedule.swift in Sources */,
 				5889A28E7A42B9735C1D84EF /* YUTorahFuzzyMatcher.swift in Sources */,
 				CB7D01FE2F70E7CFBD226E87 /* YUTorahMediaResolver.swift in Sources */,
 				7AE0118F869A861B74F92EEA /* YUTorahModels.swift in Sources */,

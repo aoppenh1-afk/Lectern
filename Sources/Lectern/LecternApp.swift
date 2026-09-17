@@ -122,6 +122,7 @@ struct LecternApp: App {
     private let statusBarController: StatusBarController
     private let canvasConnection: CanvasConnectionSettings
     private let canvasSync: CanvasSyncService
+    private let yuBannerSync: YUBannerSyncService
     private let canvasResourceOpener: CanvasResourceOpener
     private let appUpdater: AppUpdater
     private let onboardingState: OnboardingState
@@ -139,7 +140,7 @@ struct LecternApp: App {
                 Artifact.self, Flashcard.self, QuizItem.self, ChatMessage.self,
                 LiveBookmark.self, ReferenceAttachment.self,
                 CanvasAssignment.self, CanvasEvent.self, CanvasResource.self,
-                CanvasAnnouncement.self,
+                CanvasAnnouncement.self, YUFinalExam.self, YUAcademicEvent.self,
                 ShiurSubscription.self, ShiurAutomationItem.self
             ])
             let storeURL = try LecternStoreLocation.preparedStoreURL()
@@ -172,6 +173,7 @@ struct LecternApp: App {
                                                   surfacePreferences: surfacePreferences)
         canvasConnection = CanvasConnectionSettings()
         canvasSync = CanvasSyncService(modelContainer: container, connection: canvasConnection)
+        yuBannerSync = YUBannerSyncService(modelContainer: container, connection: canvasConnection)
         canvasResourceOpener = CanvasResourceOpener(connection: canvasConnection)
         zoomReminders = CanvasZoomReminderService(container: container, capture: captureController,
                                                    sync: canvasSync, connection: canvasConnection)
@@ -234,6 +236,7 @@ struct LecternApp: App {
                 .environment(surfacePreferences)
                 .environment(canvasConnection)
                 .environment(canvasSync)
+                .environment(yuBannerSync)
                 .environment(canvasResourceOpener)
                 .environment(appUpdater)
                 .environment(onboardingState)

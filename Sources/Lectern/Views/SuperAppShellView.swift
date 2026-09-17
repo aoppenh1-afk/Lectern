@@ -79,6 +79,7 @@ enum CommandStudioSection: String, CaseIterable, Identifiable {
 struct SuperAppShellView: View {
     @Environment(CanvasSyncService.self) private var canvasSync
     @Environment(CanvasConnectionSettings.self) private var canvasConnection
+    @Environment(YUBannerSyncService.self) private var bannerSync
     @Environment(CaptureController.self) private var capture
     @Environment(TranscriptionService.self) private var transcription
     @Environment(RetentionService.self) private var retention
@@ -87,6 +88,7 @@ struct SuperAppShellView: View {
     @Query(sort: \Course.name) private var courses: [Course]
     @Query private var assignments: [CanvasAssignment]
     @Query private var announcements: [CanvasAnnouncement]
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("commandStudio.selectedTerm") private var selectedTerm = AcademicScopeMatcher.preferredTerm
     @State private var selection: CommandStudioSection = .overview
 
@@ -153,6 +155,9 @@ struct SuperAppShellView: View {
             try? await Task.sleep(for: .milliseconds(450))
             while !Task.isCancelled {
                 await canvasSync.syncIfNeeded()
+                await bannerSync.syncIfNeeded(selectedTerm: selectedTerm)
+                YUAcademicCalendar.seedIfNeeded(modelContext: modelContext,
+                                               isYU: canvasConnection.isYUConnected)
                 do {
                     try await Task.sleep(for: .seconds(CanvasAutomaticSyncPolicy.maxAge))
                 } catch {
@@ -373,6 +378,7 @@ struct StudioCard<Content: View>: View {
 struct OverviewDashboardView: View {
     @Environment(CaptureController.self) private var capture
     @Environment(SurfacePreferences.self) private var surfacePreferences
+    @Environment(CanvasConnectionSettings.self) private var canvasConnection
     @Query(sort: \Course.name) private var courses: [Course]
     @Query(sort: \CanvasAssignment.dueAt) private var assignments: [CanvasAssignment]
     @Query(sort: \CanvasEvent.startAt) private var events: [CanvasEvent]
@@ -397,7 +403,36 @@ struct OverviewDashboardView: View {
     }
     private var todayEvents: [CanvasEvent] { scopedEvents.filter { Calendar.current.isDateInToday($0.startAt) }.prefix(4).map { $0 } }
     private var gradedCourses: [Course] { scopedCourses.filter { $0.currentScore != nil } }
+    private var bannerInputs: [(name: String, code: String?, meetings: [YUClassMeeting])] {
+        // Banner times apply to YU Canvas only.
+        guard canvasConnection.isYUConnected else { return [] }
+        return scopedCourses.map { ($0.name, $0.courseCode, $0.bannerMeetings) }.filter { !$0.meetings.isEmpty }
+    }
+    private var nextBanner: YUBannerSchedule.Occurrence? {
+        YUBannerSchedule.nextClass(in: bannerInputs)
+    }
+    private var bannerToday: [YUBannerSchedule.Occurrence] {
+        let now = Date()
+        var calendar = Calendar.current
+        calendar.timeZone = YUClassMeeting.yuTimeZone
+        var rows: [YUBannerSchedule.Occurrence] = []
+        for course in scopedCourses where !course.bannerMeetings.isEmpty {
+            for meeting in course.bannerMeetings {
+                guard let start = meeting.start(on: now, calendar: calendar) else { continue }
+                let end: Date? = {
+                    guard let endMinutes = meeting.endMinutes else { return nil }
+                    return calendar.date(bySettingHour: endMinutes / 60, minute: endMinutes % 60, second: 0, of: start)
+                }()
+                rows.append(.init(courseName: course.name, courseCode: course.courseCode, meeting: meeting, start: start, end: end))
+            }
+        }
+        return rows.sorted { $0.start < $1.start }.prefix(4).map { $0 }
+    }
     private var suggestedCourse: Course? {
+        if let next = nextBanner,
+           let bannerCourse = scopedCourses.first(where: { $0.name == next.courseName }) {
+            return bannerCourse
+        }
         if let courseID = todayEvents.first?.courseCanvasID,
            let scheduledCourse = scopedCourses.first(where: { $0.canvasID == courseID }) {
             return scheduledCourse
@@ -467,7 +502,7 @@ struct OverviewDashboardView: View {
                         .font(.system(size: 10, weight: .semibold)).foregroundStyle(capture.phase.isLive ? LecternTheme.accent : .secondary)
                     Spacer()
                 }
-                Text(capture.activeCourseName ?? suggestedCourse?.name ?? todayEvents.first?.courseName ?? "Start your first class")
+                Text(activeSessionTitle)
                     .font(.system(size: 20, weight: .semibold, design: .serif))
                     .foregroundStyle(LecternTheme.ink)
                 Text(activeSessionSubtitle)
@@ -485,10 +520,31 @@ struct OverviewDashboardView: View {
         }
     }
 
+    private var activeSessionTitle: String {
+        if capture.phase.isLive, let name = capture.activeCourseName { return name }
+        if let next = nextBanner { return next.courseName }
+        return suggestedCourse?.name ?? todayEvents.first?.courseName ?? "Start your first class"
+    }
+
     private var scheduleCard: some View {
         StudioCard("Today's schedule", actionTitle: "View calendar") { navigate(.calendar) } content: {
             VStack(spacing: 0) {
-                if todayEvents.isEmpty { emptyLine("No Canvas events scheduled today") }
+                if bannerToday.isEmpty, todayEvents.isEmpty { emptyLine("No Canvas events scheduled today") }
+                ForEach(Array(bannerToday.enumerated()), id: \.offset) { _, occurrence in
+                    HStack(alignment: .top, spacing: 12) {
+                        Text(occurrence.start.formatted(date: .omitted, time: .shortened))
+                            .font(.system(size: 11).monospacedDigit()).frame(width: 54, alignment: .leading)
+                        Circle().fill(occurrence.start < Date() ? LecternTheme.accent : Color.secondary.opacity(0.45)).frame(width: 8, height: 8).padding(.top, 3)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(occurrence.courseName).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
+                            Text([occurrence.meeting.timeDisplay, occurrence.meeting.locationDisplay].compactMap { $0 }.joined(separator: " · "))
+                                .font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                    Divider()
+                }
                 ForEach(todayEvents) { event in
                     HStack(alignment: .top, spacing: 12) {
                         Text(event.startAt.formatted(date: .omitted, time: .shortened))
@@ -586,10 +642,26 @@ struct OverviewDashboardView: View {
         if capture.phase.isLive {
             return "\(capture.liveStatusTitle) into \(capture.activeCourseName ?? "Unfiled")"
         }
+        if let next = nextBanner {
+            var parts = [next.start.formatted(date: .omitted, time: .shortened)]
+            if let location = next.meeting.locationDisplay { parts.append(location) }
+            parts.append(countdown(to: next.start))
+            return parts.joined(separator: " · ") + " · YU schedule"
+        }
         if let event = todayEvents.first {
             return "\(event.startAt.formatted(date: .omitted, time: .shortened)) · \(event.locationName ?? "Canvas schedule")"
         }
         return "Choose a course and Lectern will ground the recording in its class context."
+    }
+
+    private func countdown(to date: Date) -> String {
+        let minutes = Int(date.timeIntervalSinceNow / 60)
+        if minutes <= 0 { return "Starting now" }
+        if minutes < 60 { return "Starts in \(minutes) min" }
+        let hours = minutes / 60
+        if hours < 24 { return "Starts in \(hours)h" }
+        let days = hours / 24
+        return days == 1 ? "Tomorrow" : "In \(days) days"
     }
     private var nextDeadlineTitle: String { upcomingAssignments.first.map { String($0.title.prefix(16)) } ?? "All clear" }
     private var nextDeadlineLabel: String { upcomingAssignments.first.map { relativeDue($0.dueAt) } ?? "No deadline" }

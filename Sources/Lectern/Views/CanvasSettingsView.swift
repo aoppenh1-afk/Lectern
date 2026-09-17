@@ -3,6 +3,8 @@ import SwiftUI
 struct CanvasSettingsPane: View {
     @Environment(CanvasConnectionSettings.self) private var connection
     @Environment(CanvasSyncService.self) private var sync
+    @Environment(YUBannerSyncService.self) private var bannerSync
+    @AppStorage("commandStudio.selectedTerm") private var selectedTerm = AcademicScopeMatcher.preferredTerm
     @State private var domain = ""
     @State private var token = ""
     @State private var message: String?
@@ -207,6 +209,43 @@ struct CanvasSettingsPane: View {
                     }
                     .padding(14)
                 }
+            }
+
+            SettingsCard {
+                HStack(alignment: .top, spacing: 12) {
+                    settingsIcon("calendar", tint: .secondary)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("YU class schedule")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(LecternTheme.ink)
+                        Text("Public registrar times, per-course finals, and official UG calendar dates cross-check Canvas \(selectedTerm) courses. YU Canvas accounts only. No login needed.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let date = bannerSync.lastSyncAt {
+                            MetaText(["Last Banner check \(date.formatted(date: .abbreviated, time: .shortened))"])
+                        }
+                        if let error = bannerSync.lastError {
+                            Text(error)
+                                .font(.system(size: 11))
+                                .foregroundStyle(LecternTheme.warningTint)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        HStack(spacing: 8) {
+                            Button("Check Banner now") {
+                                Task { await bannerSync.syncNow(selectedTerm: selectedTerm) }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(bannerSync.isSyncing)
+                            if bannerSync.isSyncing {
+                                ProgressView().controlSize(.small)
+                                Text("Checking…").font(.system(size: 11)).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                .padding(14)
             }
         }
         .onAppear { domain = connection.domain }
