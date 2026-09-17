@@ -33,3 +33,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# HyperFrames preview and QA output
+videos/**/.thumbnails/
+videos/**/snapshots/

@@ -1,9 +1,108 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="How Lectern handles recordings, study materials, Google Docs access, and optional cloud services."><title>Privacy policy | Lectern</title><link rel="icon" href="icon.png"><link rel="stylesheet" href="style.css"></head>
-<body><a class="skip" href="#main">Skip to content</a><div class="wrap"><header class="header"><a class="brand" href="index.html"><img src="icon.png" alt="" width="38" height="38">Lectern</a><nav class="nav" aria-label="Main navigation"><a href="index.html">Home</a><a href="privacy.html" aria-current="page">Privacy</a><a href="terms.html">Terms</a></nav></header><main id="main"><article class="legal"><p class="eyebrow">Lectern / Privacy</p><h1>Privacy policy</h1><p class="meta">Effective September 8, 2026</p><p class="lede">Lectern is an open-source macOS study app. This policy describes the app and its website.</p><div class="callout">Your study library is stored on your Mac. When you use a cloud transcription service, an AI agent, or Google Docs export, the content needed for that feature is sent to that service.</div>
-<h2>Information Lectern handles</h2><p>Lectern handles recordings and imported audio, lecture and course titles, transcripts, notes, flashcards, quizzes, and other study content you create or import. Connected features can also handle Canvas course information and credentials for the services you enable.</p><p>These materials are used to record, transcribe, organize, generate study materials, and perform the exports you request. Hosted AI sharing is optional. If you enable it, Lectern stores a copy of your selected courses’ notes and transcripts in the hosted account described below.</p>
-<h2>Local storage and credentials</h2><p>Lectern stores its library and working files in its application-support folders on your Mac. Google Docs authorization state, including refresh tokens, is stored in the macOS Keychain. Canvas tokens and transcription API credentials also use Keychain storage. External AI tools can maintain their own credentials and working files; Antigravity uses a separate Lectern profile.</p>
-<h2 id="google">Google Docs access</h2><p>Google Docs is optional. When you connect it, Lectern requests the <code>https://www.googleapis.com/auth/drive.file</code> permission. This permits access to files created by Lectern or explicitly authorized for use with it. It does not grant general access to every file in your Drive. Lectern’s Docs connection does not request Gmail, contacts, email-profile, or full-Drive access.</p><p>When you push notes, Lectern sends the notes, course document title, and lecture tab title to Google. It reads the target document and its tabs so it can find the correct destination, then creates or updates the lecture’s tab. It stores document and tab identifiers locally for later updates. Updating a lecture can replace the content of its existing tab, including edits you made in Google Docs.</p><p>Lectern uses Google data only to provide these user-facing document features. The maintainer does not sell Google user data, use it for advertising, or use it to train generalized AI models. Lectern does not send the contents it reads from your Google Docs to an AI provider for training or study-material generation.</p><p>Lectern’s use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including its Limited Use requirements.</p>
-<h2>Transcription, AI, and other connections</h2><p>When you enable cloud transcription, audio and the request settings needed to transcribe it are sent to the selected provider. Local transcription processes audio on your Mac, although downloading models can require an internet connection.</p><p>When you request AI generation or chat, prompts, transcripts, and relevant attachments or audio can be sent through your configured agent and its provider. Supported options include Antigravity, Codex, and OpenCode. Those services’ terms, privacy policies, and your account settings govern their processing and retention. Google Docs authorization is separate from Antigravity sign-in.</p><p>If you connect Canvas, Lectern requests course and related academic information from your school’s Canvas service. If you export to Anki, the selected study content is sent to your local AnkiConnect service. Downloads and update checks contact the relevant hosting services, including GitHub, which receive normal network request information such as your IP address.</p>
-<h2>Retention, deletion, and disconnecting</h2><p>Local study content remains on your Mac until removed. Recording retention follows your Lectern settings; transcripts and generated materials can remain after audio is removed. Local backups and external agents may retain additional copies.</p><p>To disconnect Google Docs, use Sign out in Settings → Google Docs. To revoke Google’s authorization as well, remove Lectern from <a href="https://myaccount.google.com/connections">your Google Account connections</a>. Disconnecting or uninstalling Lectern does not delete documents already saved to Google Drive. Delete those in Google Drive separately. Other providers control deletion of any copies held by their services.</p>
-<h2>Website</h2><p>The public information pages contain no advertising or analytics scripts. The hosted connection pages use sign-in and consent forms and essential, secure session cookies. Vercel hosts the site and may process network request information under its <a href="https://vercel.com/legal/privacy-policy">Privacy Policy</a>. Static copies may also be published on GitHub Pages. Following external links takes you to those services.</p></article></main><footer class="footer"><nav aria-label="Footer"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="https://github.com/aoppenh1-afk/Lectern">GitHub</a></nav></footer></div></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How Lectern handles recordings, study materials, Google Docs access, and optional cloud services.">
+<title>Privacy policy | Lectern</title>
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="assets/legal.css">
+</head>
+<body class="legal-page">
+<a class="skip skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+<div class="site-container site-header-inner">
+<a class="site-brand" href="index.html"><img src="icon.png" alt="" width="32" height="32">Lectern</a>
+<nav class="site-nav" aria-label="Main navigation">
+<a href="index.html#how-it-works">How it works</a>
+<a href="install.html">Installation guide</a>
+<a href="https://github.com/aoppenh1-afk/Lectern">GitHub</a>
+<a class="site-download" data-mac-download href="https://github.com/aoppenh1-afk/Lectern/releases/download/v2.3/Lectern-2.3.dmg">Download</a>
+</nav>
+</div>
+</header>
+<main id="main" class="legal-main">
+<div class="site-container">
+<div class="legal-hero">
+<p class="legal-eyebrow">Lectern / Privacy</p>
+<h1 class="legal-title">Privacy policy</h1>
+<p class="legal-meta">Effective September 8, 2026</p>
+<p class="legal-lede">Lectern is an open-source macOS study app. This policy describes the app and its website.</p>
+<hr class="legal-hero-rule">
+</div>
+<div class="legal-layout">
+<nav class="legal-toc" aria-label="On this page">
+<p class="legal-toc-title">On this page</p>
+<ol>
+<li><a href="#information">Information Lectern handles</a></li>
+<li><a href="#local-storage">Local storage and credentials</a></li>
+<li><a href="#google">Google Docs access</a></li>
+<li><a href="#transcription">Transcription, AI, and other connections</a></li>
+<li><a href="#hosted-sharing">Hosted AI sharing</a></li>
+<li><a href="#retention">Retention, deletion, and disconnecting</a></li>
+<li><a href="#website">Website</a></li>
+</ol>
+</nav>
+<article class="legal-article">
+<p class="legal-callout" role="note">Your study library is stored on your Mac. When you use a cloud transcription service, an AI agent, or Google Docs export, the content needed for that feature is sent to that service.</p>
+<section class="legal-section" aria-labelledby="information">
+<h2 id="information">Information Lectern handles</h2>
+<p>Lectern handles recordings and imported audio, lecture and course titles, transcripts, notes, flashcards, quizzes, and other study content you create or import. Connected features can also handle Canvas course information and credentials for the services you enable.</p>
+<p>These materials are used to record, transcribe, organize, generate study materials, and perform the exports you request. Hosted AI sharing is optional. If you enable it, Lectern stores a copy of your selected courses’ notes and transcripts in the hosted account described below.</p>
+</section>
+<section class="legal-section" aria-labelledby="local-storage">
+<h2 id="local-storage">Local storage and credentials</h2>
+<p>Lectern stores its library and working files in its application-support folders on your Mac. Google Docs authorization state, including refresh tokens, is stored in the macOS Keychain. Canvas tokens and transcription API credentials also use Keychain storage. External AI tools can maintain their own credentials and working files; Antigravity uses a separate Lectern profile.</p>
+</section>
+<section class="legal-section" aria-labelledby="google">
+<h2 id="google">Google Docs access</h2>
+<p>Google Docs is optional. When you connect it, Lectern requests the <code>https://www.googleapis.com/auth/drive.file</code> permission. This permits access to files created by Lectern or explicitly authorized for use with it. It does not grant general access to every file in your Drive. Lectern’s Docs connection does not request Gmail, contacts, email-profile, or full-Drive access.</p>
+<p>When you push notes, Lectern sends the notes, course document title, and lecture tab title to Google. It reads the target document and its tabs so it can find the correct destination, then creates or updates the lecture’s tab. It stores document and tab identifiers locally for later updates. Updating a lecture can replace the content of its existing tab, including edits you made in Google Docs.</p>
+<p>Lectern uses Google data only to provide these user-facing document features. The maintainer does not sell Google user data, use it for advertising, or use it to train generalized AI models. Lectern does not send the contents it reads from your Google Docs to an AI provider for training or study-material generation.</p>
+<p>Lectern’s use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including its Limited Use requirements.</p>
+</section>
+<section class="legal-section" aria-labelledby="transcription">
+<h2 id="transcription">Transcription, AI, and other connections</h2>
+<p>When you enable cloud transcription, audio and the request settings needed to transcribe it are sent to the selected provider. Local transcription processes audio on your Mac, although downloading models can require an internet connection.</p>
+<p>When you request AI generation or chat, prompts, transcripts, and relevant attachments or audio can be sent through your configured agent and its provider. Supported options include Antigravity, Codex, and OpenCode. Those services’ terms, privacy policies, and your account settings govern their processing and retention. Google Docs authorization is separate from Antigravity sign-in.</p>
+<p>If you connect Canvas, Lectern requests course and related academic information from your school’s Canvas service. If you export to Anki, the selected study content is sent to your local AnkiConnect service. Downloads and update checks contact the relevant hosting services, including GitHub, which receive normal network request information such as your IP address.</p>
+</section>
+<section class="legal-section" aria-labelledby="hosted-sharing">
+<h2 id="hosted-sharing">Hosted AI sharing</h2>
+<p>When you sign in for ChatGPT and Claude sharing, Google provides an account identifier and verified email address. This sign-in is separate from Google Docs export and requests only OpenID and email access. The hosted service stores your account identity, session information, and connection permissions.</p>
+<p>When you start sharing in Lectern, the app uploads the selected course names, lecture titles and dates, notes, and raw or cleaned transcripts. Recordings, attachments, chats, flashcards, quizzes, and other service credentials are not included. Lectern serves the hosted connection through Vercel and stores the shared data in its configured Postgres database. These hosting providers process the data needed to operate the service.</p>
+<p>AI apps you approve can search and read your hosted library. They cannot change it. The last synced copy remains available when your Mac is closed. Removing a course takes effect after the Mac successfully syncs; disconnecting an AI app revokes its future access. Use the connection management page or the Mac app to delete the hosted library and revoke all connections. Local originals are retained. Account identity remains for sign-in, and hosting backups may retain deleted data according to the hosting provider’s retention settings.</p>
+<p>Connected AI services may retain material they have already retrieved under their own terms and account settings. Lectern does not log transcript content or access tokens in application logs. Necessary login cookies protect browser sessions; access and refresh token values are stored as hashes on the server and in Keychain on the Mac.</p>
+</section>
+<section class="legal-section" aria-labelledby="retention">
+<h2 id="retention">Retention, deletion, and disconnecting</h2>
+<p>Local study content remains on your Mac until removed. Recording retention follows your Lectern settings; transcripts and generated materials can remain after audio is removed. Local backups and external agents may retain additional copies.</p>
+<p>To disconnect Google Docs, use Sign out in Settings → Google Docs. To revoke Google’s authorization as well, remove Lectern from <a href="https://myaccount.google.com/connections">your Google Account connections</a>. Disconnecting or uninstalling Lectern does not delete documents already saved to Google Drive. Delete those in Google Drive separately. Other providers control deletion of any copies held by their services.</p>
+</section>
+<section class="legal-section" aria-labelledby="website">
+<h2 id="website">Website</h2>
+<p>The public information pages contain no advertising or analytics scripts. The hosted connection pages use sign-in and consent forms and essential, secure session cookies. Vercel hosts the site and may process network request information under its <a href="https://vercel.com/legal/privacy-policy">Privacy Policy</a>. Static copies may also be published on GitHub Pages. Following external links takes you to those services.</p>
+</section>
+<aside class="legal-aside" aria-label="Related pages">
+<strong>Keep reading</strong>
+See the <a href="terms.html">terms of use</a> and check <a href="https://github.com/aoppenh1-afk/Lectern/releases/latest">releases</a>.
+</aside>
+<p class="legal-back"><a href="index.html">Back to home</a></p>
+</article>
+</div>
+</main>
+<footer class="site-footer">
+<div class="site-container site-footer-inner">
+<nav class="site-footer-links" aria-label="Footer">
+<a href="index.html">Home</a>
+<a href="index.html#how-it-works">How it works</a>
+<a href="privacy.html" aria-current="page">Privacy</a>
+<a href="terms.html">Terms</a>
+<a href="https://github.com/aoppenh1-afk/Lectern">GitHub</a>
+</nav>
+</div>
+</footer>
+<script type="module" src="assets/download.js?v=20260909-dmg"></script>
+</body>
+</html>
