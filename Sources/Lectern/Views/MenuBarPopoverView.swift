@@ -32,6 +32,10 @@ struct MenuBarPopoverView: View {
             .padding(14)
         }
         .frame(width: Self.popoverWidth, alignment: .center)
+        // macOS 26 makes button-like Pickers fitted by default. A segmented
+        // Picker can otherwise change its ideal width when selection changes,
+        // pushing this fixed-width popover's content out of bounds.
+        .buttonSizing(.flexible)
     }
 
     // MARK: - Idle
