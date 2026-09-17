@@ -134,6 +134,20 @@ final class YUFinalsScheduleTests: XCTestCase {
     // MARK: - One final per course
 
     @MainActor
+    func testCanvasCodeFallbackNeedsNoBannerRow() {
+        // Microbiology never matched Banner, but its code suffix still resolves.
+        let course = Course(name: "Microbiology", colorHex: "#fff")
+        course.canvasID = 9
+        course.courseCode = "BIO-4023-261"
+        let exam = YUBannerSyncService.finalExam(for: course, matchedSections: [],
+                                                term: YUBannerTerm(code: "202609", description: "Fall 2026"))
+        let start = try! XCTUnwrap(exam?.startAt)
+        XCTAssertEqual(parts(start).month, 1)
+        XCTAssertEqual(parts(start).day, 4)
+        XCTAssertEqual(parts(start).hour, 13)
+    }
+
+    @MainActor
     func testFinalExamForTestClass() {
         let course = Course(name: "Drashot-Eastern European Jewry", colorHex: "#fff")
         course.canvasID = 7

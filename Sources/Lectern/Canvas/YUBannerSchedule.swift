@@ -269,9 +269,16 @@ enum YUBannerSchedule {
         }.first?.0
     }
 
-    /// Split "BIOL 101" into ("BIOL", "101"). Handles "BIO-101A", "blaw201".
+    /// Split "BIOL 101" into ("BIOL", "101"). Handles "BIO-101A", "blaw201",
+    /// and YU section suffixes such as the 331 in JHI-2430-331.
     static func splitCode(_ value: String) -> (subject: String, number: String)? {
-        let upper = value.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        var upper = value.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !upper.isEmpty else { return nil }
+        // YU Canvas codes append the Banner sequence as a third dash part.
+        // Drop it so the course number stays comparable: JHI-2430 stays JHI-2430.
+        var parts = upper.split(separator: "-").map(String.init)
+        if parts.count >= 3 { parts.removeLast() }
+        upper = parts.joined(separator: "-")
         guard !upper.isEmpty else { return nil }
         var subject = ""
         var number = ""

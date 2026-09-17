@@ -29,7 +29,20 @@ final class YUBannerScheduleTests: XCTestCase {
     func testSplitCode() {
         XCTAssertEqual(YUBannerSchedule.splitCode("BIOL 101")?.subject, "BIOL")
         XCTAssertEqual(YUBannerSchedule.splitCode("BIO-101A")?.number, "101A")
+        // YU Canvas appends the Banner sequence: the course stays JHI 2430.
+        XCTAssertEqual(YUBannerSchedule.splitCode("JHI-2430-331")?.subject, "JHI")
+        XCTAssertEqual(YUBannerSchedule.splitCode("JHI-2430-331")?.number, "2430")
         XCTAssertNil(YUBannerSchedule.splitCode("Microbiology"))
+    }
+
+    func testMatchesRealYUCanvasCode() {
+        let sections = [
+            section(subject: "JHI", number: "2430", title: "Drashot as a Source of Eastern European Jewry",
+                    instructor: "Joshua Karlip", weekdays: [3, 5], startMinutes: 15 * 60)
+        ]
+        let meetings = YUBannerSchedule.match(canvasCode: "JHI-2430-331", canvasName: "Drashot-Eastern European Jewry",
+                                              canvasInstructor: nil, sections: sections)
+        XCTAssertEqual(meetings.count, 1)
     }
 
     func testMatchesByCodeWithSubjectPrefix() {

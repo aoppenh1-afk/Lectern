@@ -27,6 +27,9 @@ final class YUBannerSyncService {
 
     private static let lastSyncKey = "yuBanner.lastSuccessfulSync"
     private static let lastTermCodeKey = "yuBanner.lastTermCode"
+    /// CanvasSyncService's last-sync key. A newer Canvas sync means new
+    /// courses may have arrived, so Banner must re-run even within maxAge.
+    private static let canvasSyncKey = "canvas.lastSuccessfulSync"
     private static let maxAge: TimeInterval = 24 * 60 * 60
 
     private let modelContainer: ModelContainer
@@ -51,7 +54,11 @@ final class YUBannerSyncService {
 
     func syncIfNeeded(selectedTerm: String, maxAge: TimeInterval = YUBannerSyncService.maxAge) async {
         guard isYU, !isSyncing else { return }
-        if let last = lastSyncAt, Date().timeIntervalSince(last) < maxAge { return }
+        if let last = lastSyncAt {
+            let canvasSync = defaults.object(forKey: Self.canvasSyncKey) as? Date
+            let canvasIsNewer = (canvasSync ?? .distantPast) > last
+            if !canvasIsNewer, Date().timeIntervalSince(last) < maxAge { return }
+        }
         await syncNow(selectedTerm: selectedTerm)
     }
 
