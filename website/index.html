@@ -1,11 +1,204 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Record lectures and shiurim, turn them into study materials, and send your notes to Google Docs with Lectern for macOS."><title>Lectern | Lecture notes for your Mac</title><link rel="icon" href="icon.png"><link rel="stylesheet" href="style.css"></head>
-<body><a class="skip" href="#main">Skip to content</a><div class="wrap"><header class="header"><a class="brand" href="index.html"><img src="icon.png" alt="" width="38" height="38">Lectern</a><nav class="nav" aria-label="Main navigation"><a href="index.html" aria-current="page">Home</a><a href="https://lectern-app.vercel.app/connect">AI connections</a>
-<a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></nav></header><main id="main">
-<section class="hero"><div><p class="eyebrow">For lectures, shiurim, and the studying after</p><h1>Keep the lecture.<br>Make it your notes.</h1><p class="intro">Record on your Mac, transcribe the discussion, and turn it into organized notes, flashcards, and quizzes. Built for English lectures and mixed English–Hebrew shiurim.</p><div class="actions"><a class="button" data-mac-download href="https://github.com/aoppenh1-afk/Lectern/releases/latest">Download for Mac</a><a href="https://github.com/aoppenh1-afk/Lectern#install-from-a-release">Installation guide</a></div><p class="meta">macOS 26+ · Apple silicon · Open source</p><p class="meta">Not signed by Apple — after downloading, <a href="https://github.com/aoppenh1-afk/Lectern#install-from-a-release">allow Lectern with Open Anyway</a>.</p></div>
-<aside class="note" aria-label="Illustrative study notes"><span class="label">Example notes / Biology</span><h2>How memory forms</h2><ul><li><strong>Encoding</strong><ul><li>Attention helps information enter memory.</li><li>Connect a new idea to something you already know.</li></ul></li><li><strong>Retrieval practice</strong><ul><li>Try recalling the answer before checking your notes.</li></ul></li></ul><div class="note-footer"><span>One lecture. An outline to revisit.</span><span>01</span></div></aside></section>
-<section class="section" aria-label="How Lectern works"><div class="grid"><div><p class="number">01 / CAPTURE</p><h3>Record or bring your audio</h3><p>Capture your microphone or the audio playing on your Mac. Keep your lectures together by course.</p></div><div><p class="number">02 / STUDY</p><h3>Build materials you can use</h3><p>Create transcripts, outline notes, flashcards, and quizzes using your configured transcription and AI tools. Review generated content against the lecture.</p></div><div><p class="number">03 / RETURN</p><h3>Pick up where you left off</h3><p>Keep your study library on your Mac, connect Canvas, or push finished notes to Google Docs.</p></div></div></section>
-<section class="section"><div class="docs"><div><p class="eyebrow" style="color:#b8d9e1">Optional Google Docs connection</p><h2>A course document.<br>A tab for each lecture.</h2><p>Push notes into your own Google account. Pushing the same lecture again updates its tab.</p><a href="privacy.html#google">Read how Google access works</a></div><div><ol><li>Connect Google Docs in Lectern’s settings.</li><li>Sign in to Google and allow access to files used with Lectern.</li><li>Open your generated notes and choose Push to Docs.</li></ol><p class="meta">Available in builds with Google Docs configured. Google account policies may affect access.</p></div></div></section>
-<section class="section"><h2>Your tools, your choices.</h2><p class="intro">Lectern stores your library on your Mac. Cloud transcription and AI features send the content needed for the task to the provider you choose. Google Docs export is optional.</p><p><a href="privacy.html">Read the privacy policy</a></p></section>
-</main><footer class="footer"><nav aria-label="Footer"><a href="https://lectern-app.vercel.app/connect">AI connections</a>
-<a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="https://github.com/aoppenh1-afk/Lectern">GitHub</a></nav></footer></div><script>try{(function(){var links=Array.prototype.slice.call(document.querySelectorAll('[data-mac-download]'));if(!links.length||typeof document.createElement!=='function'||!document.body)return;var b=document.createElement('div');b.className='dl-backdrop';b.hidden=true;b.innerHTML='<div class="dl-modal" role="dialog" aria-modal="true" aria-labelledby="dl-modal-title"><p class="eyebrow">Download started</p><h2 id="dl-modal-title">One extra step on first open</h2><p>Lectern isn\u2019t signed with an Apple Developer ID, so macOS will block the first open. Your download continues in the background.</p><ol><li>Open the download and move <strong>Lectern</strong> into <strong>Applications</strong>.</li><li>Double-click Lectern in Applications, then dismiss the warning.</li><li>Open <strong>System Settings \u2192 Privacy &amp; Security</strong> and click <strong>Open Anyway</strong>.</li></ol><div class="dl-actions"><a class="button" href="https://github.com/aoppenh1-afk/Lectern#install-from-a-release">Open installation guide</a><button type="button" class="button-secondary dl-close">Got it</button></div><button type="button" class="dl-x" aria-label="Close dialog">\u00d7</button></div>';document.body.appendChild(b);var c=b.querySelector('.dl-close'),x=b.querySelector('.dl-x'),last=null;function show(){last=document.activeElement;b.hidden=false;if(c&&c.focus)c.focus();}function hide(){b.hidden=true;if(last&&last.focus)last.focus();}if(c)c.addEventListener('click',hide);if(x)x.addEventListener('click',hide);b.addEventListener('click',function(e){if(e.target===b)hide();});document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!b.hidden)hide();});links.forEach(function(l){l.addEventListener('click',function(){setTimeout(show,250);});});})();}catch(e){}</script></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Lectern for macOS records lectures and shiurim, then turns them into notes, flashcards, and quizzes. Try the sample demo.">
+<title>Lectern | Keep the lecture. Make it your notes.</title>
+<link rel="canonical" href="https://aoppenh1-afk.github.io/Lectern/">
+<meta property="og:title" content="Lectern | Keep the lecture. Make it your notes.">
+<meta property="og:description" content="Record lectures and shiurim, read what was said, and study it as notes, cards, and a short quiz.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aoppenh1-afk.github.io/Lectern/">
+<meta property="og:image" content="https://aoppenh1-afk.github.io/Lectern/icon.png">
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="assets/demo.css">
+<link rel="stylesheet" href="assets/classroom.css?v=20260909-11">
+<link rel="stylesheet" href="assets/workspace.css">
+<link rel="stylesheet" href="assets/product.css?v=20260917-6">
+</head>
+<body class="lectern-home">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+<div class="site-container site-header-inner">
+<a class="site-brand" href="index.html"><img src="icon.png" alt="" width="32" height="32">Lectern</a>
+<nav class="site-nav" aria-label="Main navigation">
+<a href="#how-it-works">How it works</a>
+<a href="install.html">Installation guide</a>
+<a href="https://github.com/aoppenh1-afk/Lectern">GitHub</a>
+<a class="site-download" data-mac-download href="https://github.com/aoppenh1-afk/Lectern/releases/download/v2.3/Lectern-2.3.dmg">Download</a>
+</nav>
+</div>
+</header>
+<main id="main">
+<section class="tour" id="how-it-works" aria-labelledby="page-title">
+<div class="tour-scene" aria-hidden="true"><img src="assets/classroom-warm.jpg" alt="" width="1672" height="941" fetchpriority="high"></div>
+<div class="tour-inner">
+<header class="scene-intro">
+<div class="chalk-note chalk-left" aria-hidden="true">Focus<br>on what<br>matters.<svg viewBox="0 0 100 70"><path d="M12 5Q17 46 80 52M65 37l17 16-22 7"/></svg></div>
+<div class="chalk-note chalk-right" aria-hidden="true">Lectures captured.<br>Ideas within reach.<span></span></div>
+<p class="eyebrow">Lectern for Mac</p>
+<h1 id="page-title">Take a seat.<br><em>Be here.</em></h1>
+<p class="hero-description">Keep your attention in class. Lectern keeps the lecture.</p>
+<a class="mac-download" data-mac-download href="https://github.com/aoppenh1-afk/Lectern/releases/download/v2.3/Lectern-2.3.dmg"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.1 12.5c0-2 1.6-3 1.7-3.1-1-1.5-2.6-1.7-3.1-1.7-1.3-.1-2.6.8-3.3.8-.7 0-1.8-.8-2.9-.8-1.5 0-2.9.9-3.7 2.2-1.6 2.7-.4 6.7 1.1 8.9.7 1.1 1.6 2.2 2.7 2.2 1.1 0 1.5-.7 2.8-.7s1.7.7 2.9.7c1.2 0 1.9-1.1 2.6-2.1.9-1.2 1.3-2.4 1.3-2.5-.1 0-2.1-.8-2.1-3.9ZM15 6.2c.6-.8 1.1-1.8 1-2.9-1 .1-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.8 1.1.1 2.1-.5 2.8-1.4Z"/></svg><span>Download for macOS</span><span class="download-arrow" aria-hidden="true">→</span></a>
+</header>
+<div class="tour-product">
+<aside class="chalk-workflow" aria-label="Lecture workflow">
+<div><svg viewBox="0 0 32 32"><rect x="12" y="3" width="8" height="17" rx="4"/><path d="M7 14v3a9 9 0 0018 0v-3M16 26v4M11 30h10"/></svg><span>Record</span></div>
+<div><svg viewBox="0 0 32 32"><path d="M7 3h13l6 6v20H7zM20 3v7h6M11 15h11M11 20h11M11 25h8"/></svg><span>Organize</span></div>
+<div><svg viewBox="0 0 32 32"><path d="M16 2q2 12 13 14-11 2-13 14Q14 18 3 16 14 14 16 2z"/></svg><span>Study later</span></div>
+</aside>
+<div class="demo-stage" id="demo">
+<figure class="laptop" aria-label="Sample Lectern demo on a laptop">
+
+<div class="laptop-screen">
+<div class="app-viewport">
+<div id="lectern-demo">
+<div class="demo-fallback" aria-label="Static Lectern Overview preview">
+<div class="demo-fallback-side">
+<p class="demo-fallback-app">Lectern &middot; BIO 101</p>
+<ul>
+<li class="on">Overview</li>
+<li>Calendar</li>
+<li>Assignments</li>
+<li>Courses</li>
+<li>Subscriptions</li>
+<li>Grades</li>
+<li>Resources</li>
+<li>Announcements</li>
+<li>AI Chat</li>
+</ul>
+</div>
+<div class="demo-fallback-main">
+<p class="demo-fallback-kicker">Overview &middot; BIO 101</p>
+<h2>How memory forms</h2>
+<p><strong>BIO 101</strong> &middot; Lecture 4 &middot; 10:00 AM &middot; Encoding, retrieval, spacing</p>
+<ul>
+<li><strong>Encoding:</strong> attention helps information enter memory.</li>
+<li><strong>Retrieval practice:</strong> recall before you re-read.</li>
+<li><strong>Spacing:</strong> short returns beat one long night.</li>
+</ul>
+<p class="demo-fallback-note">Static Overview preview.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="laptop-base" aria-hidden="true"></div>
+</figure>
+<p class="demo-adapt">Mac app demo, adapted for this screen.</p>
+<div class="story-caption" aria-live="polite" aria-atomic="true">
+<p class="eyebrow" data-story-count>01 / 07 · Before class</p>
+<h2 data-story-caption>See the day ahead</h2>
+<p data-story-description>Your first class starts in a few minutes. Your schedule, readings, and deadlines are already here.</p>
+</div>
+<nav class="story-nav" aria-label="Follow a lecture">
+<button type="button" data-demo-step="overview">01 <span>Home</span></button>
+<button type="button" data-demo-step="capture">02 <span>Record</span></button>
+<button type="button" data-demo-step="transcript">03 <span>Review</span></button>
+<button type="button" data-demo-step="notes">04 <span>Notes</span></button>
+<button type="button" data-demo-step="flashcards">05 <span>Cards</span></button>
+<button type="button" data-demo-step="quiz">06 <span>Quiz</span></button>
+<button type="button" data-demo-step="docs">07 <span>Keep</span></button>
+</nav>
+<noscript><p class="demo-noscript">JavaScript is off. The static Overview preview above and all links below still work.</p></noscript>
+</div>
+</div>
+<div class="tour-chapters">
+<header class="section-head">
+<p class="eyebrow">How it works</p>
+<h2 id="how-title">One lecture, ready to revisit.</h2>
+<p class="intro">A morning class, start to finish. Scroll and the laptop follows each step.</p>
+</header>
+<div class="chapter-rail">
+<article data-story-step="overview">
+<p class="number">01 / 07 &middot; Before class</p>
+<h3>See the day ahead</h3>
+<p>Your first class starts in a few minutes. Your schedule, readings, and deadlines are already here.</p>
+<button type="button" data-demo-step="overview">Preview</button>
+</article>
+<article data-story-step="capture">
+<p class="number">02 / 07 &middot; Record</p>
+<h3>Keep what was said</h3>
+<p>The professor starts talking. Start a sample recording and stay with the discussion.</p>
+<button type="button" data-demo-step="capture">Preview</button>
+</article>
+<article data-story-step="transcript">
+<p class="number">03 / 07 &middot; Review</p>
+<h3>Read it back</h3>
+<p>You remember the idea, but not the exact words. Find them in the transcript.</p>
+<button type="button" data-demo-step="transcript">Preview</button>
+</article>
+<article data-story-step="notes">
+<p class="number">04 / 07 &middot; Notes</p>
+<h3>Keep the outline</h3>
+<p>Class is over. Turn the discussion into an outline you can come back to, in English or Hebrew.</p>
+<button type="button" data-demo-step="notes">Preview</button>
+</article>
+<article data-story-step="flashcards">
+<p class="number">05 / 07 &middot; Cards</p>
+<h3>Remember it</h3>
+<p>Tomorrow, try to recall it before you look. Reveal an answer, then move to the next card.</p>
+<button type="button" data-demo-step="flashcards">Preview</button>
+</article>
+<article data-story-step="quiz">
+<p class="number">06 / 07 &middot; Quiz</p>
+<h3>Check yourself</h3>
+<p>Did it stick? Answer a few questions and see why each answer is right.</p>
+<button type="button" data-demo-step="quiz">Preview</button>
+</article>
+<article data-story-step="docs">
+<p class="number">07 / 07 &middot; Return</p>
+<h3>Bring it back</h3>
+<p>The lecture stays in your library. Preview a Google Docs export, or download the sample cards.</p>
+<button type="button" data-demo-step="docs">Preview</button>
+</article>
+</div>
+</div>
+</div>
+</section>
+<div class="afterword">
+<section class="af-intro af-wrap" id="features" aria-labelledby="after-class-title">
+  <div class="af-section-line"><span>AFTER THE LECTURE</span><span>Lectern, on your Mac</span></div>
+  <div class="af-intro-grid"><h2 id="after-class-title">Stay with the idea.<br><em>We'll keep the details.</em></h2><p>A place for the lectures you record, the notes you return to, and the questions you still want to ask.</p></div>
+  <nav class="af-chapters" aria-label="Explore Lectern"><a href="#course-hub"><span>01</span> Organize your semester <span>↘</span></a><a href="#study-desk"><span>02</span> Return to the lecture <span>↘</span></a><a href="#exports"><span>03</span> Make it stick <span>↘</span></a></nav>
+</section>
+<section class="af-showcase" id="course-hub" aria-labelledby="semester-title"><div class="af-wrap">
+  <header class="af-section-heading"><div><p class="af-eyebrow">01 / Your semester</p><h2 id="semester-title">Everything in<br><em>its right place.</em></h2></div><p>Give each course a home. Keep recordings and study materials together, so last week's lecture is right where you left it.</p></header>
+  <a class="af-screen" href="assets/app/library.png" aria-label="Enlarge screenshot of the Lectern course library"><img src="assets/app/library.png" alt="Lectern's Mac app showing courses, lecture recordings, and the library overview" width="1568" height="985" loading="lazy"><span class="af-enlarge">Enlarge image +</span></a>
+  <div class="af-screen-caption"><span>The actual Lectern app. Your courses, at a glance.</span><span>Built for macOS</span></div>
+  <div class="af-detail-grid"><article><span>01.1</span><h3>A course for every subject.</h3><p>Organize lectures by course and academic term. Keep a separate home for shiurim, too.</p></article><article><span>01.2</span><h3>Connected when you need it.</h3><p>Connect Canvas for your semester details, or manage your courses directly in Lectern.</p></article><article><span>01.3</span><h3>Keep up with your learning.</h3><p>Follow YU Torah subscriptions and bring new shiurim into your library.</p></article></div>
+</div></section>
+<section class="af-lecture af-wrap" id="study-desk" aria-labelledby="study-title">
+  <header class="af-section-heading"><div><p class="af-eyebrow">02 / Your lecture</p><h2 id="study-title">Find the thread.<br><em>Follow it further.</em></h2></div><p>Move from what was said to what you want to remember. Your transcript and notes stay with the recording.</p></header>
+  <div class="af-tabs" role="tablist" aria-label="Lecture screenshots"><button id="view-notes" role="tab" aria-selected="true" aria-controls="lecture-notes" tabindex="0">Study notes</button><button id="view-transcript" role="tab" aria-selected="false" aria-controls="lecture-transcript" tabindex="-1">Transcript</button><span>Inside Lectern ↙</span></div>
+  <div id="lecture-notes" role="tabpanel" aria-labelledby="view-notes"><a class="af-screen af-light-screen" href="assets/app/notes.png" aria-label="Enlarge screenshot of lecture notes"><img src="assets/app/notes.png" alt="Actual microbiology lecture notes in Lectern, organized into headings and an outline" width="1568" height="985" loading="lazy"><span class="af-enlarge">Enlarge image +</span></a></div>
+  <div id="lecture-transcript" role="tabpanel" aria-labelledby="view-transcript" hidden><a class="af-screen af-light-screen" href="assets/app/transcript.png" aria-label="Enlarge screenshot of the lecture transcript"><img src="assets/app/transcript.png" alt="Lectern's transcript view alongside the course and lecture library" width="1568" height="985" loading="lazy"><span class="af-enlarge">Enlarge image +</span></a></div>
+  <div class="af-detail-grid af-two"><article><h3>Notes in your own outline style.</h3><p>Turn a lecture into organized notes, including mixed English–Hebrew shiurim. Review the details against the original recording.</p></article><article><h3>A place for the follow-up.</h3><p>Open AI Chat to work through questions with your course materials. Choose the AI tools you want to use.</p></article></div>
+</section>
+<section class="af-recall" id="exports" aria-labelledby="export-title"><div class="af-wrap">
+  <header class="af-section-heading"><div><p class="af-eyebrow">03 / Your next study session</p><h2 id="export-title">Close the notes.<br><em>See what stays.</em></h2></div><p>Make flashcards from the lecture, then take them into Anki. Send notes to Google Docs when you're ready to keep working.</p></header>
+  <a class="af-screen" href="assets/app/cards.png" aria-label="Enlarge screenshot of Lectern flashcards"><img src="assets/app/cards.png" alt="Flashcards generated from a microbiology lecture, with question and answer fields and Anki export" width="1568" height="985" loading="lazy"><span class="af-enlarge">Enlarge image +</span></a>
+  <div class="af-export-row"><p>Your lecture is the starting point. Keep studying in the tools you already use.</p><a class="af-text-link" href="assets/memory-flashcards.tsv" download>Download sample Anki cards <span>↓</span></a></div>
+</div></section>
+<section class="af-movie af-wrap" aria-labelledby="film-title"><header class="af-section-heading"><div><p class="af-eyebrow">The lecture, continued</p><h2 id="film-title">One place to<br><em>come back to.</em></h2></div><p>A short look inside Lectern.<br>Real app screens. From your library to your next study session.</p></header><video controls playsinline preload="none" poster="assets/lectern-product-poster.jpg?v=20260917-5" aria-label="32-second silent Lectern demo showing lecture selection, generation options, scrolling notes, and the flashcard editor"><source src="assets/lectern-product.mp4?v=20260917-5" type="video/mp4">Your browser does not support video. Explore the app screenshots above.</video><p class="af-film-caption">Choose a lecture → Make study materials → Review and edit <span>32 seconds · No audio</span></p></section>
+<section class="af-local af-wrap" id="privacy" aria-labelledby="local-title"><p class="af-eyebrow">Your library, your choices</p><div><h2 id="local-title">At home on <em>your Mac.</em></h2><p>Your lecture library lives locally. You choose your transcription and AI tools, and which services to connect. Cloud features send the content needed for the task to your selected provider.</p><a class="af-text-link" href="privacy.html">How your data is handled <span>↗</span></a></div></section>
+<section class="af-faq af-wrap" id="faq" aria-labelledby="faq-title"><div data-reveal><p class="af-eyebrow">Before you take a seat</p><h2 id="faq-title">A few<br><em>good questions.</em></h2><a class="af-text-link" href="install.html">The installation guide <span aria-hidden="true">↗</span></a></div><div class="af-questions" data-reveal>
+<details open><summary><span>01</span>What do I need to run Lectern?<span class="af-plus" aria-hidden="true"></span></summary><p>An Apple silicon Mac running macOS 26 or later. The installation guide walks you through recording permissions and setting up your preferred transcription and AI tools.</p></details>
+<details><summary><span>02</span>Can I record an online lecture?<span class="af-plus" aria-hidden="true"></span></summary><p>Yes. Record your microphone or capture system audio from apps such as Zoom and your browser. macOS will ask you to grant recording permission.</p></details>
+<details><summary><span>03</span>Does it work for English–Hebrew shiurim?<span class="af-plus" aria-hidden="true"></span></summary><p>Yes. Lectern supports English lectures and mixed English–Hebrew shiurim, with notes shaped for each. Review generated text against the recording, especially names and source references.</p></details>
+<details><summary><span>04</span>Do I need Canvas or Google Docs?<span class="af-plus" aria-hidden="true"></span></summary><p>No. Both are optional. You can organize your courses and keep your lecture library in Lectern without connecting either service.</p></details>
+<details><summary><span>05</span>Is Lectern free?<span class="af-plus" aria-hidden="true"></span></summary><p>Lectern is free and open source. The transcription and AI providers you configure may have their own charges or subscription requirements.</p></details>
+</div></section>
+
+<section class="af-closing" id="download" aria-labelledby="download-title"><div class="af-wrap"><div class="af-closing-top"><span>For the next thing you'll learn.</span><span class="af-closing-star" aria-hidden="true">✳</span></div><div class="af-closing-content" data-reveal><h2 id="download-title">Bring your<br><em>whole attention.</em></h2><div class="af-closing-action"><p>We'll keep the lecture.</p><a class="af-download" data-mac-download href="https://github.com/aoppenh1-afk/Lectern/releases/download/v2.3/Lectern-2.3.dmg"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.1 12.5c0-2 1.6-3 1.7-3.1-1-1.5-2.6-1.7-3.1-1.7-1.3-.1-2.6.8-3.3.8-.7 0-1.8-.8-2.9-.8-1.5 0-2.9.9-3.7 2.2-1.6 2.7-.4 6.7 1.1 8.9.7 1.1 1.6 2.2 2.7 2.2 1.1 0 1.5-.7 2.8-.7s1.7.7 2.9.7c1.2 0 1.9-1.1 2.6-2.1.9-1.2 1.3-2.4 1.3-2.5-.1 0-2.1-.8-2.1-3.9ZM15 6.2c.6-.8 1.1-1.8 1-2.9-1 .1-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.8 1.1.1 2.1-.5 2.8-1.4Z"/></svg>Download for Mac <span aria-hidden="true">↗</span></a><span class="af-requirements">macOS 26+ · Apple silicon</span><a class="af-install-link" href="install.html">First time here? Start with the installation guide.</a></div></div><div class="af-closing-bottom"><span>Free to use. Open source. Yours to explore.</span><a href="https://github.com/aoppenh1-afk/Lectern">Find us on GitHub <span aria-hidden="true">↗</span></a></div></div></section>
+</div>
+</main>
+<footer class="af-footer"><div class="af-wrap"><div class="af-footer-top"><a class="af-brand" href="index.html"><img src="icon.png" alt="" width="28" height="28">Lectern</a><p>Stay curious.</p><nav aria-label="Footer"><a href="install.html">Install</a><a href="https://github.com/aoppenh1-afk/Lectern">GitHub ↗</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></nav></div><div class="af-wordmark" aria-hidden="true">Lectern<span>↗</span></div><div class="af-footer-bottom"><span>© 2026 Lectern</span><span>Made for a curious mind.</span><a href="#main">Back to the top ↑</a></div></div></footer>
+
+<script type="module" src="assets/story.js?v=20260909-10"></script>
+<script type="module" src="assets/download.js?v=20260910-gatekeeper"></script>
+<script type="module" src="assets/product.js?v=20260917-5"></script>
+</body>
+</html>
