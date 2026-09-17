@@ -41,6 +41,7 @@ jobs:
           fetch-depth: 0
 
       - name: Import original release signing identity
+        timeout-minutes: 3
         env:
           SIGNING_P12_BASE64: ${{ secrets.LECTERN_SIGNING_P12_BASE64 }}
           SIGNING_P12_PASSWORD: ${{ secrets.LECTERN_SIGNING_P12_PASSWORD }}
@@ -62,12 +63,15 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P "$SIGNING_P12_PASSWORD" -T /usr/bin/codesign
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
           security find-certificate -c 'Lectern Release Signing' -p "$KEYCHAIN_PATH" > "$CERT_PATH"
           source scripts/release-signing.sh
           FINGERPRINT="$(openssl x509 -in "$CERT_PATH" -noout -fingerprint -sha1 | cut -d= -f2 | tr -d ':')"
           [[ "$FINGERPRINT" == "$LECTERN_RELEASE_CERTIFICATE" ]] || { echo '::error::Wrong release certificate'; exit 1; }
-          security add-trusted-cert -r trustRoot -p codeSign -k "$KEYCHAIN_PATH" "$CERT_PATH"
+          # User trust changes can wait for a GUI authorization dialog. This
+          # disposable hosted runner permits noninteractive admin trust setup.
+          echo 'Trusting verified release certificate on the temporary runner'
+          sudo -n security add-trusted-cert -d -r trustRoot -p codeSign -k "$KEYCHAIN_PATH" "$CERT_PATH"
           REQUIRE_CODE_SIGN_IDENTITY=1 resolve_lectern_signing_identity
           rm -f "$P12_PATH"
 
@@ -92,5 +96,8 @@ jobs:
       - name: Remove signing keychain
         if: always()
         run: |
+          if [[ -f "$RUNNER_TEMP/lectern-signing.pem" ]]; then
+            sudo -n security remove-trusted-cert -d "$RUNNER_TEMP/lectern-signing.pem" || true
+          fi
           security delete-keychain "$RUNNER_TEMP/lectern-signing.keychain-db" || true
           rm -f "$RUNNER_TEMP/lectern-signing.p12" "$RUNNER_TEMP/lectern-signing.pem"
