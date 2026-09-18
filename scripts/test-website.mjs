@@ -118,13 +118,21 @@ function resolveExecutable() {
 
 const norm = (s) => (s || "").replace(/\s+/g, " ").replace(/\u00a0/g, " ").trim();
 const sentences = (s) => norm(s).split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter((x) => x.length > 25);
+function stripScriptStyle(html) {
+  // Tolerate malformed end tags browsers accept (e.g. </script foo="bar">,
+  // </script >, mixed case) so stripping cannot be bypassed by junk after
+  // the tag name. No regex alone parses full HTML; this is test-only text
+  // extraction, never a security sanitizer.
+  return html.replace(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style[^>]*>/gi, " ");
+}
 function stripTags(html) {
-  return norm(html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
+  return norm(stripScriptStyle(html)
     .replace(/<[^>]+>/g, " ").replace(/&middot;|&#183;/g, "·").replace(/&rsquo;|&#8217;/g, "'")
-    .replace(/&ldquo;|&rdquo;/g, '"').replace(/&amp;/g, "&").replace(/&nbsp;/g, " "));
+    .replace(/&ldquo;|&rdquo;/g, '"').replace(/&nbsp;/g, " ").replace(/&amp;/g, "&"));
 }
 function mainText(html) {
-  const m = html.match(/<main[\s\S]*?<\/main>/i) || html.match(/<article[\s\S]*?<\/article>/i);
+  const m = html.match(/<main\b[^>]*>[\s\S]*?<\/main[^>]*>/i) || html.match(/<article\b[^>]*>[\s\S]*?<\/article[^>]*>/i);
   return stripTags(m ? m[0] : html);
 }
 
