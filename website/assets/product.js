@@ -22,14 +22,35 @@ for (const [index, tab] of tabs.entries()) {
     tabs[next].focus();
   });
 }
-// Video is explicitly played by the visitor, never autoplayed.
+// Silent demo film autoplays when scrolled into view, pauses when out of view.
 const film = document.querySelector('.af-movie video');
 if (film) {
-  new IntersectionObserver(entries => {
-    if (!entries[0].isIntersecting) film.pause();
-  }).observe(film);
+  film.muted = true; // Required for autoplay policies; the clip has no audio.
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let userPaused = false;
+  let inView = false;
+  const tryPlay = () => {
+    if (reduceMotion || userPaused || !inView || !film.paused) return;
+    film.play().catch(() => {});
+  };
+  film.addEventListener('play', () => {
+    userPaused = false;
+  });
+  film.addEventListener('pause', () => {
+    // A pause while the film is visible (and the tab is open) is the visitor's choice; honor it.
+    if (inView && !document.hidden) userPaused = true;
+  });
+  new IntersectionObserver(
+    entries => {
+      inView = entries[0].isIntersecting;
+      if (inView) tryPlay();
+      else film.pause();
+    },
+    { threshold: 0.35 },
+  ).observe(film);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) film.pause();
+    else tryPlay();
   });
 }
 
