@@ -1,9 +1,11 @@
+import SwiftData
 import SwiftUI
 
 struct CanvasSettingsPane: View {
     @Environment(CanvasConnectionSettings.self) private var connection
     @Environment(CanvasSyncService.self) private var sync
     @Environment(YUBannerSyncService.self) private var bannerSync
+    @Query(sort: \YUAcademicEvent.startAt) private var academicEvents: [YUAcademicEvent]
     @AppStorage("commandStudio.selectedTerm") private var selectedTerm = AcademicScopeMatcher.preferredTerm
     @State private var domain = ""
     @State private var token = ""
@@ -224,6 +226,9 @@ struct CanvasSettingsPane: View {
                             .fixedSize(horizontal: false, vertical: true)
                         if let date = bannerSync.lastSyncAt {
                             MetaText(["Last Banner check \(date.formatted(date: .abbreviated, time: .shortened))"])
+                        }
+                        if connection.isYUConnected {
+                            MetaText(["UG calendar dates \(academicEvents.count)"])
                         }
                         if let error = bannerSync.lastError {
                             Text(error)

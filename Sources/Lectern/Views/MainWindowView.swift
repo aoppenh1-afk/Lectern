@@ -699,7 +699,8 @@ struct MainWindowView: View {
             Divider()
             Button("Delete Lecture", role: .destructive) {
                 if selectedLecture == lecture { selectedLecture = nil }
-                transcription.cancel(lectureID: lecture.persistentModelID)
+                transcription.cancel(lectureID: lecture.persistentModelID,
+                                     discardingCheckpointsFor: lecture.recording?.filePath)
                 generation.cancel(lectureID: lecture.persistentModelID)
                 capture.discardLectureRecording(lecture)
                 modelContext.delete(lecture)

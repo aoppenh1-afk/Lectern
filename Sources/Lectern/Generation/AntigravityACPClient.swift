@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// Lectern's feature-facing Antigravity provider. It speaks ACP through the
 /// managed Google runtime and never shells out to the normal `agy` CLI.
@@ -79,16 +80,24 @@ struct AntigravityACPClient: Sendable {
     }
 
     private let connectionFactory: ConnectionFactory
+    private let usesManagedProfile: Bool
     private let skillURLOverrides: [LecternAgentSkill: URL]
+    private let transcriptionTimeout: Duration?
+    private let sessionPool: AISessionPool
 
     init(
-        connectionFactory: @escaping ConnectionFactory = {
-            try await AntigravityACPManager.shared.makeConnection()
-        },
-        skillURLOverrides: [LecternAgentSkill: URL] = [:]
+        connectionFactory: ConnectionFactory? = nil,
+        skillURLOverrides: [LecternAgentSkill: URL] = [:],
+        transcriptionTimeout: Duration? = nil,
+        sessionPool: AISessionPool = .shared
     ) {
-        self.connectionFactory = connectionFactory
+        self.usesManagedProfile = connectionFactory == nil
+        self.connectionFactory = connectionFactory ?? {
+            try await AntigravityACPManager.shared.makeConnection()
+        }
         self.skillURLOverrides = skillURLOverrides
+        self.transcriptionTimeout = transcriptionTimeout
+        self.sessionPool = sessionPool
     }
 
     static func configured(for profile: AgentProfile) -> AntigravityACPClient {
@@ -111,13 +120,22 @@ struct AntigravityACPClient: Sendable {
         thinkingLevel: ThinkingLevel = .high,
         inputs: [WorkspaceInput] = [],
         skills: Set<LecternAgentSkill> = [],
-        jsonSchema: String? = nil
+        jsonSchema: String? = nil,
+        transcriptionDuration: Double? = nil
     ) async throws -> String {
-        try await AISessionPool.shared.withPermit {
+        try await sessionPool.withPermit {
             try await runSession(prompt: prompt, modelID: modelID, thinkingLevel: thinkingLevel,
-                                 inputs: inputs, skills: skills, jsonSchema: jsonSchema)
+                                 inputs: inputs, skills: skills, jsonSchema: jsonSchema,
+                                 transcriptionDuration: transcriptionDuration)
         }
     }
+
+    func transcriptionSkillFingerprint() throws -> String {
+        let data = try Data(contentsOf: resolvedSkillURL(for: .transcription))
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    func concurrentSessionLimit() async -> Int { await sessionPool.limit }
 
     private func runSession(
         prompt: String,
@@ -125,10 +143,24 @@ struct AntigravityACPClient: Sendable {
         thinkingLevel: ThinkingLevel = .high,
         inputs: [WorkspaceInput] = [],
         skills: Set<LecternAgentSkill> = [],
-        jsonSchema: String? = nil
+        jsonSchema: String? = nil,
+        transcriptionDuration: Double? = nil
     ) async throws -> String {
-        let connection = try await connectionFactory()
+        let connection = try await usesManagedProfile
+            ? AntigravityACPManager.shared.makeConnection(transcriptionOnly: transcriptionDuration != nil)
+            : connectionFactory()
         defer { connection.shutdown() }
+        if transcriptionDuration != nil { connection.restrictToTranscription() }
+        // A sleeping deadline costs no polling and cannot consume time waiting
+        // for the shared session permit. Leave ample room for high reasoning.
+        let deadline = transcriptionDuration.map { duration in
+            Task {
+                try? await Task.sleep(for: transcriptionTimeout ?? .seconds(max(900, min(7_200, duration * 3))))
+                guard !Task.isCancelled else { return }
+                connection.shutdown(error: ACPConnection.ACPError.transcriptionStopped("Antigravity timed out transcribing this audio part.", reason: .timeout))
+            }
+        }
+        defer { deadline?.cancel() }
 
         do {
             try await connection.authenticate(methodID: "oauth-personal")
@@ -141,6 +173,11 @@ struct AntigravityACPClient: Sendable {
         let workspace = try AntigravityACPWorkingDirectory()
         defer { workspace.remove() }
         let session = try await connection.newSession(workingDirectory: workspace.url)
+        if transcriptionDuration != nil, session.availableModeIDs.contains("default") {
+            try await connection.requireMode(sessionID: session.id, modeID: "default")
+        } else if transcriptionDuration != nil, !session.availableModeIDs.isEmpty {
+            throw ACPConnection.ACPError.transcriptionStopped("Antigravity did not offer its default mode for transcription.", reason: .configuration)
+        }
         try await connection.applyAntigravityGenerationSettings(
             session: session,
             model: modelID,

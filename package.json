@@ -9,5 +9,5 @@
     "db:migrate": "node scripts/migrate-hosted.mjs"
   },
   "dependencies": { "@modelcontextprotocol/sdk": "^1.27.1", "jose": "^6.2.1", "pg": "^8.20.0", "zod": "^4.6.5" },
-  "devDependencies": { "@electric-sql/pglite": "^0.3.14" }
+  "devDependencies": { "@electric-sql/pglite": "^0.5.8" }
 }

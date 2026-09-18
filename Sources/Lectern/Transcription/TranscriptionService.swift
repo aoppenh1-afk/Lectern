@@ -10,10 +10,29 @@ final class TranscriptionService {
     struct Progress {
         var message: String?
         var subtitle: String?
+        var completedChunks: Int? = nil
+        var totalChunks: Int? = nil
+        var startedAt: Date? = nil
+        var fractionCompleted: Double? {
+            guard let completedChunks, let totalChunks, totalChunks > 0 else { return nil }
+            return min(1, max(0, Double(completedChunks) / Double(totalChunks)))
+        }
     }
     var isRunning: Bool { !activeTasks.isEmpty }
     private(set) var lastError: String?
     private(set) var progressByLecture: [PersistentIdentifier: Progress] = [:]
+
+    private func publishChunkProgress(completed: Int, total: Int, retrying: Bool, warning: String?, lectureID: PersistentIdentifier) {
+        guard activeTasks[lectureID] != nil else { return }
+        let percent = total > 0 ? Int(Double(completed) / Double(total) * 100) : 0
+        let startedAt = progressByLecture[lectureID]?.startedAt ?? Date()
+        progressByLecture[lectureID] = Progress(
+            message: "Transcribing · \(percent)%",
+            subtitle: warning ?? (retrying ? "Retrying the current audio part. \(completed) of \(total) parts complete."
+                : "\(completed) of \(total) audio parts complete.\(completed == total ? " Finishing transcript…" : "")"),
+            completedChunks: completed, totalChunks: total, startedAt: startedAt
+        )
+    }
 
     private let modelContainer: ModelContainer
     private let preferences: TranscriptionPreferences
@@ -23,6 +42,7 @@ final class TranscriptionService {
     private let externalEngine: ExternalTranscriptionEngine
     private let jobStore: TranscriptionJobStore
     private var activeTasks: [PersistentIdentifier: Task<Void, Never>] = [:]
+    private var freshTranscriptions = Set<PersistentIdentifier>()
     private let localPool = AISessionPool(limit: 1)
 
     init(
@@ -62,8 +82,17 @@ final class TranscriptionService {
     }
 
     /// Also used before deleting a lecture.
-    func cancel(lectureID: PersistentIdentifier) {
-        activeTasks[lectureID]?.cancel()
+    func cancel(lectureID: PersistentIdentifier, discardingCheckpointsFor sourcePath: String? = nil) {
+        let task = activeTasks[lectureID]
+        task?.cancel()
+        if let sourcePath {
+            let engine = externalEngine
+            Task {
+                // Wait for any in-flight atomic write before deleting its cache.
+                await task?.value
+                await engine.discardCheckpoints(sourcePath: sourcePath)
+            }
+        }
     }
 
     func cancelTranscription(for lecture: Lecture) {
@@ -172,6 +201,7 @@ final class TranscriptionService {
               lecture.status == .failed else {
             return
         }
+        if lecture.status == .ready { freshTranscriptions.insert(lecture.persistentModelID) }
         lecture.language = language
         lecture.transcriptionSourceOverride = source
         lecture.requestedTranscriptionConnectionID = connectionID
@@ -190,6 +220,7 @@ final class TranscriptionService {
         await performJob(id)
         activeTasks[id] = nil
         progressByLecture[id] = nil
+        freshTranscriptions.remove(id)
         if activeTasks.isEmpty {
             // Use a fresh task because cancellation must not skip model cleanup.
             let pool = localPool
@@ -621,11 +652,15 @@ final class TranscriptionService {
     ) async throws -> TranscriptionResult {
         try checkJob(lecture)
         let audioIdentity = Self.audioIdentity(path: recordingPath)
-        let recoveredJob = await jobStore.recoverableJob(
+        let startFresh = freshTranscriptions.remove(lecture.persistentModelID) != nil
+        let candidate = await jobStore.recoverableJob(
             recordingPath: recordingPath,
             sourceAudioHash: audioIdentity,
-            includeCompleted: recoverCompletedResult
+            includeCompleted: recoverCompletedResult,
+            retryFailedConnectionID: selectedConnection.provider == .antigravityCLI ? selectedConnection.id : nil,
+            connectionID: selectedConnection.id
         )
+        let recoveredJob = startFresh ? nil : candidate
         try checkJob(lecture)
         var job = recoveredJob ?? PersistentTranscriptionJob(
             recordingPath: recordingPath,
@@ -636,7 +671,16 @@ final class TranscriptionService {
             policySnapshot: preferences.snapshot()
         )
         if job.state == .completed, let result = job.completedResult {
-            return result
+            if result.providerInfo.provider != .antigravityCLI { return result }
+            // A crash may leave the job completed before the artifact is saved.
+            // Rebuild from verified chunks so changed audio/settings/skills cannot
+            // bypass the content-based identity check through the job-history file.
+            job.currentAttemptIndex = 0
+        }
+        if job.state == .failed {
+            // An explicit retry starts with the selected provider, not the last
+            // exhausted fallback. Its accepted chunk checkpoints stay reusable.
+            job.currentAttemptIndex = 0
         }
 
         let planIDs = recoveredJob?.fallbackPlanSnapshot
@@ -718,13 +762,21 @@ final class TranscriptionService {
                 lectureLanguage: lecture.language,
                 connection: connection,
                 attemptNumber: index + 1,
-                resumeProviderJobID: resumeID
+                resumeProviderJobID: resumeID,
+                checkpointID: jobID
             )
 
             do {
                 let store = jobStore
-                let result = try await externalEngine.transcribe(request) { update in
-                    await store.update(id: jobID, state: update.state, providerJobID: update.providerJobID)
+                let lectureID = lecture.persistentModelID
+                let result = try await externalEngine.transcribe(request) { [weak self] update in
+                    if let completed = update.completedChunks, let total = update.totalChunks {
+                        await self?.publishChunkProgress(completed: completed, total: total,
+                                                        retrying: update.state == .waitingForRetry,
+                                                        warning: update.checkpointWarning, lectureID: lectureID)
+                    } else {
+                        await store.update(id: jobID, state: update.state, providerJobID: update.providerJobID)
+                    }
                 }
                 if let persisted = await jobStore.job(id: jobID) { job = persisted }
                 try checkJob(lecture)

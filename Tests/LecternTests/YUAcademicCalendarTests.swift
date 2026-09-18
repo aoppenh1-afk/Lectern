@@ -90,4 +90,18 @@ final class YUAcademicCalendarTests: XCTestCase {
         YUAcademicCalendar.seedIfNeeded(modelContext: context, isYU: true, defaults: defaults)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<YUAcademicEvent>()), first)
     }
+
+    @MainActor
+    func testReseedsWhenStoreEmptyDespiteFlag() throws {
+        let container = try ModelContainer(for: YUAcademicEvent.self,
+                                           configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let context = ModelContext(container)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "yuAcademicCalendarReseedTests"))
+        // A failed first save can stamp the flag with no rows. The next
+        // launch must heal the store instead of trusting the flag.
+        defaults.set(YUAcademicCalendar.seededVersion, forKey: YUAcademicCalendar.seededVersionKey)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<YUAcademicEvent>()), 0)
+        YUAcademicCalendar.seedIfNeeded(modelContext: context, isYU: true, defaults: defaults)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<YUAcademicEvent>()), YUAcademicCalendar.entries.count)
+    }
 }

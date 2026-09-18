@@ -200,6 +200,29 @@ enum AntigravityACPProfile {
         try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: helper.path)
     }
 
+    /// Inspect only the managed profile's known configuration locations. This
+    /// detects configured automation; it cannot disable the runtime's native tools.
+    static func validateTranscriptionConfiguration(layout: AntigravityACPLayout) throws {
+        for directory in [layout.profileDirectory, layout.acpProfileDirectory] {
+            for name in ["settings.json", "mcp.json", "mcp_config.json"] {
+                let file = directory.appendingPathComponent(name)
+                guard FileManager.default.fileExists(atPath: file.path) else { continue }
+                let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+                guard size <= 1_024 * 1_024,
+                      let object = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any] else {
+                    throw ACPConnection.ACPError.transcriptionStopped("Antigravity's managed configuration could not be checked for transcription.", reason: .configuration)
+                }
+                for key in ["hooks", "mcpServers", "mcp_servers"] {
+                    guard let value = object[key] else { continue }
+                    let empty = (value as? [String: Any])?.isEmpty == true || (value as? [Any])?.isEmpty == true || value is NSNull
+                    guard empty else {
+                        throw ACPConnection.ACPError.transcriptionStopped("Antigravity's managed profile has hooks or MCP servers configured. Remove that automation before transcribing.", reason: .configuration)
+                    }
+                }
+            }
+        }
+    }
+
     static func launchEnvironment(
         installation: AntigravityACPInstallation,
         layout: AntigravityACPLayout,
@@ -1008,6 +1031,7 @@ final class AntigravityACPManager {
     }
 
     func makeConnection(
+        transcriptionOnly: Bool = false,
         onAuthorizationURL: (@Sendable (URL) -> Void)? = nil
     ) async throws -> ACPConnection {
         let acquired = try await installer.acquire()
@@ -1017,6 +1041,7 @@ final class AntigravityACPManager {
             let connection = try await Self.connect(
                 installation: acquired.installation,
                 layout: layout,
+                transcriptionOnly: transcriptionOnly,
                 onAuthorizationURL: onAuthorizationURL,
                 onClose: { [weak self, installer, leaseID = acquired.leaseID] in
                     Task {
@@ -1086,10 +1111,12 @@ final class AntigravityACPManager {
     nonisolated private static func connect(
         installation: AntigravityACPInstallation,
         layout: AntigravityACPLayout,
+        transcriptionOnly: Bool = false,
         onAuthorizationURL: (@Sendable (URL) -> Void)? = nil,
         onClose: (@Sendable () -> Void)? = nil
     ) async throws -> ACPConnection {
         try AntigravityACPProfile.prepare(layout: layout)
+        if transcriptionOnly { try AntigravityACPProfile.validateTranscriptionConfiguration(layout: layout) }
         let runtimeTemp = layout.acpProfileDirectory
             .appendingPathComponent("tmp/run-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(
@@ -1106,6 +1133,7 @@ final class AntigravityACPManager {
                 arguments: [],
                 environment: environment,
                 workingDirectory: layout.profileDirectory,
+                transcriptionOnly: transcriptionOnly,
                 onAuthorizationURL: onAuthorizationURL,
                 onClose: onClose,
                 onProcessExit: { try? FileManager.default.removeItem(at: runtimeTemp) }

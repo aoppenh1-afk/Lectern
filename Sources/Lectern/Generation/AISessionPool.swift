@@ -12,6 +12,8 @@ actor AISessionPool {
 
     init(limit: Int? = nil) { fixedLimit = limit.map { max(1, $0) } }
 
+    var limit: Int { fixedLimit ?? Self.configuredLimit() }
+
     static func configuredLimit(defaults: UserDefaults = .standard) -> Int {
         guard defaults.object(forKey: settingsKey) != nil else { return defaultLimit }
         return min(20, max(1, defaults.integer(forKey: settingsKey)))
@@ -23,7 +25,7 @@ actor AISessionPool {
         defer { waiting.removeAll { $0 == id } }
         while true {
             try Task.checkCancellation()
-            if waiting.first == id, running < (fixedLimit ?? Self.configuredLimit()) { break }
+            if waiting.first == id, running < limit { break }
             try await Task.sleep(for: .milliseconds(50))
         }
         waiting.removeFirst()
