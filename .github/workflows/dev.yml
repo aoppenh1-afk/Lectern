@@ -26,7 +26,6 @@ jobs:
     permissions:
       contents: write
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Optional: the shared desktop OAuth client from README.md so dev builds
       # keep Google Docs working. These are plain variables, NOT secrets: the
       # same values already ship in every stable build's Info.plist and are
@@ -39,6 +38,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Import original release signing identity
         timeout-minutes: 3
@@ -89,8 +89,11 @@ jobs:
         run: xcodegen generate
 
       - name: Publish dev prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          gh auth setup-git
           scripts/release-dev.sh
 
       # GitHub destroys this hosted runner VM, including its signing keychain
