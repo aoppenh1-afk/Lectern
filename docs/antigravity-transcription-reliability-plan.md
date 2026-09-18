@@ -69,7 +69,7 @@ Current Lectern behavior explains why that could continue:
 - `ACPConnection.respondToPermissionRequest` automatically selects `allow_once` when offered. This policy is shared with generation.
 - `handleSessionUpdate` consumes text messages and ignores tool events. The prompt path checks refusal but does not require a successful completion reason.
 - Initialization already advertises client filesystem and terminal capabilities as false. These flags describe client-provided protocol methods; they do not disable the runtime's own tools.
-- `AntigravityACPClient.run` serves transcription and generation. Each invocation owns a connection and acquires a permit from the shared `AISessionPool`. The configured concurrency default is five.
+- `AntigravityACPClient.run` serves transcription and generation. Each invocation owns a connection and acquires a permit from the shared `AISessionPool`. The configured concurrency default is three.
 - The transcription adapter holds successful chunk results in memory until all chunks finish. Its audio preparation exports all chunks before the first request and deletes temporary audio on exit.
 - `TranscriptionJobStore.persist` encodes and atomically rewrites the entire job history. Adding token-level updates or chunk transcripts to that file would create unnecessary work.
 - Timestamp parsing currently repairs backward timestamps and clamps out-of-range timestamps. Validation must examine raw values before that repair. The parser accepts untimed text too, which remains necessary for the no-timestamps option.

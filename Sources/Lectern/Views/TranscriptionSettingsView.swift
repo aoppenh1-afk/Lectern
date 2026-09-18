@@ -22,7 +22,7 @@ struct TranscriptionSettingsPane: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Concurrent AI sessions").font(.headline)
                     Stepper("Maximum sessions: \(maximumSessions)", value: $maximumSessions, in: 1...20)
-                    Text("Shared by Gemini ACP transcription and study-material generation. Default: 5. Extra requests wait for a free session. Local models run one at a time. Lowering the limit lets running sessions finish.")
+                    Text("Shared by Gemini ACP transcription and study-material generation. Default: 3. Extra requests wait for a free session. Local models run one at a time. Lowering the limit lets running sessions finish.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

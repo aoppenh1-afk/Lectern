@@ -2,13 +2,13 @@ import Foundation
 import Testing
 
 struct AISessionPoolTests {
-    @Test func defaultsToFiveAndClampsStoredLimit() {
+    @Test func defaultsToThreeAndClampsStoredLimit() {
         let suite = "AISessionPoolTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
-        #expect(AISessionPool.configuredLimit(defaults: defaults) == 5)
-        defaults.set(3, forKey: AISessionPool.settingsKey)
         #expect(AISessionPool.configuredLimit(defaults: defaults) == 3)
+        defaults.set(4, forKey: AISessionPool.settingsKey)
+        #expect(AISessionPool.configuredLimit(defaults: defaults) == 4)
         defaults.set(0, forKey: AISessionPool.settingsKey)
         #expect(AISessionPool.configuredLimit(defaults: defaults) == 1)
         defaults.set(99, forKey: AISessionPool.settingsKey)
