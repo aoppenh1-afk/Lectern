@@ -3,7 +3,7 @@ import Foundation
 /// Shared by transcription and study-material requests. Waiting jobs are cancellable.
 actor AISessionPool {
     static let settingsKey = "ai.maximumConcurrentSessions"
-    static let defaultLimit = 5
+    static let defaultLimit = 3
     static let shared = AISessionPool()
 
     private let fixedLimit: Int?
