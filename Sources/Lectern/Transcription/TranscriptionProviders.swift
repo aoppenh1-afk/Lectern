@@ -964,6 +964,8 @@ enum TranscriptionErrorCode: String, Codable, Sendable {
     case networkUnavailable
     case providerUnavailable
     case timeout
+    case offTask
+    case outputLimit
     case acceptedStateUnknown
     case malformedResponse
     case contentRejected
@@ -1072,21 +1074,23 @@ actor TranscriptionJobStore {
     func recoverableJob(
         recordingPath: String,
         sourceAudioHash: String,
-        includeCompleted: Bool
+        includeCompleted: Bool,
+        retryFailedConnectionID: UUID? = nil,
+        connectionID: UUID? = nil
     ) -> PersistentTranscriptionJob? {
-        jobs.last {
-            guard $0.recordingPath == recordingPath,
-                  $0.sourceAudioHash == sourceAudioHash else {
-                return false
-            }
-            switch $0.state {
-            case .failed, .cancelled:
-                return false
-            case .completed:
-                return includeCompleted && $0.completedResult != nil
-            default:
-                return true
-            }
+        guard let latest = jobs.last(where: {
+            $0.recordingPath == recordingPath && $0.sourceAudioHash == sourceAudioHash
+                && (connectionID == nil || $0.selectedConnectionID == connectionID)
+        }) else { return nil }
+        switch latest.state {
+        case .failed:
+            return retryFailedConnectionID == latest.selectedConnectionID ? latest : nil
+        case .cancelled:
+            return nil
+        case .completed:
+            return includeCompleted && latest.completedResult != nil ? latest : nil
+        default:
+            return latest
         }
     }
 

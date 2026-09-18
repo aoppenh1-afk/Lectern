@@ -179,6 +179,17 @@ struct LectureDetailView: View {
                         Text(liveTranscribingSubtitle)
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
+                        if let fraction = transcription.progressByLecture[lecture.persistentModelID]?.fractionCompleted {
+                            ProgressView(value: fraction)
+                                .tint(LecternTheme.processingTint)
+                                .accessibilityLabel("Transcription progress")
+                                .accessibilityValue("\(Int(fraction * 100)) percent")
+                        }
+                        if let started = transcription.progressByLecture[lecture.persistentModelID]?.startedAt {
+                            Text("\(started, style: .relative) elapsed")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     Spacer()
                     CancelJobButton(isCancelling: transcription.isCancelling(lectureID: lecture.persistentModelID)) {

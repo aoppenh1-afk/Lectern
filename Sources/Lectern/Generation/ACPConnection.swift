@@ -1,15 +1,20 @@
 import Foundation
+import Darwin
 
 /// One spawned ACP agent process speaking newline-delimited JSON-RPC 2.0
 /// over stdio. All I/O and state is confined to internal serial queues; the
 /// public API is async and safe to call from anywhere.
 final class ACPConnection: @unchecked Sendable {
+    enum TranscriptionStopReason: String, Sendable {
+        case offTask, timeout, outputLimit, incompleteOutput, configuration
+    }
     enum ACPError: LocalizedError {
         case spawnFailed(String)
         case connectionClosed
         case requestFailed(code: Int, message: String)
         case authRequired(methods: [String])
         case unexpectedResponse
+        case transcriptionStopped(String, reason: TranscriptionStopReason = .offTask)
 
         var errorDescription: String? {
             switch self {
@@ -18,6 +23,7 @@ final class ACPConnection: @unchecked Sendable {
             case .requestFailed(_, let message): return message
             case .authRequired(let methods): return "Authentication required (\(methods.joined(separator: ", ")))."
             case .unexpectedResponse: return "Agent returned an unexpected response."
+            case .transcriptionStopped(let message, _): return message
             }
         }
     }
@@ -55,6 +61,19 @@ final class ACPConnection: @unchecked Sendable {
     private var nextRequestID = 1
     private var pending: [Int: PendingCall] = [:]
     private var isClosed = false
+    private var transcriptionOnly = false
+    private var closeError: Error = ACPError.connectionClosed
+    private var transcriptionOutputBytes = 0
+    private var transcriptionFailure: ACPError?
+
+    /// This is a protocol policy, not a sandbox for the agent's native tools.
+    func restrictToTranscription() {
+        mutex.with { transcriptionOnly = true }
+    }
+
+    func requireMode(sessionID: String, modeID: String) async throws {
+        _ = try await request(method: "session/set_mode", params: ["sessionId": sessionID, "modeId": modeID])
+    }
     private var chunkBuffers: [String: StringAccumulator] = [:]
 
     private let process: Process
@@ -97,6 +116,7 @@ final class ACPConnection: @unchecked Sendable {
         arguments: [String],
         environment: [String: String],
         workingDirectory: URL? = nil,
+        transcriptionOnly: Bool = false,
         onAuthorizationURL: (@Sendable (URL) -> Void)? = nil,
         onClose: (@Sendable () -> Void)? = nil,
         onProcessExit: (@Sendable () -> Void)? = nil
@@ -128,6 +148,7 @@ final class ACPConnection: @unchecked Sendable {
             onClose: onClose,
             onProcessExit: onProcessExit
         )
+        if transcriptionOnly { connection.restrictToTranscription() }
         connection.startReading(stdoutPipe.fileHandleForReading)
 
         let initializeTimeout = Task {
@@ -451,6 +472,11 @@ final class ACPConnection: @unchecked Sendable {
         }
         try Task.checkCancellation()
 
+        if let failure = mutex.with({ transcriptionFailure }) { throw failure }
+        if mutex.with({ transcriptionOnly }),
+           (result as? [String: Any])?["stopReason"] as? String != "end_turn" {
+            throw ACPError.transcriptionStopped("Antigravity did not finish the audio part successfully.", reason: .incompleteOutput)
+        }
         if let dict = result as? [String: Any],
            dict["stopReason"] as? String == "refusal" {
             throw ACPError.requestFailed(code: -32000, message: "The agent refused this request.")
@@ -482,20 +508,41 @@ final class ACPConnection: @unchecked Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    func shutdown() {
-        let waiters: [PendingCall] = mutex.with {
+    func shutdown(error: Error = ACPError.connectionClosed) {
+        let waiters: [PendingCall]? = mutex.with {
+            guard !isClosed else { return nil }
             isClosed = true
+            closeError = error
+            if let failure = error as? ACPError { transcriptionFailure = failure }
             let all = Array(pending.values)
             pending.removeAll()
             return all
         }
-        waiters.forEach { $0.continuation.resume(throwing: ACPError.connectionClosed) }
+        guard let waiters else { return }
+        waiters.forEach { $0.continuation.resume(throwing: error) }
 
         writeQueue.async { [stdinHandle] in
             try? stdinHandle.close()
         }
         if process.isRunning {
-            process.terminate()
+            let pid = process.processIdentifier
+            // Never signal another job's group. Foundation normally owns a
+            // group for its child; verify that ownership before using it.
+            let ownsGroup = mutex.with { transcriptionOnly } && getpgid(pid) == pid
+            if ownsGroup { kill(-pid, SIGTERM) } else { process.terminate() }
+            if mutex.with({ transcriptionOnly }) {
+                DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 2) { [process] in
+                    // A child may ignore TERM after the group leader has exited.
+                    // A surviving group retains its ID; never signal a reused PID.
+                    let group = getpgid(pid)
+                    if ownsGroup, group == pid || (group == -1 && errno == ESRCH) {
+                        kill(-pid, SIGKILL)
+                    } else if process.isRunning {
+                        process.terminate()
+                        kill(pid, SIGKILL)
+                    }
+                }
+            }
         }
         notifyClosed()
     }
@@ -529,7 +576,7 @@ final class ACPConnection: @unchecked Sendable {
                     return true
                 }
                 guard registered else {
-                    continuation.resume(throwing: ACPError.connectionClosed)
+                    continuation.resume(throwing: mutex.with { closeError })
                     return
                 }
                 writeQueue.async { [self] in
@@ -546,14 +593,21 @@ final class ACPConnection: @unchecked Sendable {
     }
 
     private func startReading(_ handle: FileHandle) {
-        let buffer = LineBuffer()
-        handle.readabilityHandler = { fileHandle in
+        let buffer = LineBuffer(maximumLineBytes: mutex.with { transcriptionOnly } ? 8 * 1_024 * 1_024 : nil)
+        handle.readabilityHandler = { [self] fileHandle in
             let data = fileHandle.availableData
             guard !data.isEmpty else {
                 fileHandle.readabilityHandler = nil
                 return
             }
-            for line in buffer.append(data) {
+            let lines = buffer.append(data)
+            if buffer.exceededLimit {
+                stdoutQueue.async { [weak self] in
+                    self?.shutdown(error: ACPError.transcriptionStopped("Antigravity exceeded the protocol output limit.", reason: .outputLimit))
+                }
+                return
+            }
+            for line in lines {
                 self.stdoutQueue.async { [weak self] in
                     self?.handleLine(line)
                 }
@@ -617,6 +671,14 @@ final class ACPConnection: @unchecked Sendable {
             respondToPermissionRequest(obj)
         default:
             if hasID, let method {
+                if mutex.with({ transcriptionOnly }) {
+                    let failure = ACPError.transcriptionStopped("Antigravity requested a tool or user input during transcription.")
+                    mutex.with { transcriptionFailure = failure }
+                    send(["jsonrpc": "2.0", "id": obj["id"] as Any,
+                          "error": ["code": -32601, "message": "Transcription does not support client tools or user input"]])
+                    writeQueue.async { [self] in shutdown(error: failure) }
+                    return
+                }
                 send(["jsonrpc": "2.0",
                       "id": obj["id"] as Any,
                       "error": ["code": -32601, "message": "Lectern does not support \(method)"]])
@@ -625,6 +687,13 @@ final class ACPConnection: @unchecked Sendable {
     }
 
     private func handleSessionUpdate(_ params: [String: Any]?) {
+        if mutex.with({ transcriptionOnly }),
+           let update = params?["update"] as? [String: Any],
+           let kind = update["sessionUpdate"] as? String,
+           kind == "tool_call" || kind == "tool_call_update" {
+            shutdown(error: ACPError.transcriptionStopped("Antigravity attempted tool work during transcription. The audio part was stopped."))
+            return
+        }
         guard let params,
               let sessionID = params["sessionId"] as? String,
               let update = params["update"] as? [String: Any],
@@ -633,6 +702,16 @@ final class ACPConnection: @unchecked Sendable {
               content["type"] as? String == "text",
               let text = content["text"] as? String else { return }
 
+        let exceeded = mutex.with {
+            guard transcriptionOnly else { return false }
+            transcriptionOutputBytes += text.utf8.count
+            return transcriptionOutputBytes > 4 * 1_024 * 1_024
+        }
+        if exceeded {
+            shutdown(error: ACPError.transcriptionStopped("Antigravity exceeded the transcript output limit.", reason: .outputLimit))
+            return
+        }
+
         let accumulator = mutex.with { chunkBuffers[sessionID] }
         accumulator?.append(text)
     }
@@ -640,6 +719,17 @@ final class ACPConnection: @unchecked Sendable {
     /// One-off generation may approve a single action, but never grants a
     /// permanent permission or mistakes an Antigravity user question for one.
     private func respondToPermissionRequest(_ envelope: [String: Any]) {
+        if mutex.with({ transcriptionOnly }) {
+            let failure = ACPError.transcriptionStopped("Antigravity requested tool permission during transcription. The audio part was stopped.")
+            mutex.with { transcriptionFailure = failure }
+            // Queue the denial before closing stdin. Never select allow_once.
+            send(["jsonrpc": "2.0", "id": envelope["id"] as Any,
+                  "result": ["outcome": ["outcome": "cancelled"]]])
+            writeQueue.async { [self] in
+                shutdown(error: failure)
+            }
+            return
+        }
         guard let params = envelope["params"] as? [String: Any],
               let options = params["options"] as? [[String: Any]],
               let toolCall = params["toolCall"] as? [String: Any],
@@ -839,6 +929,9 @@ final class LineBuffer: @unchecked Sendable {
     private var buffer = Data()
     private let maximumLineBytes: Int?
     private var droppingOversizeLine = false
+    private var didExceedLimit = false
+
+    var exceededLimit: Bool { mutex.with { didExceedLimit } }
 
     init(maximumLineBytes: Int? = nil) {
         self.maximumLineBytes = maximumLineBytes
@@ -851,6 +944,7 @@ final class LineBuffer: @unchecked Sendable {
             var lines: [Data] = []
             while let newline = buffer.firstIndex(of: 0x0A) {
                 let line = buffer[buffer.startIndex..<newline]
+                if let maximumLineBytes, line.count > maximumLineBytes { didExceedLimit = true }
                 buffer.removeSubrange(buffer.startIndex...newline)
                 if !droppingOversizeLine, !line.isEmpty,
                    maximumLineBytes.map({ line.count <= $0 }) ?? true {
@@ -859,6 +953,7 @@ final class LineBuffer: @unchecked Sendable {
                 droppingOversizeLine = false
             }
             if let maximumLineBytes, buffer.count > maximumLineBytes {
+                didExceedLimit = true
                 buffer.removeAll(keepingCapacity: false)
                 droppingOversizeLine = true
             }
