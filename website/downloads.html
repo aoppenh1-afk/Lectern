@@ -13,6 +13,44 @@ video{display:block;width:100vw;height:100vh;object-fit:contain;background:#0c24
 </head>
 <body>
 <video src="assets/lectern-install.mp4" autoplay muted loop playsinline preload="auto" poster="assets/lectern-install-poster.jpg" aria-label="26-second silent Lectern install guide: download the DMG, drag Lectern onto Applications, approve it with Open Anyway in Privacy and Security"></video>
+<script>
+// The linking page hands over its resolved installer URL via sessionStorage
+// and navigates here immediately; the download starts on film load so no
+// later navigation can disturb it. Direct visits resolve the latest release
+// the same way download.js does.
+try {
+  var startFilmDownload = function (url) {
+    var frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden;';
+    frame.src = url;
+    document.body.appendChild(frame);
+  };
+  var stored = null;
+  try { stored = window.sessionStorage.getItem('lectern-dmg-url'); } catch (storageError) {}
+  if (stored) {
+    startFilmDownload(stored);
+  } else {
+    fetch('https://api.github.com/repos/aoppenh1-afk/Lectern/releases/latest', {
+      headers: { Accept: 'application/vnd.github+json' }
+    }).then(function (response) {
+      if (!response.ok) throw new Error('Release lookup unavailable');
+      return response.json();
+    }).then(function (release) {
+      var assets = release.assets || [];
+      var asset = assets.find(function (a) { return /^Lectern(?:-[\w.-]+)?\.dmg$/i.test(a.name); }) ||
+        assets.find(function (a) { return /^Lectern(?:-[\w.-]+)?\.zip$/i.test(a.name); });
+      var url = new URL(asset.browser_download_url);
+      if (url.origin !== 'https://github.com' || !url.pathname.startsWith('/aoppenh1-afk/Lectern/releases/download/')) throw new Error('Unexpected release asset');
+      startFilmDownload(url.href);
+    }).catch(function () {
+      // The film still plays; the install guide links the installer.
+    });
+  }
+} catch (error) {
+  // Film plays regardless; the download link still works without JS.
+}
+</script>
 <noscript><p style="color:#f6f5f0;font-family:sans-serif;text-align:center;padding-top:40vh">Your download has started. <a style="color:#f6f5f0" href="install.html">Open the installation guide</a>.</p></noscript>
 </body>
 </html>

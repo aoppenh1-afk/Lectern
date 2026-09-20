@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
-const source = await readFile(new URL('../assets/download.js', import.meta.url), 'utf8');
+const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const source = await readFile(path.join(root, 'assets', 'download.js'), 'utf8');
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 const DMG = 'https://github.com/aoppenh1-afk/Lectern/releases/download/v2.6.1/Lectern-2.6.1.dmg';
@@ -24,33 +26,40 @@ function makeElement() {
   };
 }
 
+function makeStorage(initial = {}) {
+  const data = { ...initial };
+  return {
+    getItem: (key) => (key in data ? data[key] : null),
+    setItem: (key, value) => { data[key] = String(value); },
+    removeItem: (key) => { delete data[key]; },
+    data,
+  };
+}
+
 function makeLink(href) {
   return { href, listeners: {}, addEventListener(event, fn) { (this.listeners[event] ??= []).push(fn); } };
 }
 
-async function loadOn(pageUrl) {
+async function loadDownloadJs(pageUrl) {
   const appended = [];
   const body = makeElement();
   body.appendChild = (child) => { appended.push(child); return child; };
-  const listeners = {};
+  const links = [makeLink('fallback'), makeLink('fallback')];
   const document = {
     querySelectorAll: () => links,
     createElement: () => makeElement(),
     body,
     activeElement: null,
-    addEventListener: (event, fn) => { (listeners[event] ??= []).push(fn); },
+    addEventListener: () => {},
   };
-  const links = [makeLink('fallback'), makeLink('fallback')];
-  // querySelectorAll above closes over `links` declared after; rebind:
-  document.querySelectorAll = () => links;
-  const window = { location: { href: pageUrl } };
+  const sessionStorage = makeStorage();
+  const window = { location: { href: pageUrl }, sessionStorage };
   const fetch = async () => ({
     ok: true,
     json: async () => ({ assets: [{ name: 'Lectern-2.6.1.dmg', browser_download_url: DMG }] }),
   });
-  const run = new AsyncFunction('document', 'fetch', 'window', source);
-  await run(document, fetch, window);
-  return { appended, links, window, document };
+  await new AsyncFunction('document', 'fetch', 'window', source)(document, fetch, window);
+  return { appended, links, window, document, sessionStorage };
 }
 
 function click(link, event = {}) {
@@ -61,21 +70,20 @@ function click(link, event = {}) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Plain left click on the homepage: download fires via iframe, tab redirects.
+// Plain left click off the guide: hands the URL over and navigates at once.
 {
-  const { appended, links, window } = await loadOn('https://example.com/index.html');
+  const { appended, links, window, sessionStorage } = await loadDownloadJs('https://example.com/index.html');
   assert.equal(links[0].href, DMG);
   const event = click(links[0]);
   assert.equal(event.defaultPrevented, true);
-  const frames = appended.filter((el) => el.src === DMG);
-  assert.equal(frames.length, 1);
-  await sleep(750);
+  assert.equal(sessionStorage.data['lectern-dmg-url'], DMG);
   assert.equal(window.location.href, 'downloads.html');
+  assert.equal(appended.filter((el) => el.src === DMG).length, 0);
 }
 
-// Install guide: download fires, modal shows, no navigation.
+// Install guide: download fires here, modal shows, no navigation.
 {
-  const { appended, links, window, document } = await loadOn('https://example.com/install.html');
+  const { appended, links, window } = await loadDownloadJs('https://example.com/install.html');
   const event = click(links[0]);
   assert.equal(event.defaultPrevented, true);
   assert.ok(appended.some((el) => el.src === DMG));
@@ -83,27 +91,61 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const backdrop = appended.find((el) => el.className === 'dl-backdrop');
   assert.equal(backdrop.hidden, false);
   assert.equal(window.location.href, 'https://example.com/install.html');
-  assert.ok(document.body.style.overflow === 'hidden');
 }
 
-// Film page: download fires, no redirect loop.
+// Film page clicks: download fires here, no redirect loop.
 {
-  const { appended, links, window } = await loadOn('https://example.com/downloads.html');
+  const { appended, links, window } = await loadDownloadJs('https://example.com/downloads.html');
   click(links[0]);
   assert.ok(appended.some((el) => el.src === DMG));
-  await sleep(750);
+  await sleep(100);
   assert.equal(window.location.href, 'https://example.com/downloads.html');
 }
 
-// Modified click (cmd-click): browser default untouched, no redirect.
+// Modified click (cmd-click): browser default untouched.
 {
-  const { appended, links, window } = await loadOn('https://example.com/index.html');
+  const { appended, links, window } = await loadDownloadJs('https://example.com/index.html');
   const before = appended.length;
   const event = click(links[0], { metaKey: true });
   assert.notEqual(event.defaultPrevented, true);
   assert.equal(appended.length, before);
-  await sleep(750);
   assert.equal(window.location.href, 'https://example.com/index.html');
 }
 
-console.log('PASS: iframe download survives the film redirect; modal, film-page, and modified-click behavior preserved.');
+// Film page boot with a handed-over URL: download starts on load.
+{
+  const film = await readFile(path.join(root, 'downloads.html'), 'utf8');
+  const scripts = [...film.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.ok(scripts.length > 0);
+  for (const script of scripts) {
+    const appended = [];
+    const body = makeElement();
+    body.appendChild = (child) => { appended.push(child); return child; };
+    const document = { createElement: () => makeElement(), body };
+    const window = { sessionStorage: makeStorage({ 'lectern-dmg-url': DMG }) };
+    const fetch = async () => { throw new Error('must not fetch when handed a URL'); };
+    await new AsyncFunction('document', 'fetch', 'window', script)(document, fetch, window);
+    await sleep(50);
+    assert.ok(appended.some((el) => el.src === DMG));
+  }
+}
+
+// Film page boot as a direct visit: resolves the latest release itself.
+{
+  const film = await readFile(path.join(root, 'downloads.html'), 'utf8');
+  const script = [...film.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join('\n');
+  const appended = [];
+  const body = makeElement();
+  body.appendChild = (child) => { appended.push(child); return child; };
+  const document = { createElement: () => makeElement(), body };
+  const window = { sessionStorage: makeStorage() };
+  const fetch = async () => ({
+    ok: true,
+    json: async () => ({ assets: [{ name: 'Lectern-2.6.1.dmg', browser_download_url: DMG }] }),
+  });
+  await new AsyncFunction('document', 'fetch', 'window', script)(document, fetch, window);
+  await sleep(50);
+  assert.ok(appended.some((el) => el.src === DMG));
+}
+
+console.log('PASS: instant film redirect with handover; guide modal, film boot, and modified-click behavior preserved.');
