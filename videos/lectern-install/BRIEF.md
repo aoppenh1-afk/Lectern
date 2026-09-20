@@ -27,7 +27,7 @@ A silent install walkthrough for the Lectern website, in the style of the Wispr 
 ## Customizations
 
 - Split layout like the reference: dark steps panel left, animated macOS windows right, orange cursor with click rings.
-- After a download starts from any data-mac-download link off the install page, navigate to install.html so the video and steps are in front of the user.
+- After a download starts from any data-mac-download link off the install and film pages, navigate to downloads.html, a fullscreen page playing only this film.
 
 ## Notes
 
