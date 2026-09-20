@@ -18,9 +18,10 @@ try {
 }
 
 // Post-download Gatekeeper help: the app is not signed with an Apple Developer
-// ID, so macOS blocks the first open. Let the download proceed, then show a
-// modal pointing at install.html#open. Guarded so the release-resolution test
-// (minimal document mock) and no-JS fallback keep working.
+// ID, so macOS blocks the first open. Let the download proceed, then guide the
+// user to downloads.html (fullscreen install film; modal on the guide itself,
+// nothing on the film page). Guarded so the release-resolution test (minimal
+// document mock) and no-JS fallback keep working.
 try {
   const canRender =
     typeof document !== 'undefined' &&
@@ -76,8 +77,19 @@ try {
     });
     for (const link of links) {
       link.addEventListener('click', () => {
-        // Let the browser start the download first, then explain the warning.
-        setTimeout(show, 250);
+        // Let the browser start the download first. On the install guide keep
+        // the modal; on the film page do nothing; from anywhere else, send the
+        // user to the fullscreen install film while the download continues.
+        const href = typeof window !== 'undefined' ? window.location.href : '';
+        const onInstallPage = /install\.html($|[?#])/.test(href);
+        const onFilmPage = /downloads\.html($|[?#])/.test(href);
+        if (onInstallPage) {
+          setTimeout(show, 250);
+        } else if (!onFilmPage && typeof window !== 'undefined' && window.location) {
+          setTimeout(() => {
+            window.location.href = 'downloads.html';
+          }, 600);
+        }
       });
     }
   }
