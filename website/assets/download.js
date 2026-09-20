@@ -75,11 +75,28 @@ try {
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !backdrop.hidden) hide();
     });
+    // Fire-and-remember download: the DMG is fetched through a hidden iframe
+    // so the file request survives the tab navigating to the film page below.
+    // (Navigating the tab itself to the DMG first aborts the download when the
+    // redirect fires mid-handshake.) Modified clicks are left alone so
+    // cmd-click/open-in-new-tab keep the browser default.
+    const startDownload = (url) => {
+      const frame = document.createElement('iframe');
+      frame.setAttribute('aria-hidden', 'true');
+      frame.setAttribute('tabindex', '-1');
+      frame.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden;';
+      frame.src = url;
+      document.body.appendChild(frame);
+    };
     for (const link of links) {
-      link.addEventListener('click', () => {
-        // Let the browser start the download first. On the install guide keep
-        // the modal; on the film page do nothing; from anywhere else, send the
-        // user to the fullscreen install film while the download continues.
+      link.addEventListener('click', (event) => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        // Take over the download so the film-page redirect cannot cancel it.
+        event.preventDefault();
+        startDownload(link.href);
+        // On the install guide keep the modal; on the film page do nothing;
+        // from anywhere else, send the user to the fullscreen install film
+        // while the download continues in the background.
         const href = typeof window !== 'undefined' ? window.location.href : '';
         const onInstallPage = /install\.html($|[?#])/.test(href);
         const onFilmPage = /downloads\.html($|[?#])/.test(href);
