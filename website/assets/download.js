@@ -18,9 +18,10 @@ try {
 }
 
 // Post-download Gatekeeper help: the app is not signed with an Apple Developer
-// ID, so macOS blocks the first open. Let the download proceed, then show a
-// modal pointing at install.html#open. Guarded so the release-resolution test
-// (minimal document mock) and no-JS fallback keep working.
+// ID, so macOS blocks the first open. Let the download proceed, then guide the
+// user to install.html (modal on the guide itself, redirect from elsewhere).
+// Guarded so the release-resolution test (minimal document mock) and no-JS
+// fallback keep working.
 try {
   const canRender =
     typeof document !== 'undefined' &&
@@ -76,8 +77,18 @@ try {
     });
     for (const link of links) {
       link.addEventListener('click', () => {
-        // Let the browser start the download first, then explain the warning.
-        setTimeout(show, 250);
+        // Let the browser start the download first. On the install guide keep
+        // the modal; from anywhere else, send the user to the guide (with its
+        // install video and steps) while the download continues in background.
+        const href = typeof window !== 'undefined' ? window.location.href : '';
+        const onInstallPage = /install\.html($|[?#])/.test(href);
+        if (onInstallPage) {
+          setTimeout(show, 250);
+        } else if (typeof window !== 'undefined' && window.location) {
+          setTimeout(() => {
+            window.location.href = 'install.html#download';
+          }, 600);
+        }
       });
     }
   }
