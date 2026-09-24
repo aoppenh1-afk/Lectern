@@ -65,9 +65,9 @@ final class CaptureController {
         }
     }
 
-    /// Imports an existing audio file as a lecture. Transcription starts only
-    /// when the user requests it from the lecture.
-    func importAudio(at sourceURL: URL, into course: Course?, language: LectureLanguage? = nil) throws {
+    /// Imports an existing audio file as a lecture. The caller decides whether
+    /// to start transcription after import.
+    func importAudio(at sourceURL: URL, into course: Course?, language: LectureLanguage? = nil) throws -> Lecture {
         try importService.importAudio(
             from: sourceURL,
             metadata: .init(
