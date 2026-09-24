@@ -71,6 +71,72 @@ struct AntigravityACPLayout: Sendable {
     }
 }
 
+/// The Google runtime stores one SQLite conversation per ACP session in this
+/// private Lectern profile. It does not advertise ACP session deletion.
+final class AntigravityACPSessionCleanup: @unchecked Sendable {
+    private let layout: AntigravityACPLayout
+    private let mutex = Mutex()
+    private var sessionIDs: Set<String> = []
+
+    init(layout: AntigravityACPLayout) { self.layout = layout }
+
+    func record(_ sessionID: String) {
+        guard let id = Self.canonicalID(sessionID) else { return }
+        mutex.with { sessionIDs.insert(id) }
+    }
+
+    /// Called only after the agent process has exited and closed its databases.
+    func removeRecorded() {
+        let ids = mutex.with { sessionIDs }
+        for id in ids { Self.remove(id: id, layout: layout) }
+    }
+
+    /// Old app versions left sessions behind. Run this without active managed
+    /// connections, and leave recent files alone in case another app is using
+    /// the same profile.
+    static func pruneLegacySessions(layout: AntigravityACPLayout, olderThan cutoff: Date = Date().addingTimeInterval(-86_400)) {
+        let directory = layout.acpProfileDirectory.appendingPathComponent("conversations", isDirectory: true)
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: [.contentModificationDateKey], options: []
+        ) else { return }
+        var latestByID: [String: Date] = [:]
+        for file in files {
+            guard let id = conversationID(for: file.lastPathComponent),
+                  let modified = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+            else { continue }
+            latestByID[id] = max(latestByID[id] ?? modified, modified)
+        }
+        for (id, modified) in latestByID where modified < cutoff {
+            let brain = layout.acpProfileDirectory.appendingPathComponent("brain/\(id)", isDirectory: true)
+            if let brainModified = try? brain.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+               brainModified >= cutoff { continue }
+            remove(id: id, layout: layout)
+        }
+    }
+
+    private static func canonicalID(_ value: String) -> String? {
+        guard value.count == 36, let uuid = UUID(uuidString: value) else { return nil }
+        return uuid.uuidString.lowercased()
+    }
+
+    private static func conversationID(for name: String) -> String? {
+        for suffix in [".db-wal", ".db-shm", ".db", ".meta"] where name.hasSuffix(suffix) {
+            return canonicalID(String(name.dropLast(suffix.count)))
+        }
+        return nil
+    }
+
+    private static func remove(id: String, layout: AntigravityACPLayout) {
+        let directory = layout.acpProfileDirectory.appendingPathComponent("conversations", isDirectory: true)
+        for suffix in [".db-wal", ".db-shm", ".db", ".meta"] {
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent(id + suffix))
+        }
+        try? FileManager.default.removeItem(
+            at: layout.acpProfileDirectory.appendingPathComponent("brain/\(id)", isDirectory: true)
+        )
+    }
+}
+
 struct AntigravityACPInstallation: Equatable, Sendable {
     let executable: URL
     let harness: URL
@@ -451,7 +517,7 @@ actor AntigravityACPInstaller {
 
     let layout: AntigravityACPLayout
     private let fileManager: FileManager
-    private var leases: Set<UUID> = []
+    private var leases: [UUID: String] = [:]
 
     init(layout: AntigravityACPLayout, fileManager: FileManager = .default) {
         self.layout = layout
@@ -472,15 +538,22 @@ actor AntigravityACPInstaller {
     func acquire() throws -> (installation: AntigravityACPInstallation, leaseID: UUID) {
         let installation = try resolve()
         let leaseID = UUID()
-        leases.insert(leaseID)
+        leases[leaseID] = installation.executable.deletingLastPathComponent().lastPathComponent
         return (installation, leaseID)
     }
 
     func release(leaseID: UUID) {
-        leases.remove(leaseID)
+        leases.removeValue(forKey: leaseID)
+        pruneInactiveVersions()
     }
 
     func hasNoLeases() -> Bool { leases.isEmpty }
+
+    func pruneLegacySessionsIfIdle() -> Bool {
+        guard leases.isEmpty else { return false }
+        AntigravityACPSessionCleanup.pruneLegacySessions(layout: layout)
+        return true
+    }
 
     func install(
         release: AntigravityACPRelease,
@@ -507,6 +580,7 @@ actor AntigravityACPInstaller {
             try await validate(existing)
             try Task.checkCancellation()
             try activate(releaseID: release.sha256)
+            pruneInactiveVersions()
             return existing
         }
 
@@ -620,6 +694,7 @@ actor AntigravityACPInstaller {
             throw error
         }
         if let backup { try? fileManager.removeItem(at: backup) }
+        pruneInactiveVersions()
         return try completedRelease(id: release.sha256)
     }
 
@@ -653,6 +728,24 @@ actor AntigravityACPInstaller {
             )
         }
         return .init(executable: executable, harness: harness, version: record.version)
+    }
+
+    /// Keep the active release and any release still used by a live process.
+    /// A failed removal can be retried on refresh or when the last lease ends.
+    func pruneInactiveVersions() {
+        guard let active = try? decode(ActiveRecord.self, at: layout.activeRecord),
+              active.releaseId.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil,
+              let versions = try? fileManager.contentsOfDirectory(
+                at: layout.versionsDirectory, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+              ) else { return }
+        for version in versions {
+            let id = version.lastPathComponent
+            guard id.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil,
+                  id != active.releaseId, !leases.values.contains(id),
+                  let values = try? version.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+                  values.isDirectory == true, values.isSymbolicLink != true else { continue }
+            try? fileManager.removeItem(at: version)
+        }
     }
 
     private func activate(releaseID: String) throws {
@@ -771,6 +864,7 @@ final class AntigravityACPManager {
     private var pendingAuthorization: AntigravityACPAuthorization.Pending?
     private var installationTask: Task<Void, Never>?
     private var activeConnections: [UUID: ACPConnection] = [:]
+    private var didPruneLegacySessions = false
 
     let layout: AntigravityACPLayout
     private let installer: AntigravityACPInstaller
@@ -842,6 +936,8 @@ final class AntigravityACPManager {
             // another PyInstaller process just to recheck its identity.
             installation = resolved
             runtimeState = .ready(version: resolved.version)
+            await installer.pruneInactiveVersions()
+            await pruneLegacySessionsIfIdle()
             await refreshAuthenticationStatus()
         } catch AntigravityACPError.notInstalled {
             installation = nil
@@ -1034,6 +1130,10 @@ final class AntigravityACPManager {
         transcriptionOnly: Bool = false,
         onAuthorizationURL: (@Sendable (URL) -> Void)? = nil
     ) async throws -> ACPConnection {
+        await installer.pruneInactiveVersions()
+        await pruneLegacySessionsIfIdle()
+        try AntigravityACPProfile.prepare(layout: layout)
+        if transcriptionOnly { try AntigravityACPProfile.validateTranscriptionConfiguration(layout: layout) }
         let acquired = try await installer.acquire()
         let connectionID = UUID()
         do {
@@ -1043,19 +1143,32 @@ final class AntigravityACPManager {
                 layout: layout,
                 transcriptionOnly: transcriptionOnly,
                 onAuthorizationURL: onAuthorizationURL,
-                onClose: { [weak self, installer, leaseID = acquired.leaseID] in
-                    Task {
-                        await installer.release(leaseID: leaseID)
-                        _ = await MainActor.run { self?.activeConnections.removeValue(forKey: connectionID) }
-                    }
+                onClose: { [weak self] in
+                    Task { @MainActor in self?.activeConnections.removeValue(forKey: connectionID) }
+                },
+                onProcessExit: { [installer, leaseID = acquired.leaseID] in
+                    Task { await installer.release(leaseID: leaseID) }
                 }
             )
             activeConnections[connectionID] = connection
             return connection
         } catch {
-            await installer.release(leaseID: acquired.leaseID)
+            // Once spawned, connect() shuts down on handshake failure and the
+            // process-exit callback releases the lease after the binary exits.
+            if case ACPConnection.ACPError.spawnFailed = error {
+                await installer.release(leaseID: acquired.leaseID)
+            } else if case ACPConnection.ACPError.transcriptionStopped = error {
+                await installer.release(leaseID: acquired.leaseID)
+            } else if error is CocoaError {
+                await installer.release(leaseID: acquired.leaseID)
+            }
             throw error
         }
+    }
+
+    private func pruneLegacySessionsIfIdle() async {
+        guard !didPruneLegacySessions else { return }
+        didPruneLegacySessions = await installer.pruneLegacySessionsIfIdle()
     }
 
     private func stopActiveConnections() async {
@@ -1113,12 +1226,14 @@ final class AntigravityACPManager {
         layout: AntigravityACPLayout,
         transcriptionOnly: Bool = false,
         onAuthorizationURL: (@Sendable (URL) -> Void)? = nil,
-        onClose: (@Sendable () -> Void)? = nil
+        onClose: (@Sendable () -> Void)? = nil,
+        onProcessExit: (@Sendable () -> Void)? = nil
     ) async throws -> ACPConnection {
         try AntigravityACPProfile.prepare(layout: layout)
         if transcriptionOnly { try AntigravityACPProfile.validateTranscriptionConfiguration(layout: layout) }
         let runtimeTemp = layout.acpProfileDirectory
             .appendingPathComponent("tmp/run-\(UUID().uuidString)", isDirectory: true)
+        let sessionCleanup = AntigravityACPSessionCleanup(layout: layout)
         try FileManager.default.createDirectory(
             at: runtimeTemp, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
         )
@@ -1136,7 +1251,12 @@ final class AntigravityACPManager {
                 transcriptionOnly: transcriptionOnly,
                 onAuthorizationURL: onAuthorizationURL,
                 onClose: onClose,
-                onProcessExit: { try? FileManager.default.removeItem(at: runtimeTemp) }
+                onSessionCreated: { sessionCleanup.record($0) },
+                onProcessExit: {
+                    sessionCleanup.removeRecorded()
+                    try? FileManager.default.removeItem(at: runtimeTemp)
+                    onProcessExit?()
+                }
             )
         } catch {
             // Spawn failures have no process-exit callback.
