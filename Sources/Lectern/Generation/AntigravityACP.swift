@@ -871,8 +871,13 @@ actor AntigravityACPInstaller {
             try fileManager.moveItem(at: destination, to: candidate)
             backup = candidate
         }
+        let pinnedInstalled: AntigravityACPInstallation
         do {
             try fileManager.moveItem(at: pair, to: destination)
+            // Resolve before activating: a failure here rolls back to the
+            // backup instead of leaving active.json pointed at an unreadable
+            // release.
+            pinnedInstalled = try completedRelease(id: release.sha256)
             try activate(releaseID: release.sha256)
         } catch {
             if fileManager.fileExists(atPath: destination.path) {
@@ -883,10 +888,6 @@ actor AntigravityACPInstaller {
             }
             throw error
         }
-        // Resolve the new release before discarding the backup: if the new
-        // record is unreadable, activation is rolled back above and the
-        // previous runtime stays in place.
-        let pinnedInstalled = try completedRelease(id: release.sha256)
         if let backup { try? fileManager.removeItem(at: backup) }
         pruneOldVersions(keeping: release.sha256)
         return pinnedInstalled
@@ -1017,8 +1018,12 @@ actor AntigravityACPInstaller {
             try fileManager.moveItem(at: destination, to: candidate)
             backup = candidate
         }
+        let installed: AntigravityACPInstallation
         do {
             try fileManager.moveItem(at: pair, to: destination)
+            // Resolve before activating so a bad record restores the backup
+            // instead of leaving active.json pointed at an unreadable release.
+            installed = try completedRelease(id: digest)
             try activate(releaseID: digest)
         } catch {
             if fileManager.fileExists(atPath: destination.path) {
@@ -1029,7 +1034,6 @@ actor AntigravityACPInstaller {
             }
             throw error
         }
-        let installed = try completedRelease(id: digest)
         if let backup { try? fileManager.removeItem(at: backup) }
         pruneOldVersions(keeping: digest)
         return installed
