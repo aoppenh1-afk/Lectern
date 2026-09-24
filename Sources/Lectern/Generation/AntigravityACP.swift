@@ -643,6 +643,28 @@ private final class AntigravityACPRegistryDownload: NSObject, URLSessionDownload
 
     func urlSession(
         _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        // Registry releases carry no pinned SHA-256, so a redirect off the
+        // allow-listed Google host must stop the download before any bytes
+        // are trusted.
+        guard let url = request.url,
+              (try? AntigravityACPRegistry.validateDownloadURL(url)) != nil else {
+            completionHandler(nil)
+            task.cancel()
+            finish(.failure(AntigravityACPError.downloadFailed(
+                "The Antigravity download redirected to an unexpected URL. Nothing was installed."
+            )))
+            return
+        }
+        completionHandler(request)
+    }
+
+    func urlSession(
+        _ session: URLSession,
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
@@ -861,9 +883,13 @@ actor AntigravityACPInstaller {
             }
             throw error
         }
+        // Resolve the new release before discarding the backup: if the new
+        // record is unreadable, activation is rolled back above and the
+        // previous runtime stays in place.
+        let pinnedInstalled = try completedRelease(id: release.sha256)
         if let backup { try? fileManager.removeItem(at: backup) }
         pruneOldVersions(keeping: release.sha256)
-        return try completedRelease(id: release.sha256)
+        return pinnedInstalled
     }
 
     /// Installs a release advertised by the official registry. The archive
@@ -1003,15 +1029,20 @@ actor AntigravityACPInstaller {
             }
             throw error
         }
+        let installed = try completedRelease(id: digest)
         if let backup { try? fileManager.removeItem(at: backup) }
         pruneOldVersions(keeping: digest)
-        return try completedRelease(id: digest)
+        return installed
     }
 
-    /// Removes every installed version except `keeping` (plus transient
-    /// staging entries). Best-effort: a cleanup failure never fails the update
-    /// itself, but the active runtime is always preserved.
+    /// Removes every installed version except `keeping` (plus stale
+    /// `.previous-` backups). Best-effort: a cleanup failure never fails the
+    /// update itself, but the active runtime is always preserved. Leased
+    /// runtimes run from their version directory, so pruning is skipped while
+    /// any connection holds a lease; the next lease-free install or refresh
+    /// retries it.
     func pruneOldVersions(keeping releaseID: String) {
+        guard leases.isEmpty else { return }
         guard let entries = try? fileManager.contentsOfDirectory(
             at: layout.versionsDirectory,
             includingPropertiesForKeys: nil
@@ -1026,6 +1057,15 @@ actor AntigravityACPInstaller {
             guard isVersion || isStaleBackup else { continue }
             try? fileManager.removeItem(at: entry)
         }
+    }
+
+    /// Retries deferred cleanup: removes every installed version except the
+    /// active one. Called after a successful resolve so an update that was
+    /// skipped while connections held leases still frees disk later.
+    func pruneKeepingActive() {
+        guard leases.isEmpty else { return }
+        guard let active = try? decode(ActiveRecord.self, at: layout.activeRecord) else { return }
+        pruneOldVersions(keeping: active.releaseId)
     }
 
     func removeManagedRuntime() throws {
@@ -1284,6 +1324,8 @@ final class AntigravityACPManager {
             // another PyInstaller process just to recheck its identity.
             installation = resolved
             runtimeState = .ready(version: resolved.version)
+            // Retry cleanup deferred from an update that ran while leased.
+            await installer.pruneKeepingActive()
             await refreshAuthenticationStatus()
         } catch AntigravityACPError.notInstalled {
             installation = nil
@@ -1390,7 +1432,14 @@ final class AntigravityACPManager {
         phase: @escaping @Sendable (AntigravityACPInstaller.Phase) -> Void,
         validate: @escaping @Sendable (AntigravityACPInstallation) async throws -> Void
     ) async throws -> AntigravityACPInstallation {
-        let currentVersion = installation?.version ?? (try? await installer.resolve().version)
+        // Note: `await` cannot live in a `??` right-hand side (autoclosure),
+        // so resolve the fallback explicitly.
+        let currentVersion: String?
+        if let version = installation?.version {
+            currentVersion = version
+        } else {
+            currentVersion = try? await installer.resolve().version
+        }
         if let currentVersion,
            let pinned = AntigravityACPRelease.current,
            currentVersion == pinned.version {
@@ -1402,7 +1451,7 @@ final class AntigravityACPManager {
         }
         if let currentVersion,
            let remote = await latestRegistryRelease(),
-           remote.version == currentVersion {
+           AntigravityACPRelease.compare(remote.version, currentVersion) == .orderedSame {
             runtimeState = .installing(phase: .downloading, downloaded: 0, total: 1)
             return try await installer.installRegistryRelease(
                 release: remote, forceReinstall: true,
@@ -1609,8 +1658,12 @@ final class AntigravityACPManager {
         defer { try? FileManager.default.removeItem(at: temporaryRoot) }
         let connection = try await connect(installation: installation, layout: validationLayout)
         defer { connection.shutdown() }
+        // The ACP binary may report a prefixed version ("agy_acp_server_1.2.1")
+        // while the registry advertises the bare number ("1.2.1"), so compare
+        // by release identity rather than exact string equality.
         guard connection.identity?.name == "antigravity-acp",
-              connection.identity?.version == installation.version,
+              let reportedVersion = connection.identity?.version,
+              AntigravityACPRelease.compare(reportedVersion, installation.version) == .orderedSame,
               connection.initialization?.protocolVersion == 1,
               connection.initialization?.supportsLoadSession == true,
               connection.initialization?.supportsResume == true,

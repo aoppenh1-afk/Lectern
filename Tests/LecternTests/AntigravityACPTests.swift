@@ -161,6 +161,38 @@ final class AntigravityACPTests: XCTestCase {
         XCTAssertEqual(try await installer.resolve().version, "new")
     }
 
+    func testPruningDefersWhileRuntimeIsLeased() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Lectern-ACP-Prune-Lease-Test-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = AntigravityACPLayout(root: root)
+        let activeID = String(repeating: "a", count: 64)
+        let oldID = String(repeating: "b", count: 64)
+        try writeInstalledFixture(layout: layout, version: "new", releaseID: activeID)
+        let activeRecord = try Data(contentsOf: layout.activeRecord)
+        try writeInstalledFixture(layout: layout, version: "old", releaseID: oldID)
+        try activeRecord.write(to: layout.activeRecord)
+
+        let installer = AntigravityACPInstaller(layout: layout)
+        let acquired = try await installer.acquire()
+        await installer.pruneOldVersions(keeping: activeID)
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: layout.versionsDirectory.appendingPathComponent(oldID).path
+            ),
+            "A leased runtime must survive pruning."
+        )
+
+        await installer.release(leaseID: acquired.leaseID)
+        await installer.pruneOldVersions(keeping: activeID)
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: layout.versionsDirectory.appendingPathComponent(oldID).path
+            )
+        )
+        XCTAssertEqual(try await installer.resolve().version, "new")
+    }
+
     func testFailedUpdateValidationKeepsPreviousRuntimeActive() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

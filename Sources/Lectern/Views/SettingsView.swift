@@ -1160,7 +1160,12 @@ private struct AgentsPane: View {
         case .notInstalled, .cancelled:
             return "Downloads the official runtime directly from Google. Your existing agy CLI is separate and is not used."
         case .ready(let version):
-            return "Google release \(version) · SHA-256 verified"
+            // Only the pinned release is SHA-256 checked against a known hash;
+            // registry releases are validated by archive shape and ACP handshake.
+            if version == AntigravityACPRelease.current?.version {
+                return "Google release \(version) · SHA-256 verified"
+            }
+            return "Google release \(version) · Validated"
         case .failed(let message):
             return message
         default:
