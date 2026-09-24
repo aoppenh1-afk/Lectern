@@ -9,9 +9,8 @@ enum SidebarSelection: Hashable {
 struct MainWindowView: View {
     @Environment(CaptureController.self) private var capture
     @Environment(TranscriptionService.self) private var transcription
+    @Environment(TranscriptionPreferences.self) private var transcriptionPreferences
     @Environment(GenerationService.self) private var generation
-    @Environment(LectureChatService.self) private var lectureChat
-    @Environment(CourseSynthesisService.self) private var courseSynthesis
     @Environment(RetentionService.self) private var retention
     @Environment(SurfacePreferences.self) private var surfacePreferences
     @Environment(\.modelContext) private var modelContext
@@ -33,8 +32,6 @@ struct MainWindowView: View {
     @State private var searchText = ""
     @State private var importError: String?
     @State private var generateTarget: Lecture?
-    @State private var showingAIChat = false
-    @State private var showingCourseSynthesis = false
     @State private var exportTarget: Lecture?
     @State private var renamingLecture: Lecture?
     @State private var renameText = ""
@@ -63,12 +60,6 @@ struct MainWindowView: View {
         .onChange(of: selection) { _, _ in
             selectedLecture = nil
             searchText = ""
-            showingCourseSynthesis = false
-        }
-        .onChange(of: selectedLecture) { oldValue, newValue in
-            guard oldValue != newValue else { return }
-            lectureChat.cancelResponse()
-            showingCourseSynthesis = false
         }
         .sheet(item: $generateTarget) { lecture in
             GenerateSheet(lecture: lecture)
@@ -128,39 +119,25 @@ struct MainWindowView: View {
             .help("Generate cleaned transcript, notes, flashcards, quiz")
 
             Button {
-                withAnimation(LecternTheme.standardAnimation) {
-                    if selectedLecture != nil {
-                        showingAIChat.toggle()
-                    } else if selectedCourse != nil {
-                        showingCourseSynthesis.toggle()
-                    }
-                }
+                importAudioLecture(autoTranscribe: true)
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 11))
-                    Text(selectedLecture == nil ? "Course AI" : "AI Chat")
+                    Image(systemName: "arrow.up.to.line")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Upload Audio")
                         .font(.system(size: 12.5, weight: .medium))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .background(
-                    Capsule().fill((showingAIChat || showingCourseSynthesis)
-                        ? LecternTheme.accent.opacity(0.10)
-                        : LecternTheme.cardFill)
-                )
-                .overlay(
-                    Capsule().strokeBorder(
-                        (showingAIChat || showingCourseSynthesis) ? LecternTheme.accent.opacity(0.45) : cardBorder,
-                        lineWidth: 1
-                    )
-                )
-                .foregroundStyle((showingAIChat || showingCourseSynthesis) ? LecternTheme.accent : LecternTheme.ink)
+                .background(Capsule().fill(LecternTheme.cardFill))
+                .overlay(Capsule().strokeBorder(cardBorder, lineWidth: 1))
+                .foregroundStyle(LecternTheme.ink)
             }
             .buttonStyle(.plain)
-            .disabled(!canOpenAI)
-            .opacity(canOpenAI ? 1 : 0.45)
-            .help(selectedLecture == nil ? "Ask across this course" : "Ask questions about this lecture")
+            .disabled(selectedCourse == nil)
+            .opacity(selectedCourse == nil ? 0.45 : 1)
+            .help(selectedCourse.map { "Upload audio to \($0.name) for transcription" }
+                  ?? "Select a course to upload audio")
 
             Spacer()
 
@@ -267,12 +244,6 @@ struct MainWindowView: View {
         .overlay(Capsule().strokeBorder(cardBorder, lineWidth: 1))
         .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
         .foregroundStyle(LecternTheme.ink)
-    }
-
-    private var canOpenAI: Bool {
-        if let selectedLecture { return LectureChatService.hasSource(selectedLecture) }
-        guard let selectedCourse else { return false }
-        return CourseChatSource.make(course: selectedCourse, lectures: selectedCourse.lectures) != nil
     }
 
     // MARK: - Sidebar
@@ -778,42 +749,27 @@ struct MainWindowView: View {
     @ViewBuilder
     private var detailPane: some View {
         if let selectedLecture {
-            if showingAIChat {
-                LectureChatView(lecture: selectedLecture) {
-                    withAnimation(LecternTheme.standardAnimation) {
-                        showingAIChat = false
-                    }
-                }
-                .id(selectedLecture.persistentModelID)
-            } else {
-                LectureDetailView(lecture: selectedLecture) {
-                    attachReferenceMaterials(to: selectedLecture)
-                }
-                    .id(selectedLecture.persistentModelID)
+            LectureDetailView(lecture: selectedLecture) {
+                attachReferenceMaterials(to: selectedLecture)
             }
-        } else if showingCourseSynthesis, let selectedCourse {
-            CourseSynthesisView(
-                course: selectedCourse,
-                availableCourses: [],
-                selectedCourseID: .constant(nil)
-            ) {
-                courseSynthesis.cancel()
-                withAnimation(LecternTheme.standardAnimation) {
-                    showingCourseSynthesis = false
-                }
-            }
-            .id(selectedCourse.persistentModelID)
+            .id(selectedLecture.persistentModelID)
         } else {
             dashboardHome
         }
     }
 
-    private func importAudioLecture() {
+    private func importAudioLecture(autoTranscribe: Bool = false) {
         guard let url = LectureImportPicker.chooseAudioFile() else { return }
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
         do {
-            try capture.importAudio(at: url, into: selectedCourse)
+            let lecture = try capture.importAudio(at: url, into: selectedCourse)
+            if autoTranscribe {
+                selectedLecture = lecture
+                if transcriptionPreferences.source != .askEachTime {
+                    transcription.retranscribe(lecture, as: lecture.language)
+                }
+            }
         } catch {
             importError = error.localizedDescription
         }
