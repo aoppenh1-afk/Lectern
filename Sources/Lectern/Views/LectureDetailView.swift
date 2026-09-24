@@ -330,49 +330,57 @@ struct LectureDetailView: View {
            let provider = lecture.transcriptConnectionName,
            let model = lecture.transcriptModelID {
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 14) {
+                // Keep the original single-row height when the detail pane is narrow.
+                HStack(spacing: 10) {
                     transcriptProvenanceInfo(provider: provider, model: model)
+                        .frame(minWidth: 200, maxWidth: 260, alignment: .leading)
+                    Spacer(minLength: 4)
+                    transcriptProvenanceActions
                         .fixedSize(horizontal: true, vertical: false)
-                    Spacer(minLength: 0)
-                    horizontalProvenanceActions
                 }
 
-                VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
                     transcriptProvenanceInfo(provider: provider, model: model)
-                    transcriptProvenanceActions
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    compactProvenanceActions
                 }
             }
-            .padding(16)
+            .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
     }
 
     private func transcriptProvenanceInfo(provider: String, model: String) -> some View {
-        HStack(spacing: 12) {
+        let subtitle = [model, lecture.transcriptCompletedAt?.formatted(date: .abbreviated, time: .shortened)]
+            .compactMap { $0 }.joined(separator: "  ·  ")
+        return HStack(spacing: 12) {
             Group {
                 if let providerID = lecture.transcriptProviderRaw.flatMap(TranscriptionProviderID.init(rawValue:)),
                    providerID != .local {
-                    ProviderLogo(provider: providerID, size: 44)
+                    ProviderLogo(provider: providerID, size: 28)
                 } else {
                     Image(systemName: "macbook")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(LecternTheme.accent)
-                        .frame(width: 44, height: 44)
-                        .background(LecternTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 11))
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 28, height: 28)
+                        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 7))
                 }
             }
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Transcribed with \(provider)")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(LecternTheme.ink)
-                Text([model, lecture.transcriptCompletedAt?.formatted(date: .abbreviated, time: .shortened)].compactMap { $0 }.joined(separator: "  ·  "))
-                    .font(.system(size: 13))
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .help(subtitle)
                 if let fallback = lecture.transcriptFallbackSummary {
                     Text(fallback)
                         .font(.system(size: 10))
                         .foregroundStyle(LecternTheme.warningTint)
+                        .lineLimit(1)
+                        .help(fallback)
                 }
             }
         }
@@ -380,53 +388,62 @@ struct LectureDetailView: View {
     }
 
     private var transcriptProvenanceActions: some View {
-        ViewThatFits(in: .horizontal) {
-            horizontalProvenanceActions
-            VStack(spacing: 10) {
-                transcribeAgainButton
-                generateCleanTranscriptAndNotesButton
-            }
+        HStack(spacing: 8) {
+            transcribeAgainButton(compact: false)
+            generateCleanTranscriptAndNotesButton(compact: false)
         }
     }
 
-    private var horizontalProvenanceActions: some View {
-        HStack(spacing: 10) {
-            transcribeAgainButton
-            generateCleanTranscriptAndNotesButton
+    private var compactProvenanceActions: some View {
+        HStack(spacing: 6) {
+            transcribeAgainButton(compact: true)
+            generateCleanTranscriptAndNotesButton(compact: true)
         }
-        .fixedSize(horizontal: true, vertical: false)
     }
 
-    private var transcribeAgainButton: some View {
+    private func transcribeAgainButton(compact: Bool) -> some View {
         transcriptionPickerButton {
-            Label("Transcribe again", systemImage: "arrow.clockwise")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(LecternTheme.ink)
-                .padding(.horizontal, 14)
-                .frame(height: 44)
-                .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+            Group {
+                if compact {
+                    Image(systemName: "arrow.clockwise")
+                } else {
+                    Label("Transcribe again", systemImage: "arrow.clockwise")
+                }
+            }
+            .font(.system(size: 11.5, weight: .medium))
+            .foregroundStyle(LecternTheme.ink)
+            .frame(width: compact ? 28 : nil, height: 28)
+            .padding(.horizontal, compact ? 0 : 10)
+            .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
         }
         .disabled(lecture.recording?.isPruned != false
                   || transcription.isQueuedOrRunning(lectureID: lecture.persistentModelID)
                   || transcription.isCancelling(lectureID: lecture.persistentModelID))
+        .accessibilityLabel("Transcribe again")
         .help("Choose a transcriber and transcribe this recording again")
     }
 
-    private var generateCleanTranscriptAndNotesButton: some View {
+    private func generateCleanTranscriptAndNotesButton(compact: Bool) -> some View {
         Button(action: onGenerate) {
-            Label("Generate clean transcription & notes", systemImage: "doc.text")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 14)
-                .frame(height: 44)
-                .background(Color(hex: "2168ED"), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            Group {
+                if compact {
+                    Image(systemName: "doc.text")
+                } else {
+                    Label("Generate clean transcription & notes", systemImage: "doc.text")
+                }
+            }
+            .font(.system(size: 11.5, weight: .medium))
+            .foregroundStyle(.white)
+            .frame(width: compact ? 28 : nil, height: 28)
+            .padding(.horizontal, compact ? 0 : 10)
+            .background(Color(hex: "2168ED"), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(generation.job(for: lecture.persistentModelID) != nil)
-        .help("Open generation options for this lecture")
+        .accessibilityLabel("Generate clean transcription and notes")
+        .help("Generate clean transcription & notes")
     }
 
     private func transcriptionChoiceMenu(label: String) -> some View {
