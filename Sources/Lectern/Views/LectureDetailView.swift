@@ -247,6 +247,12 @@ struct LectureDetailView: View {
                     }
                 }
             }
+        } else if let warning = generation.warnings[lecture.persistentModelID] {
+            SurfaceCard(padding: 14) {
+                Label(warning, systemImage: "exclamationmark.triangle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(LecternTheme.warningTint)
+            }
         }
     }
 
@@ -812,9 +818,11 @@ struct LectureDetailView: View {
     }
 
     private func jumpToBookmark(_ offset: TimeInterval) {
-        selectedTab = .rawTranscript
-        jumpBookmarkOffset = offset
-        jumpRequest = UUID()
+        if lecture.artifact(of: .rawTranscript) != nil {
+            selectedTab = .rawTranscript
+            jumpBookmarkOffset = offset
+            jumpRequest = UUID()
+        }
         if lecture.recording?.isPruned == false {
             audioPlayer.play(lecture, from: offset)
         }

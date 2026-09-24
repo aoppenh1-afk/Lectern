@@ -1,7 +1,7 @@
 import XCTest
 
 final class NotesMarkdownTests: XCTestCase {
-    func testBookmarksMatchTheNearestTimedTranscriptParagraph() {
+    func testBookmarksMatchSpeechAcrossParagraphsAndSilenceGaps() {
         let paragraphs = TranscriptParagraph.parse("""
         [00:10] First concept
 
@@ -14,6 +14,13 @@ final class NotesMarkdownTests: XCTestCase {
         XCTAssertEqual(TranscriptParagraph.closestIndex(to: 12, in: paragraphs), 0)
         XCTAssertEqual(TranscriptParagraph.closestIndex(to: 37, in: paragraphs), 2)
         XCTAssertEqual(TranscriptParagraph.closestIndex(to: 17.5, in: paragraphs), 0)
+        let longPassage = TranscriptParagraph.parse("""
+        [00:10] \(String(repeating: "This concept continues through the explanation. ", count: 15))
+
+        [00:40] Next concept
+        """)
+        XCTAssertEqual(TranscriptParagraph.closestIndex(to: 30, in: longPassage), 0)
+        XCTAssertEqual(TranscriptParagraph.closestIndex(to: 39.7, in: longPassage), 1)
         XCTAssertEqual(TranscriptParagraph.closestIndex(to: 90,
             in: TranscriptParagraph.parse("Untimed transcript")), 0)
         XCTAssertEqual(TranscriptParagraph.link(25.125), "lectern://bookmark/25125")

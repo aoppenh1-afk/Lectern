@@ -15,6 +15,7 @@ final class GenerationService {
 
     private(set) var activeJobs: [PersistentIdentifier: ActiveJob] = [:]
     private(set) var errors: [PersistentIdentifier: String] = [:]
+    private(set) var warnings: [PersistentIdentifier: String] = [:]
     var activeJob: ActiveJob? { activeJobs.values.first }
     func job(for id: PersistentIdentifier) -> ActiveJob? { activeJobs[id] }
     func isCancelling(_ id: PersistentIdentifier) -> Bool { generationTasks[id]?.isCancelled == true }
@@ -27,6 +28,13 @@ final class GenerationService {
     private struct GeneratedOutput: Sendable {
         let kind: GenerationJobKind
         let content: String
+        let warning: String?
+
+        init(kind: GenerationJobKind, content: String, warning: String? = nil) {
+            self.kind = kind
+            self.content = content
+            self.warning = warning
+        }
     }
 
     private struct NoteFlagRequirement: Sendable {
@@ -106,6 +114,7 @@ final class GenerationService {
         let title = lecture.title
         activeJobs[id] = ActiveJob(lectureTitle: title, remaining: ordered)
         errors[id] = nil
+        warnings[id] = nil
         lastError = nil
         completionNotifier.prepare(for: .generation)
         let task = Task<Void, Error> {
@@ -122,6 +131,7 @@ final class GenerationService {
                 if Task.isCancelled || error is CancellationError { throw CancellationError() }
                 let message = "\(profile.title): \(error.localizedDescription)"
                 errors[id] = message
+                warnings[id] = nil
                 lastError = message
                 throw error
             }
@@ -235,6 +245,7 @@ final class GenerationService {
                 break
             case .notes:
                 storeNotes(lecture: lecture, markdown: output.content, profile: profile, context: context)
+                warnings[lectureID] = output.warning
             case .flashcards:
                 try storeFlashcards(lecture: lecture, output: output.content, context: context)
             case .quiz:
@@ -394,12 +405,12 @@ final class GenerationService {
                     source: transcript,
                     language: language
                 )
-                violations += missingBookmarkLinkViolations(in: output, links: requiredBookmarkLinks)
             }
             guard violations.isEmpty else {
                 throw InvalidNotesOutput(violations: violations)
             }
-            return GeneratedOutput(kind: kind, content: output)
+            return GeneratedOutput(kind: kind, content: output,
+                warning: missingBookmarkWarning(in: output, links: requiredBookmarkLinks))
         }
 
         let prompt: String
@@ -490,11 +501,12 @@ final class GenerationService {
                         source: transcript,
                         language: language
                     )
-                    violations += missingBookmarkLinkViolations(in: output, links: requiredBookmarkLinks)
                 }
                 guard violations.isEmpty else {
                     throw InvalidNotesOutput(violations: violations)
                 }
+                return GeneratedOutput(kind: kind, content: output,
+                    warning: missingBookmarkWarning(in: output, links: requiredBookmarkLinks))
             }
             return GeneratedOutput(kind: kind, content: output)
         }
@@ -509,6 +521,13 @@ final class GenerationService {
             }
             return matched ? nil : "Include the actual flagged study point on an outline line labeled \(requirement.label) with its exact source link \(requirement.link)."
         }
+    }
+
+    private nonisolated static func missingBookmarkWarning(in notes: String,
+                                                           links: [NoteFlagRequirement]) -> String? {
+        let count = missingBookmarkLinkViolations(in: notes, links: links).count
+        guard count > 0 else { return nil }
+        return "Generated Notes may omit \(count) Important or Test flag\(count == 1 ? "" : "s") or their source links. Review those flags in the transcript."
     }
 
     private nonisolated static func newSession(connection: ACPConnection,

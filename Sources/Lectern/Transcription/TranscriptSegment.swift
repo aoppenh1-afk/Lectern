@@ -37,13 +37,21 @@ struct TranscriptParagraph: Sendable {
     static func closestIndex(to offset: TimeInterval, in paragraphs: [TranscriptParagraph]) -> Int? {
         let timed = paragraphs.enumerated().compactMap { index, paragraph -> (Int, Double)? in
             paragraph.startSeconds.map { (index, $0) }
-        }
+        }.sorted { $0.1 < $1.1 }
         guard !timed.isEmpty else { return paragraphs.isEmpty ? nil : 0 }
-        return timed.min { left, right in
-            let leftDistance = abs(left.1 - offset)
-            let rightDistance = abs(right.1 - offset)
-            return leftDistance == rightDistance ? left.1 < right.1 : leftDistance < rightDistance
-        }?.0
+        // Displayed timestamps are rounded; a start up to half a second ahead
+        // can still be the speech the student flagged.
+        let nextPosition = timed.firstIndex { $0.1 > offset + 0.5 }
+        guard let nextPosition else { return timed.last?.0 }
+        guard nextPosition > 0 else { return timed.first?.0 }
+
+        let previous = timed[nextPosition - 1]
+        let next = timed[nextPosition]
+        let wordCount = paragraphs[previous.0].text.split(whereSeparator: \.isWhitespace).count
+        // A long paragraph likely continues toward the next anchor; a short
+        // one can end before a silence gap. Approximate its end from speech.
+        let estimatedEnd = min(next.1, previous.1 + max(2, Double(wordCount) / 2))
+        return abs(offset - estimatedEnd) <= abs(next.1 - offset) ? previous.0 : next.0
     }
 
     static func timeLabel(_ offset: TimeInterval) -> String {
