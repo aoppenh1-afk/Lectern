@@ -56,7 +56,7 @@ enum LectureDocumentExportService {
 
         if options.includeBookmarks, !lecture.orderedBookmarks.isEmpty {
             let bookmarks = lecture.orderedBookmarks.map { bookmark in
-                let label = bookmark.isExamAlert ? "Exam alert" : "Bookmark"
+                let label = bookmark.kind.title
                 let note = bookmark.note.isEmpty ? label : "\(label): \(bookmark.note)"
                 return "- [\(timeLabel(bookmark.offset))] \(note)"
             }.joined(separator: "\n")

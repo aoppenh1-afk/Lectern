@@ -4,6 +4,17 @@ import Testing
 
 @MainActor
 struct TranscriptionQueueTests {
+    @Test func continuousSpeechKeepsRegularTimestampAnchors() {
+        let segments = (0..<6).map { index in
+            TranscriptSegment(startSeconds: Double(index * 5),
+                              endSeconds: Double(index * 5 + 4),
+                              text: "Concept \(index)")
+        }
+        let paragraphs = TranscriptParagraph.parse(TranscriptionService.markdown(from: segments))
+        #expect(paragraphs.map(\.timestampLabel) == ["00:00", "00:20"])
+        #expect(TranscriptParagraph.closestIndex(to: 23, in: paragraphs) == 1)
+    }
+
     @Test(arguments: [true, false])
     func deletedQueuedLectureIsSkipped(saveDeletion: Bool) async throws {
         let container = try ModelContainer(for: Course.self, Lecture.self, ShiurSubscription.self,

@@ -85,7 +85,8 @@ struct GenerateSheet: View {
         }
         .onChange(of: viewState) { old, new in
             guard old == .running, new != .running else { return }
-            if generation.errors[lecture.persistentModelID] == nil {
+            if generation.errors[lecture.persistentModelID] == nil,
+               generation.warnings[lecture.persistentModelID] == nil {
                 dismiss()
             } else {
                 finished = true
@@ -914,18 +915,21 @@ struct GenerateSheet: View {
     // MARK: - Done
 
     private var completionView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let error = generation.errors[lecture.persistentModelID]
+        let warning = generation.warnings[lecture.persistentModelID]
+        let hasIssue = error != nil || warning != nil
+        return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                Image(systemName: generation.errors[lecture.persistentModelID] == nil ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                Image(systemName: hasIssue ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundStyle(generation.errors[lecture.persistentModelID] == nil ? LecternTheme.successTint : LecternTheme.warningTint)
+                    .foregroundStyle(hasIssue ? LecternTheme.warningTint : LecternTheme.successTint)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(generation.errors[lecture.persistentModelID] == nil ? "Materials ready" : "Finished with errors")
+                    Text(error != nil ? "Finished with errors" : warning != nil ? "Materials ready with a warning" : "Materials ready")
                         .font(.system(size: 17, weight: .bold, design: .serif))
                         .foregroundStyle(LecternTheme.ink)
-                    if let error = generation.errors[lecture.persistentModelID] {
-                        Text(error)
+                    if let message = error ?? warning {
+                        Text(message)
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }

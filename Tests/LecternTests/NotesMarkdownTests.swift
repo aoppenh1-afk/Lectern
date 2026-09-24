@@ -1,6 +1,56 @@
 import XCTest
 
 final class NotesMarkdownTests: XCTestCase {
+    func testBookmarksMatchSpeechAcrossParagraphsAndSilenceGaps() {
+        let paragraphs = TranscriptParagraph.parse("""
+        [00:10] First concept
+
+        [00:25] Second concept
+
+        [00:42] Third concept
+        """)
+        XCTAssertEqual(paragraphs.map(\.text), ["First concept", "Second concept", "Third concept"])
+        XCTAssertEqual(TranscriptParagraph.closestIndex(to: 23, in: paragraphs), 1)
+        XCTAssertEqual(TranscriptParagraph.closestIndex(to: 12, in: paragraphs), 0)
+        XCTAssertEqual(TranscriptParagraph.closestIndex(to: 37, in: paragraphs), 2)
+        XCTAssertEqual(TranscriptParagraph.closestIndex(to: 17.5, in: paragraphs), 0)
+        let longPassage = TranscriptParagraph.parse("""
+        [00:10] \(String(repeating: "This concept continues through the explanation. ", count: 15))
+
+        [00:40] Next concept
+        """)
+        XCTAssertEqual(TranscriptParagraph.closestIndex(to: 30, in: longPassage), 0)
+        XCTAssertEqual(TranscriptParagraph.closestIndex(to: 39.7, in: longPassage), 1)
+        XCTAssertEqual(TranscriptParagraph.closestIndex(to: 90,
+            in: TranscriptParagraph.parse("Untimed transcript")), 0)
+        XCTAssertEqual(TranscriptParagraph.link(25.125), "lectern://bookmark/25125")
+    }
+
+    func testTimedFlagsGiveNotesAIContextAndSelectiveInstructions() {
+        let context = "<timed-student-flags>Test / Quiz: compare X and Y at 00:25</timed-student-flags>"
+        let prompt = Prompts.notes(cleanedTranscript: "X differs from Y", bookmarkContext: context,
+                                   skillInstructions: "Outline contract")
+        XCTAssertTrue(prompt.contains(context))
+        XCTAssertTrue(prompt.contains("Clarify and Question remain transcript annotations"))
+        XCTAssertTrue(prompt.contains("**Important:**"))
+        XCTAssertTrue(prompt.contains("**Test:**"))
+        XCTAssertTrue(prompt.contains("If an annotation names a comparison"))
+        let antigravity = Prompts.antigravityNotesRequest(language: .english, hasBookmarks: true)
+        XCTAssertTrue(antigravity.contains("@lecture-bookmarks.md"))
+        XCTAssertTrue(antigravity.contains("**Test:**"))
+    }
+
+    func testExistingBookmarkFlagsRetainTheirMeaning() {
+        let plain = LiveBookmark(offset: 20, note: "Core idea")
+        let exam = LiveBookmark(offset: 30, isExamAlert: true)
+        XCTAssertEqual(plain.kind, .important)
+        XCTAssertEqual(exam.kind, .quiz)
+        plain.kind = .question
+        XCTAssertFalse(plain.isExamAlert)
+        exam.kind = .clarify
+        XCTAssertFalse(exam.isExamAlert)
+    }
+
     func testDafReferencesUseLogicalAmudMarks() {
         let input = "- **גמ׳ :דף לו** on שבת (.דף ל״ו) and :דף קיט; רש״י: explanation"
         let expected = "- **גמ׳ דף לו:** on שבת (דף ל״ו.) and דף קיט:; רש״י: explanation"

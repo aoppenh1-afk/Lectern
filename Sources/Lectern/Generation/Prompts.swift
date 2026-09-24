@@ -106,6 +106,7 @@ enum Prompts {
     static func notes(
         cleanedTranscript: String,
         language: LectureLanguage = .english,
+        bookmarkContext: String = "",
         skillInstructions: String = LecternAgentSkill.notes.instructions()
     ) -> String {
         let branch = language == .hebrewEnglish ? "English-Hebrew shiur" : "English lecture"
@@ -119,7 +120,10 @@ enum Prompts {
         <task>
         Language branch: \(branch).
         Create the complete notes now and return only the final Markdown document.
+        \(notesBookmarkInstruction(hasBookmarks: !bookmarkContext.isEmpty))
         </task>
+
+        \(bookmarkContext)
 
         <lecture-source>
         \(cleanedTranscript)
@@ -127,13 +131,15 @@ enum Prompts {
         """
     }
 
-    static func antigravityNotesRequest(language: LectureLanguage) -> String {
+    static func antigravityNotesRequest(language: LectureLanguage, hasBookmarks: Bool = false) -> String {
         let branch = language == .hebrewEnglish ? "English-Hebrew shiur" : "English lecture"
         return """
         Apply the lectern-notes skill to @lecture-source.md.
 
         Language branch: \(branch).
         Treat @lecture-source.md together with any explicitly named supplementary reference files as the complete source boundary.
+        \(notesBookmarkInstruction(hasBookmarks: hasBookmarks))
+        \(hasBookmarks ? "Read @lecture-bookmarks.md for the student's timed flags and nearby raw transcript context." : "")
         Return only the final Markdown notes document.
         """
     }
@@ -148,17 +154,27 @@ enum Prompts {
         """
     }
 
-    static func antigravityNotesRepair(violations: [String], language: LectureLanguage) -> String {
+    static func antigravityNotesRepair(violations: [String], language: LectureLanguage,
+                                      hasBookmarks: Bool = false) -> String {
         let branch = language == .hebrewEnglish ? "English-Hebrew shiur" : "English lecture"
         return """
         Apply the lectern-notes skill to repair @draft-notes.md against @lecture-source.md.
 
         Language branch: \(branch).
         Use any explicitly named supplementary reference files to resolve uncertain terminology without inventing content.
+        \(notesBookmarkInstruction(hasBookmarks: hasBookmarks))
+        \(hasBookmarks ? "Read @lecture-bookmarks.md again while repairing the draft." : "")
         Preserve every grounded point and its source order while fixing these failures:
         \(violations.map { "- \($0)" }.joined(separator: "\n"))
 
         Return only the complete repaired Markdown document.
+        """
+    }
+
+    private static func notesBookmarkInstruction(hasBookmarks: Bool) -> String {
+        guard hasBookmarks else { return "" }
+        return """
+        Interpret each timed flag using its type, the student's annotation, its matched raw passage, and the full lecture. Clarify and Question remain transcript annotations; do not promote them into Notes merely because they were flagged. For Important, include and visibly emphasize the actual concept the student meant with a concise **Important:** label on its outline item. For Test / Quiz, prioritize the material as exam content and label its outline item **Test:**. If an annotation names a comparison, explain that comparison as the study point. Ground every claim in the lecture. Place the flag's exact provided Markdown source link beside each Important or Test point so it can return to the recording; keep each flag's link even when several relate to one concept.
         """
     }
 
