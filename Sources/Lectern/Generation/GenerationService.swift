@@ -29,6 +29,11 @@ final class GenerationService {
         let content: String
     }
 
+    private struct NoteFlagRequirement: Sendable {
+        let link: String
+        let label: String
+    }
+
     private struct InvalidNotesOutput: LocalizedError, Sendable {
         let violations: [String]
 
@@ -152,6 +157,14 @@ final class GenerationService {
         let language = lecture.language
         let supplementaryInputs = antigravityReferenceInputs(for: lecture)
         let rawSource = sourceWithReferences(transcript: rawTranscript, lecture: lecture)
+        let bookmarkContext = kinds.contains(.notes)
+            ? notesBookmarkContext(rawTranscript: rawTranscript, lecture: lecture) : ""
+        let requiredBookmarkLinks: [NoteFlagRequirement] = kinds.contains(.notes)
+            ? lecture.orderedBookmarks
+                .filter { $0.kind == .important || $0.kind == .quiz }
+                .map { NoteFlagRequirement(link: TranscriptParagraph.link($0.offset),
+                                           label: $0.kind == .quiz ? "**Test:**" : "**Important:**") }
+            : []
 
         if kinds.contains(.cleanedTranscript) {
             activeJobs[lectureID]?.remaining = kinds
@@ -166,7 +179,9 @@ final class GenerationService {
                 workspaceDirectory: workspaceDirectory,
                 effortHint: effortHint,
                 language: language,
-                supplementaryInputs: supplementaryInputs
+                supplementaryInputs: supplementaryInputs,
+                bookmarkContext: "",
+                requiredBookmarkLinks: []
             ).content.trimmingCharacters(in: .whitespacesAndNewlines)
             try Task.checkCancellation()
             guard lecture.modelContext != nil, !lecture.isDeleted else { throw CancellationError() }
@@ -197,7 +212,9 @@ final class GenerationService {
                         workspaceDirectory: self.workspaceDirectory,
                         effortHint: effortHint,
                         language: language,
-                        supplementaryInputs: supplementaryInputs
+                        supplementaryInputs: supplementaryInputs,
+                        bookmarkContext: kind == .notes ? bookmarkContext : "",
+                        requiredBookmarkLinks: kind == .notes ? requiredBookmarkLinks : []
                     )
                 }
             }
@@ -250,6 +267,29 @@ final class GenerationService {
         }
         rendered.append("Use reference sources to correct uncertain wording, names, technical terms, and recognition errors. Do not add reference-only claims to a cleaned transcript or attribute them to the professor. For notes and study materials, use them as supporting context while distinguishing them from what the professor said in this lecture.")
         return rendered.joined(separator: "\n\n")
+    }
+
+    private func notesBookmarkContext(rawTranscript: String, lecture: Lecture) -> String {
+        guard !lecture.bookmarks.isEmpty else { return "" }
+        let paragraphs = TranscriptParagraph.parse(rawTranscript)
+        let entries = lecture.orderedBookmarks.map { bookmark -> [String: String] in
+            let index = TranscriptParagraph.closestIndex(to: bookmark.offset, in: paragraphs)
+            let nearby = index.map { matched in
+                paragraphs[max(0, matched - 1)...min(paragraphs.count - 1, matched + 1)]
+                    .map { $0.text }.joined(separator: " ")
+            } ?? ""
+            return [
+                "type": bookmark.kind.title,
+                "recordingTime": TranscriptParagraph.timeLabel(bookmark.offset),
+                "note": bookmark.note,
+                "matchedTranscript": index.map { paragraphs[$0].text } ?? "",
+                "nearbyTranscript": String(nearby.prefix(1_000)),
+                "sourceLink": "[↗ \(TranscriptParagraph.timeLabel(bookmark.offset))](\(TranscriptParagraph.link(bookmark.offset)))"
+            ]
+        }
+        let data = (try? JSONSerialization.data(withJSONObject: entries, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+        let json = String(decoding: data, as: UTF8.self)
+        return "<timed-student-flags>\n\(json)\n</timed-student-flags>"
     }
 
     private func antigravityReferenceInputs(for lecture: Lecture) -> [AntigravityACPClient.WorkspaceInput] {
@@ -306,7 +346,9 @@ final class GenerationService {
         workspaceDirectory: URL,
         effortHint: String,
         language: LectureLanguage,
-        supplementaryInputs: [AntigravityACPClient.WorkspaceInput]
+        supplementaryInputs: [AntigravityACPClient.WorkspaceInput],
+        bookmarkContext: String,
+        requiredBookmarkLinks: [NoteFlagRequirement]
     ) async throws -> GeneratedOutput {
         if profile.id == AgentProfiles.antigravityID, kind == .notes {
             let cli = AntigravityACPClient.configured(for: profile)
@@ -315,14 +357,17 @@ final class GenerationService {
                 to: modelOverride ?? profile.model ?? AntigravityACPClient.modelID
             )
             let source = AntigravityACPClient.WorkspaceInput.text(transcript, named: "lecture-source.md")
+            let bookmarkInputs: [AntigravityACPClient.WorkspaceInput] = bookmarkContext.isEmpty
+                ? [] : [.text(bookmarkContext, named: "lecture-bookmarks.md")]
             let referenceInstruction = AntigravityACPClient.supplementaryReferenceInstruction(
                 for: supplementaryInputs
             )
             var output = NotesMarkdownNormalizer.normalize(try await cli.run(
-                prompt: effortHint + referenceInstruction + Prompts.antigravityNotesRequest(language: language),
+                prompt: effortHint + referenceInstruction + Prompts.antigravityNotesRequest(
+                    language: language, hasBookmarks: !bookmarkContext.isEmpty),
                 modelID: modelID,
                 thinkingLevel: thinkingLevel,
-                inputs: [source] + supplementaryInputs,
+                inputs: [source] + bookmarkInputs + supplementaryInputs,
                 skills: [.notes]
             ))
             var violations = NotesOutputValidator.violations(
@@ -330,15 +375,18 @@ final class GenerationService {
                 source: transcript,
                 language: language
             )
+            violations += missingBookmarkLinkViolations(in: output, links: requiredBookmarkLinks)
             if !violations.isEmpty {
                 output = NotesMarkdownNormalizer.normalize(try await cli.run(
                     prompt: effortHint + referenceInstruction + Prompts.antigravityNotesRepair(
                         violations: violations,
-                        language: language
+                        language: language,
+                        hasBookmarks: !bookmarkContext.isEmpty
                     ),
                     modelID: modelID,
                     thinkingLevel: thinkingLevel,
-                    inputs: [source, .text(output, named: "draft-notes.md")] + supplementaryInputs,
+                    inputs: [source, .text(output, named: "draft-notes.md")]
+                        + bookmarkInputs + supplementaryInputs,
                     skills: [.notes]
                 ))
                 violations = NotesOutputValidator.violations(
@@ -346,6 +394,7 @@ final class GenerationService {
                     source: transcript,
                     language: language
                 )
+                violations += missingBookmarkLinkViolations(in: output, links: requiredBookmarkLinks)
             }
             guard violations.isEmpty else {
                 throw InvalidNotesOutput(violations: violations)
@@ -358,7 +407,8 @@ final class GenerationService {
         case .cleanedTranscript:
             prompt = Prompts.cleanedTranscript(rawTranscript: transcript, language: language)
         case .notes:
-            prompt = Prompts.notes(cleanedTranscript: transcript, language: language)
+            prompt = Prompts.notes(cleanedTranscript: transcript, language: language,
+                                   bookmarkContext: bookmarkContext)
         case .flashcards:
             prompt = Prompts.flashcards(cleanedTranscript: transcript, language: language)
         case .quiz:
@@ -429,6 +479,7 @@ final class GenerationService {
                     source: transcript,
                     language: language
                 )
+                violations += missingBookmarkLinkViolations(in: output, links: requiredBookmarkLinks)
                 if !violations.isEmpty {
                     output = NotesMarkdownNormalizer.normalize(try await connection.prompt(
                         sessionID: session.id,
@@ -439,12 +490,24 @@ final class GenerationService {
                         source: transcript,
                         language: language
                     )
+                    violations += missingBookmarkLinkViolations(in: output, links: requiredBookmarkLinks)
                 }
                 guard violations.isEmpty else {
                     throw InvalidNotesOutput(violations: violations)
                 }
             }
             return GeneratedOutput(kind: kind, content: output)
+        }
+    }
+
+    private nonisolated static func missingBookmarkLinkViolations(in notes: String,
+                                                                  links: [NoteFlagRequirement]) -> [String] {
+        let lines = notes.components(separatedBy: .newlines)
+        return links.compactMap { requirement in
+            let matched = lines.contains { line in
+                line.contains("(\(requirement.link))") && line.contains(requirement.label)
+            }
+            return matched ? nil : "Include the actual flagged study point on an outline line labeled \(requirement.label) with its exact source link \(requirement.link)."
         }
     }
 

@@ -16,6 +16,7 @@ final class CaptureController {
         let offset: TimeInterval
         let note: String
         let isExamAlert: Bool
+        let kind: LiveBookmarkKind
     }
     enum Phase {
         case idle
@@ -191,14 +192,17 @@ final class CaptureController {
     /// Drops a timestamp against the active recording. Option-Command-B adds
     /// a plain bookmark; recording surfaces can attach a note or exam flag.
     @discardableResult
-    func addBookmark(note: String = "", isExamAlert: Bool = false) -> Bool {
+    func addBookmark(note: String = "", isExamAlert: Bool = false,
+                     kind: LiveBookmarkKind? = nil) -> Bool {
         guard case .recording(let startedAt) = phase else { return false }
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedKind = kind ?? (isExamAlert ? .quiz : .important)
         liveBookmarks.append(PendingBookmark(
             createdAt: Date(),
             offset: Date().timeIntervalSince(startedAt),
             note: trimmed,
-            isExamAlert: isExamAlert
+            isExamAlert: resolvedKind == .quiz,
+            kind: resolvedKind
         ))
         notifyPhaseChange()
         return true
@@ -494,7 +498,8 @@ final class CaptureController {
         for pending in liveBookmarks {
             let bookmark = LiveBookmark(offset: pending.offset,
                                         note: pending.note,
-                                        isExamAlert: pending.isExamAlert)
+                                        isExamAlert: pending.isExamAlert,
+                                        kind: pending.kind)
             bookmark.createdAt = pending.createdAt
             bookmark.lecture = lecture
             lecture.bookmarks.append(bookmark)

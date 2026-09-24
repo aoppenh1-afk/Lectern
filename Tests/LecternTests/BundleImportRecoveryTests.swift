@@ -37,9 +37,12 @@ struct BundleImportRecoveryTests {
         #expect(!FileManager.default.fileExists(atPath: copiedReference.path))
 
         manifest["references"] = []
+        manifest["bookmarks"] = [["offset": 25.5, "note": "Likely on exam", "isExamAlert": true]]
         try JSONSerialization.data(withJSONObject: manifest).write(to: bundle.appendingPathComponent("manifest.json"))
         let imported = try LecternBundleService.importBundle(from: bundle, into: nil, context: context)
         #expect(imported.artifact(of: .rawTranscript)?.content == "Transcript")
+        #expect(imported.bookmarks.first?.kind == .quiz)
+        #expect(imported.bookmarks.first?.note == "Likely on exam")
         #expect(try context.fetch(FetchDescriptor<Lecture>()).count == 2)
     }
 }

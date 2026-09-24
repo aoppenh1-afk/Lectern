@@ -17,6 +17,7 @@ struct MenuBarPopoverView: View {
     @State private var selectedCourse: Course?
     @State private var selectedLanguage: LectureLanguage = .english
     @State private var bookmarkNote = ""
+    @State private var bookmarkKind: LiveBookmarkKind = .important
 
     var body: some View {
         GlassEffectContainer(spacing: 10) {
@@ -225,6 +226,13 @@ struct MenuBarPopoverView: View {
             .frame(width: Self.contentWidth)
 
             HStack(spacing: 6) {
+                Picker("Flag", selection: $bookmarkKind) {
+                    ForEach(LiveBookmarkKind.allCases) { kind in
+                        Text(kind.title).tag(kind)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 105)
                 TextField("Quick thought…", text: $bookmarkNote)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(saveThought)
@@ -278,7 +286,7 @@ struct MenuBarPopoverView: View {
     }
 
     private func saveThought() {
-        guard capture.addBookmark(note: bookmarkNote) else { return }
+        guard capture.addBookmark(note: bookmarkNote, kind: bookmarkKind) else { return }
         bookmarkNote = ""
     }
 }

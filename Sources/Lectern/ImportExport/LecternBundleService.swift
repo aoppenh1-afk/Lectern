@@ -47,6 +47,7 @@ enum LecternBundleService {
         let offset: TimeInterval
         let note: String
         let isExamAlert: Bool
+        let kind: String?
     }
     private struct Reference: Codable {
         let name: String
@@ -90,7 +91,8 @@ enum LecternBundleService {
                                                    options: $0.options, answer: $0.answer,
                                                    explanation: $0.explanation, kind: $0.kind) } : [],
             bookmarks: options.includeBookmarks
-                ? lecture.orderedBookmarks.map { Bookmark(offset: $0.offset, note: $0.note, isExamAlert: $0.isExamAlert) } : [],
+                ? lecture.orderedBookmarks.map { Bookmark(offset: $0.offset, note: $0.note,
+                    isExamAlert: $0.isExamAlert, kind: $0.kind.rawValue) } : [],
             references: []
         )
 
@@ -173,7 +175,9 @@ enum LecternBundleService {
             lecture.quizItems.append(question)
         }
         for item in manifest.bookmarks {
-            let bookmark = LiveBookmark(offset: item.offset, note: item.note, isExamAlert: item.isExamAlert)
+            let bookmark = LiveBookmark(offset: item.offset, note: item.note,
+                isExamAlert: item.isExamAlert,
+                kind: item.kind.flatMap(LiveBookmarkKind.init(rawValue:)))
             bookmark.lecture = lecture
             lecture.bookmarks.append(bookmark)
         }

@@ -15,6 +15,8 @@ struct LectureDetailView: View {
     let onAttachFiles: () -> Void
 
     @State private var selectedTab: Tab = .rawTranscript
+    @State private var jumpBookmarkOffset: Double?
+    @State private var jumpRequest = UUID()
     @State private var antigravityCatalog = AgentModelCatalog.empty
     @State private var transcriptionPickerOpen = false
     @State private var transcriptionModelSearch = ""
@@ -26,19 +28,28 @@ struct LectureDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                hero
-                statusArea
-                generationStatusArea
-                transcriptProvenance
-                tabBar
-                artifactContent
+        ScrollViewReader { scrollProxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    hero
+                    statusArea
+                    generationStatusArea
+                    transcriptProvenance
+                    tabBar
+                    artifactContent
+                }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 24)
+                .frame(maxWidth: LecternTheme.readingWidth + 56)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 24)
-            .frame(maxWidth: LecternTheme.readingWidth + 56)
-            .frame(maxWidth: .infinity)
+            .onChange(of: jumpRequest) { _, _ in
+                guard let offset = jumpBookmarkOffset,
+                      let raw = lecture.artifact(of: .rawTranscript)?.content,
+                      let index = TranscriptParagraph.closestIndex(
+                        to: offset, in: TranscriptParagraph.parse(raw)) else { return }
+                withAnimation { scrollProxy.scrollTo("transcript-\(index)", anchor: .center) }
+            }
         }
         .task {
             _ = transcription.recoverCompletedLocalCheckpointIfPossible(lecture)
@@ -698,6 +709,15 @@ struct LectureDetailView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     GoogleDocsNotesBar(lecture: lecture)
                     NotesContentView(markdown: notes.content)
+                        .environment(\.openURL, OpenURLAction { url in
+                            guard url.scheme == "lectern", url.host == "bookmark",
+                                  let milliseconds = Double(url.lastPathComponent) else {
+                                return .systemAction
+                            }
+                            let offset = milliseconds / 1_000
+                            jumpToBookmark(offset)
+                            return .handled
+                        })
                 }
                 .padding(.top, 16)
             }
@@ -748,9 +768,7 @@ struct LectureDetailView: View {
             ForEach(lecture.orderedBookmarks) { bookmark in
                 HStack(alignment: .top, spacing: 10) {
                     Button {
-                        if lecture.recording?.isPruned == false {
-                            audioPlayer.play(lecture, from: bookmark.offset)
-                        }
+                        jumpToBookmark(bookmark.offset)
                     } label: {
                         Text(Self.bookmarkTime(bookmark.offset))
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -758,15 +776,22 @@ struct LectureDetailView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(LecternTheme.accent)
 
-                    Image(systemName: bookmark.isExamAlert
-                          ? "exclamationmark.triangle.fill"
-                          : "bookmark.fill")
-                        .foregroundStyle(bookmark.isExamAlert ? .orange : LecternTheme.accent)
+                    Image(systemName: bookmark.kind.symbol)
+                        .foregroundStyle(bookmark.kind == .quiz ? .orange : LecternTheme.accent)
                     Text(bookmark.note.isEmpty
-                         ? (bookmark.isExamAlert ? "Exam alert" : "Bookmark")
-                         : bookmark.note)
+                         ? bookmark.kind.title
+                         : "\(bookmark.kind.title): \(bookmark.note)")
                         .font(.system(size: 13))
                     Spacer()
+                    Menu {
+                        ForEach(LiveBookmarkKind.allCases) { kind in
+                            Button(kind.title) { bookmark.kind = kind }
+                        }
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .help("Change flag type")
                     Button(role: .destructive) {
                         modelContext.delete(bookmark)
                     } label: {
@@ -784,6 +809,15 @@ struct LectureDetailView: View {
     private static func bookmarkTime(_ interval: TimeInterval) -> String {
         let value = max(0, Int(interval))
         return String(format: "%02d:%02d", value / 60, value % 60)
+    }
+
+    private func jumpToBookmark(_ offset: TimeInterval) {
+        selectedTab = .rawTranscript
+        jumpBookmarkOffset = offset
+        jumpRequest = UUID()
+        if lecture.recording?.isPruned == false {
+            audioPlayer.play(lecture, from: offset)
+        }
     }
 
     private var hasAnyArtifact: Bool {
@@ -811,39 +845,18 @@ struct TranscriptView: View {
     let lecture: Lecture
     let content: String
 
-    private struct Paragraph {
-        let startSeconds: Double?
-        let timestampLabel: String?
-        let text: String
-    }
+    private var paragraphs: [TranscriptParagraph] { TranscriptParagraph.parse(content) }
 
-    private var paragraphs: [Paragraph] {
-        content.components(separatedBy: "\n\n").compactMap { raw in
-            guard !raw.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-            if let match = Self.timestampPattern.firstMatch(in: raw, range: raw.fullRange),
-               Range(match.range(at: 1), in: raw) != nil,
-               Range(match.range(at: 2), in: raw) != nil {
-                let label = String(raw[Range(match.range(at: 1), in: raw)!])
-                let seconds = Self.parseTimestamp(label)
-                let text = String(raw[Range(match.range(at: 2), in: raw)!])
-                return Paragraph(startSeconds: seconds, timestampLabel: label, text: text)
-            }
-            return Paragraph(startSeconds: nil, timestampLabel: nil, text: raw)
+    private func bookmarksByParagraph(_ parsed: [TranscriptParagraph]) -> [Int: [LiveBookmark]] {
+        return Dictionary(grouping: lecture.orderedBookmarks) { bookmark in
+            TranscriptParagraph.closestIndex(to: bookmark.offset, in: parsed) ?? 0
         }
-    }
-
-    private static let timestampPattern = try! NSRegularExpression(
-        pattern: #"^\[(\d{2}:\d{2})\]\s*(.*)$"#, options: [.anchorsMatchLines]
-    )
-
-    static func parseTimestamp(_ label: String) -> Double? {
-        let parts = label.split(separator: ":").compactMap { Double($0) }
-        guard parts.count == 2 else { return nil }
-        return parts[0] * 60 + parts[1]
     }
 
     var body: some View {
         let playable = lecture.recording?.isPruned == false
+        let paragraphs = self.paragraphs
+        let bookmarksByParagraph = self.bookmarksByParagraph(paragraphs)
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 SectionLabel(title: "Raw Transcript")
@@ -855,7 +868,7 @@ struct TranscriptView: View {
                 }
             }
 
-            ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
+            ForEach(Array(paragraphs.enumerated()), id: \.offset) { index, paragraph in
                 HStack(alignment: .firstTextBaseline, spacing: 14) {
                     if let label = paragraph.timestampLabel {
                         Button {
@@ -878,7 +891,12 @@ struct TranscriptView: View {
                         .lineSpacing(4)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if let bookmarks = bookmarksByParagraph[index] {
+                        TranscriptBookmarkMarker(bookmarks: bookmarks, lecture: lecture)
+                    }
                 }
+                .id("transcript-\(index)")
             }
 
             if !playable {
@@ -902,6 +920,55 @@ struct TranscriptView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+private struct TranscriptBookmarkMarker: View {
+    @Environment(LectureAudioPlayer.self) private var audioPlayer
+    let bookmarks: [LiveBookmark]
+    let lecture: Lecture
+    @State private var showingDetail = false
+
+    var body: some View {
+        Button { showingDetail.toggle() } label: {
+            HStack(spacing: 2) {
+                Image(systemName: "bookmark.fill")
+                if bookmarks.count > 1 { Text("\(bookmarks.count)") }
+            }
+            .font(.system(size: 10))
+            .foregroundStyle(bookmarks.contains(where: { $0.kind == .quiz }) ? .orange : LecternTheme.accent)
+            .opacity(0.65)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(bookmarks.count) transcript flag\(bookmarks.count == 1 ? "" : "s")")
+        .help(bookmarks.map { bookmark in
+            "\(bookmark.kind.title) · \(TranscriptParagraph.timeLabel(bookmark.offset))"
+                + (bookmark.note.isEmpty ? "" : " · \(bookmark.note)")
+        }.joined(separator: "\n"))
+        .popover(isPresented: $showingDetail) {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(bookmarks) { bookmark in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(bookmark.kind.title).fontWeight(.semibold)
+                            Spacer()
+                            Text(TranscriptParagraph.timeLabel(bookmark.offset))
+                                .font(.system(.caption, design: .monospaced))
+                        }
+                        if !bookmark.note.isEmpty { Text(bookmark.note) }
+                        if lecture.recording?.isPruned == false {
+                            Button("Play from here") {
+                                audioPlayer.play(lecture, from: bookmark.offset)
+                                showingDetail = false
+                            }
+                        }
+                    }
+                    .padding(.vertical, 3)
+                }
+            }
+            .padding(12)
+            .frame(minWidth: 220, alignment: .leading)
         }
     }
 }

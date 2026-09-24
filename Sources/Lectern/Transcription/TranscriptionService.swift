@@ -847,12 +847,17 @@ final class TranscriptionService {
         var lines: [String] = []
         var currentLine = ""
         var previousEnd: Double?
+        var paragraphStart: Double?
 
         for segment in segments {
-            let startsNewParagraph = previousEnd.map { segment.startSeconds - $0 > 2.0 } ?? true
+            let startsNewParagraph = currentLine.isEmpty
+                || previousEnd.map { segment.startSeconds - $0 > 2.0 } == true
+                || paragraphStart.map { segment.startSeconds - $0 >= 20 } == true
+                || currentLine.count + segment.text.count > 400
             if startsNewParagraph {
                 if !currentLine.isEmpty { lines.append(currentLine) }
                 currentLine = "[\(timestamp(segment.startSeconds))] \(segment.text)"
+                paragraphStart = segment.startSeconds
             } else {
                 currentLine += " " + segment.text
             }
