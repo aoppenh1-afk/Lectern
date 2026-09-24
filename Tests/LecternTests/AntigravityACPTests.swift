@@ -158,7 +158,8 @@ final class AntigravityACPTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: staleBackup.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: unrelated.path))
         // The active runtime still resolves after pruning.
-        XCTAssertEqual(try await installer.resolve().version, "new")
+        let pruned = try await installer.resolve()
+        XCTAssertEqual(pruned.version, "new")
     }
 
     func testPruningDefersWhileRuntimeIsLeased() async throws {
@@ -190,7 +191,8 @@ final class AntigravityACPTests: XCTestCase {
                 atPath: layout.versionsDirectory.appendingPathComponent(oldID).path
             )
         )
-        XCTAssertEqual(try await installer.resolve().version, "new")
+        let resolved = try await installer.resolve()
+        XCTAssertEqual(resolved.version, "new")
     }
 
     func testFailedUpdateValidationKeepsPreviousRuntimeActive() async throws {
