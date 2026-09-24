@@ -11,7 +11,6 @@ struct MainWindowView: View {
     @Environment(TranscriptionService.self) private var transcription
     @Environment(TranscriptionPreferences.self) private var transcriptionPreferences
     @Environment(GenerationService.self) private var generation
-    @Environment(LectureChatService.self) private var lectureChat
     @Environment(RetentionService.self) private var retention
     @Environment(SurfacePreferences.self) private var surfacePreferences
     @Environment(\.modelContext) private var modelContext
@@ -33,7 +32,6 @@ struct MainWindowView: View {
     @State private var searchText = ""
     @State private var importError: String?
     @State private var generateTarget: Lecture?
-    @State private var showingAIChat = false
     @State private var exportTarget: Lecture?
     @State private var renamingLecture: Lecture?
     @State private var renameText = ""
@@ -62,10 +60,6 @@ struct MainWindowView: View {
         .onChange(of: selection) { _, _ in
             selectedLecture = nil
             searchText = ""
-        }
-        .onChange(of: selectedLecture) { oldValue, newValue in
-            guard oldValue != newValue else { return }
-            lectureChat.cancelResponse()
         }
         .sheet(item: $generateTarget) { lecture in
             GenerateSheet(lecture: lecture)
@@ -125,41 +119,25 @@ struct MainWindowView: View {
             .help("Generate cleaned transcript, notes, flashcards, quiz")
 
             Button {
-                if selectedLecture != nil {
-                    withAnimation(LecternTheme.standardAnimation) {
-                        showingAIChat.toggle()
-                    }
-                } else if selectedCourse != nil {
-                    importAudioLecture(autoTranscribe: true)
-                }
+                importAudioLecture(autoTranscribe: true)
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: selectedLecture == nil ? "square.and.arrow.up" : "sparkles")
-                        .font(.system(size: 11))
-                    Text(selectedLecture == nil ? "Upload Audio" : "AI Chat")
+                    Image(systemName: "arrow.up.to.line")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Upload Audio")
                         .font(.system(size: 12.5, weight: .medium))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .background(
-                    Capsule().fill(selectedLecture != nil && showingAIChat
-                        ? LecternTheme.accent.opacity(0.10)
-                        : LecternTheme.cardFill)
-                )
-                .overlay(
-                    Capsule().strokeBorder(
-                        selectedLecture != nil && showingAIChat ? LecternTheme.accent.opacity(0.45) : cardBorder,
-                        lineWidth: 1
-                    )
-                )
-                .foregroundStyle(selectedLecture != nil && showingAIChat ? LecternTheme.accent : LecternTheme.ink)
+                .background(Capsule().fill(LecternTheme.cardFill))
+                .overlay(Capsule().strokeBorder(cardBorder, lineWidth: 1))
+                .foregroundStyle(LecternTheme.ink)
             }
             .buttonStyle(.plain)
-            .disabled(!canUseCourseAction)
-            .opacity(canUseCourseAction ? 1 : 0.45)
-            .help(selectedLecture == nil
-                  ? (selectedCourse.map { "Upload audio to \($0.name) for transcription" } ?? "Select a course to upload audio")
-                  : "Ask questions about this lecture")
+            .disabled(selectedCourse == nil)
+            .opacity(selectedCourse == nil ? 0.45 : 1)
+            .help(selectedCourse.map { "Upload audio to \($0.name) for transcription" }
+                  ?? "Select a course to upload audio")
 
             Spacer()
 
@@ -268,11 +246,6 @@ struct MainWindowView: View {
         )
         .overlay(Capsule().strokeBorder(cardBorder, lineWidth: 1))
         .foregroundStyle(LecternTheme.ink)
-    }
-
-    private var canUseCourseAction: Bool {
-        if let selectedLecture { return LectureChatService.hasSource(selectedLecture) }
-        return selectedCourse != nil
     }
 
     // MARK: - Sidebar
@@ -778,19 +751,10 @@ struct MainWindowView: View {
     @ViewBuilder
     private var detailPane: some View {
         if let selectedLecture {
-            if showingAIChat {
-                LectureChatView(lecture: selectedLecture) {
-                    withAnimation(LecternTheme.standardAnimation) {
-                        showingAIChat = false
-                    }
-                }
-                .id(selectedLecture.persistentModelID)
-            } else {
-                LectureDetailView(lecture: selectedLecture) {
-                    attachReferenceMaterials(to: selectedLecture)
-                }
-                    .id(selectedLecture.persistentModelID)
+            LectureDetailView(lecture: selectedLecture) {
+                attachReferenceMaterials(to: selectedLecture)
             }
+            .id(selectedLecture.persistentModelID)
         } else {
             dashboardHome
         }
