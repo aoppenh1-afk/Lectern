@@ -82,6 +82,7 @@ final class ACPConnection: @unchecked Sendable {
     private let writeQueue = DispatchQueue(label: "com.lectern.acp.write")
     private let stderrTail = StderrTail()
     private let onAuthorizationURL: (@Sendable (URL) -> Void)?
+    private let onSessionCreated: (@Sendable (String) -> Void)?
     private let onClose: (@Sendable () -> Void)?
     private var didNotifyClose = false
 
@@ -119,6 +120,7 @@ final class ACPConnection: @unchecked Sendable {
         transcriptionOnly: Bool = false,
         onAuthorizationURL: (@Sendable (URL) -> Void)? = nil,
         onClose: (@Sendable () -> Void)? = nil,
+        onSessionCreated: (@Sendable (String) -> Void)? = nil,
         onProcessExit: (@Sendable () -> Void)? = nil
     ) async throws -> ACPConnection {
         let process = Process()
@@ -146,6 +148,7 @@ final class ACPConnection: @unchecked Sendable {
             stderrPipe: stderrPipe,
             onAuthorizationURL: onAuthorizationURL,
             onClose: onClose,
+            onSessionCreated: onSessionCreated,
             onProcessExit: onProcessExit
         )
         if transcriptionOnly { connection.restrictToTranscription() }
@@ -213,12 +216,14 @@ final class ACPConnection: @unchecked Sendable {
         stderrPipe: Pipe,
         onAuthorizationURL: (@Sendable (URL) -> Void)?,
         onClose: (@Sendable () -> Void)?,
+        onSessionCreated: (@Sendable (String) -> Void)?,
         onProcessExit: (@Sendable () -> Void)?
     ) {
         self.process = process
         self.stdinHandle = stdinHandle
         self.onAuthorizationURL = onAuthorizationURL
         self.onClose = onClose
+        self.onSessionCreated = onSessionCreated
 
         // ACP 1.1.1 emits OAuth links on stderr; the browser helper does too.
         let stderrLines = LineBuffer(maximumLineBytes: 16_512)
@@ -288,6 +293,7 @@ final class ACPConnection: @unchecked Sendable {
                   let sessionID = dict["sessionId"] as? String else {
                 throw ACPError.unexpectedResponse
             }
+            onSessionCreated?(sessionID)
             return SessionInfo.parse(sessionID: sessionID, from: dict)
         } catch let error as RPCError where error.code == 401 || error.isAuthError {
             throw ACPError.authRequired(methods: error.authMethodIDs())

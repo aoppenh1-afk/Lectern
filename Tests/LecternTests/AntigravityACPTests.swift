@@ -74,6 +74,146 @@ final class AntigravityACPTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: layout.activeRecord), activeRecord)
     }
 
+    func testActivatingAnExistingReleaseRemovesTheOldVersion() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = AntigravityACPLayout(root: root)
+        let oldID = String(repeating: "a", count: 64)
+        let newID = String(repeating: "b", count: 64)
+        try writeInstalledFixture(layout: layout, version: "old", releaseID: oldID)
+        let oldDirectory = layout.versionsDirectory.appendingPathComponent(oldID)
+        let activeRecord = try Data(contentsOf: layout.activeRecord)
+        try writeInstalledFixture(layout: layout, version: "new", releaseID: newID)
+        try activeRecord.write(to: layout.activeRecord)
+
+        let installer = AntigravityACPInstaller(layout: layout)
+        let release = AntigravityACPRelease(
+            version: "new", url: URL(string: "https://example.invalid/not-downloaded.zip")!,
+            sha256: newID, archiveBytes: 1,
+            executable: .init(name: "agy_acp_server.par", bytes: 4),
+            harness: .init(name: "localharness_external", bytes: 7)
+        )
+        _ = try await installer.install(
+            release: release, forceReinstall: false, progress: { _, _ in }, phase: { _ in },
+            validate: { _ in }
+        )
+
+        let installed = try await installer.resolve()
+        XCTAssertEqual(installed.version, "new")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldDirectory.path))
+    }
+
+    func testOldVersionWaitsForItsProcessLeaseBeforeRemoval() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = AntigravityACPLayout(root: root)
+        let oldID = String(repeating: "a", count: 64)
+        let newID = String(repeating: "b", count: 64)
+        try writeInstalledFixture(layout: layout, version: "old", releaseID: oldID)
+        let oldDirectory = layout.versionsDirectory.appendingPathComponent(oldID)
+        let activeRecord = try Data(contentsOf: layout.activeRecord)
+        try writeInstalledFixture(layout: layout, version: "new", releaseID: newID)
+        try activeRecord.write(to: layout.activeRecord)
+
+        let installer = AntigravityACPInstaller(layout: layout)
+        let lease = try await installer.acquire()
+        let release = AntigravityACPRelease(
+            version: "new", url: URL(string: "https://example.invalid/not-downloaded.zip")!,
+            sha256: newID, archiveBytes: 1,
+            executable: .init(name: "agy_acp_server.par", bytes: 4),
+            harness: .init(name: "localharness_external", bytes: 7)
+        )
+        _ = try await installer.install(
+            release: release, forceReinstall: false, progress: { _, _ in }, phase: { _ in },
+            validate: { _ in }
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: oldDirectory.path))
+        await installer.release(leaseID: lease.leaseID)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldDirectory.path))
+    }
+
+    func testLegacyConversationSweepPreservesRecentSessionsAndCredentials() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = AntigravityACPLayout(root: root)
+        let directory = layout.acpProfileDirectory.appendingPathComponent("conversations")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let oldID = UUID().uuidString.lowercased()
+        let recentID = UUID().uuidString.lowercased()
+        let oldDB = directory.appendingPathComponent(oldID + ".db")
+        let oldWAL = directory.appendingPathComponent(oldID + ".db-wal")
+        let recentDB = directory.appendingPathComponent(recentID + ".db")
+        let token = layout.token
+        for file in [oldDB, oldWAL, recentDB, token] {
+            try Data("fixture".utf8).write(to: file)
+        }
+        for file in [oldDB, oldWAL] {
+            try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 100)], ofItemAtPath: file.path)
+        }
+
+        AntigravityACPSessionCleanup.pruneLegacySessions(layout: layout, olderThan: Date(timeIntervalSince1970: 200))
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldDB.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldWAL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recentDB.path))
+        XCTAssertEqual(try Data(contentsOf: token), Data("fixture".utf8))
+    }
+
+    func testManagedConnectionRemovesItsConversationAfterProcessExit() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = AntigravityACPLayout(root: root)
+        let releaseID = String(repeating: "a", count: 64)
+        let releaseDirectory = layout.versionsDirectory.appendingPathComponent(releaseID)
+        try FileManager.default.createDirectory(at: releaseDirectory, withIntermediateDirectories: true)
+        let script = #"""
+#!/usr/bin/python3
+import json, os, pathlib, sys
+for raw in sys.stdin:
+    request = json.loads(raw)
+    method = request.get("method")
+    if method == "initialize":
+        result = {"protocolVersion": 1, "agentInfo": {"name": "antigravity-acp", "version": "fixture"}}
+    elif method == "session/new":
+        session_id = "507848f0-e1f2-4768-a7da-eb6176467614"
+        directory = pathlib.Path(os.environ["GEMINI_HOME"]) / "antigravity-acp" / "conversations"
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / (session_id + ".db")).write_bytes(b"conversation")
+        (directory / (session_id + ".meta")).write_text("{}")
+        result = {"sessionId": session_id}
+    else:
+        result = {}
+    print(json.dumps({"jsonrpc": "2.0", "id": request["id"], "result": result}), flush=True)
+"""#
+        let executable = releaseDirectory.appendingPathComponent("agy_acp_server.par")
+        let harness = releaseDirectory.appendingPathComponent("localharness_external")
+        try Data(script.utf8).write(to: executable)
+        try Data("harness".utf8).write(to: harness)
+        for file in [executable, harness] {
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
+        }
+        let record: [String: Any] = [
+            "releaseId": releaseID, "version": "fixture",
+            "executable": ["name": executable.lastPathComponent, "bytes": try executable.resourceValues(forKeys: [.fileSizeKey]).fileSize!],
+            "harness": ["name": harness.lastPathComponent, "bytes": 7],
+        ]
+        try JSONSerialization.data(withJSONObject: record).write(to: releaseDirectory.appendingPathComponent(".install-complete.json"))
+        try JSONSerialization.data(withJSONObject: ["releaseId": releaseID]).write(to: layout.activeRecord)
+
+        let manager = await AntigravityACPManager(layout: layout)
+        let connection = try await manager.makeConnection()
+        let session = try await connection.newSession(workingDirectory: root)
+        let database = layout.acpProfileDirectory.appendingPathComponent("conversations/\(session.id).db")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: database.path))
+        connection.shutdown()
+
+        let deadline = Date().addingTimeInterval(5)
+        while FileManager.default.fileExists(atPath: database.path), Date() < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: database.path))
+    }
+
     private func writeInstalledFixture(
         layout: AntigravityACPLayout, version: String, releaseID: String = String(repeating: "a", count: 64)
     ) throws {
