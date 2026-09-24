@@ -918,7 +918,7 @@ struct GenerateSheet: View {
         let error = generation.errors[lecture.persistentModelID]
         let warning = generation.warnings[lecture.persistentModelID]
         let hasIssue = error != nil || warning != nil
-        VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 Image(systemName: hasIssue ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                     .font(.system(size: 22))
