@@ -13,6 +13,7 @@ struct LectureDetailView: View {
 
     @Bindable var lecture: Lecture
     let onAttachFiles: () -> Void
+    let onGenerate: () -> Void
 
     @State private var selectedTab: Tab = .rawTranscript
     @State private var antigravityCatalog = AgentModelCatalog.empty
@@ -311,41 +312,108 @@ struct LectureDetailView: View {
         if lecture.status == .ready,
            let provider = lecture.transcriptConnectionName,
            let model = lecture.transcriptModelID {
-            HStack(spacing: 10) {
-                if let providerID = lecture.transcriptProviderRaw.flatMap(TranscriptionProviderID.init(rawValue:)),
-                   providerID != .local {
-                    ProviderLogo(provider: providerID, size: 28)
-                } else {
-                    Image(systemName: "macbook")
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(width: 28, height: 28)
-                        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 7))
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 14) {
+                    transcriptProvenanceInfo(provider: provider, model: model)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 0)
+                    horizontalProvenanceActions
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Transcribed with \(provider)")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text([model, lecture.transcriptCompletedAt?.formatted(date: .abbreviated, time: .shortened)].compactMap { $0 }.joined(separator: "  ·  "))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    if let fallback = lecture.transcriptFallbackSummary {
-                        Text(fallback)
-                            .font(.system(size: 10))
-                            .foregroundStyle(LecternTheme.warningTint)
-                    }
+
+                VStack(alignment: .leading, spacing: 14) {
+                    transcriptProvenanceInfo(provider: provider, model: model)
+                    transcriptProvenanceActions
                 }
-                Spacer()
-                transcriptionChoiceMenu(label: "Transcribe again")
             }
-            .padding(10)
-            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 
+    private func transcriptProvenanceInfo(provider: String, model: String) -> some View {
+        HStack(spacing: 12) {
+            Group {
+                if let providerID = lecture.transcriptProviderRaw.flatMap(TranscriptionProviderID.init(rawValue:)),
+                   providerID != .local {
+                    ProviderLogo(provider: providerID, size: 44)
+                } else {
+                    Image(systemName: "macbook")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(LecternTheme.accent)
+                        .frame(width: 44, height: 44)
+                        .background(LecternTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 11))
+                }
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Transcribed with \(provider)")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(LecternTheme.ink)
+                Text([model, lecture.transcriptCompletedAt?.formatted(date: .abbreviated, time: .shortened)].compactMap { $0 }.joined(separator: "  ·  "))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                if let fallback = lecture.transcriptFallbackSummary {
+                    Text(fallback)
+                        .font(.system(size: 10))
+                        .foregroundStyle(LecternTheme.warningTint)
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var transcriptProvenanceActions: some View {
+        ViewThatFits(in: .horizontal) {
+            horizontalProvenanceActions
+            VStack(spacing: 10) {
+                transcribeAgainButton
+                generateCleanTranscriptAndNotesButton
+            }
+        }
+    }
+
+    private var horizontalProvenanceActions: some View {
+        HStack(spacing: 10) {
+            transcribeAgainButton
+            generateCleanTranscriptAndNotesButton
+        }
+    }
+
+    private var transcribeAgainButton: some View {
+        transcriptionPickerButton {
+            Label("Transcribe again", systemImage: "arrow.clockwise")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(LecternTheme.ink)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+        }
+        .disabled(lecture.recording?.isPruned != false
+                  || transcription.isQueuedOrRunning(lectureID: lecture.persistentModelID)
+                  || transcription.isCancelling(lectureID: lecture.persistentModelID))
+        .help("Choose a transcriber and transcribe this recording again")
+    }
+
+    private var generateCleanTranscriptAndNotesButton: some View {
+        Button(action: onGenerate) {
+            Label("Generate clean transcription & notes", systemImage: "doc.text")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .background(Color(hex: "2168ED"), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(generation.job(for: lecture.persistentModelID) != nil)
+        .help("Open generation options for this lecture")
+    }
+
     private func transcriptionChoiceMenu(label: String) -> some View {
-        Button {
-            localAvailability.refresh()
-            transcriptionPickerOpen.toggle()
-        } label: {
+        transcriptionPickerButton {
             HStack(spacing: 8) {
                 Text(label)
                     .font(.system(size: 11.5, weight: .medium))
@@ -364,6 +432,15 @@ struct LectureDetailView: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
             }
+        }
+    }
+
+    private func transcriptionPickerButton<Content: View>(@ViewBuilder label: () -> Content) -> some View {
+        Button {
+            localAvailability.refresh()
+            transcriptionPickerOpen.toggle()
+        } label: {
+            label()
         }
         .buttonStyle(.plain)
         .popover(isPresented: $transcriptionPickerOpen, arrowEdge: .top) {

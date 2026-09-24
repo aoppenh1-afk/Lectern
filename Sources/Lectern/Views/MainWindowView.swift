@@ -788,9 +788,11 @@ struct MainWindowView: View {
                 }
                 .id(selectedLecture.persistentModelID)
             } else {
-                LectureDetailView(lecture: selectedLecture) {
-                    attachReferenceMaterials(to: selectedLecture)
-                }
+                LectureDetailView(
+                    lecture: selectedLecture,
+                    onAttachFiles: { attachReferenceMaterials(to: selectedLecture) },
+                    onGenerate: { generateTarget = selectedLecture }
+                )
                     .id(selectedLecture.persistentModelID)
             }
         } else if showingCourseSynthesis, let selectedCourse {
