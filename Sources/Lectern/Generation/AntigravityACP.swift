@@ -17,6 +17,9 @@ struct AntigravityACPRelease: Equatable, Sendable {
     let harness: Member
 
     /// Pinned to the Google registry release verified by T3 Code on 2026-09-03.
+    /// Used as the offline fallback and integrity reference. Live update checks
+    /// compare this against Google's official ACP registry (see
+    /// `AntigravityACPRegistry`) so newer releases can be offered in-app.
     static var current: AntigravityACPRelease? {
         #if arch(arm64)
         AntigravityACPRelease(
@@ -30,6 +33,136 @@ struct AntigravityACPRelease: Equatable, Sendable {
         #else
         nil
         #endif
+    }
+
+    /// Compares release versions such as "agy_acp_server_1.1.1" and "1.2.1".
+    /// Returns `.orderedAscending` when `lhs` is older than `rhs`.
+    static func compare(_ lhs: String, _ rhs: String) -> ComparisonResult {
+        let left = rank(of: lhs)
+        let right = rank(of: rhs)
+        // Google's legacy date-stamped release candidates
+        // ("agy_acp_server_20260818_01_RC01") predate the dotted release
+        // scheme, so any dotted release outranks any RC.
+        if left.isReleaseCandidate != right.isReleaseCandidate {
+            return left.isReleaseCandidate ? .orderedAscending : .orderedDescending
+        }
+        let count = max(left.numbers.count, right.numbers.count)
+        for index in 0..<count {
+            let l = index < left.numbers.count ? left.numbers[index] : 0
+            let r = index < right.numbers.count ? right.numbers[index] : 0
+            if l < r { return .orderedAscending }
+            if l > r { return .orderedDescending }
+        }
+        return .orderedSame
+    }
+
+    /// True when `candidate` is a newer release than `installed`.
+    static func isNewer(_ candidate: String, than installed: String) -> Bool {
+        compare(installed, candidate) == .orderedAscending
+    }
+
+    private static func rank(of version: String) -> (isReleaseCandidate: Bool, numbers: [Int]) {
+        let isReleaseCandidate = version.range(
+            of: "RC", options: [.caseInsensitive, .diacriticInsensitive]
+        ) != nil
+        // All integer groups in order: "1.2.1" -> [1, 2, 1],
+        // "agy_acp_server_20260818_01_RC01" -> [20260818, 1, 1].
+        let numbers = version.split(whereSeparator: { !$0.isNumber })
+            .compactMap { Int($0) }
+        // For dotted releases keep the dotted core ("1.2.1"); for RC builds
+        // the date stamp leads and only matters against other RCs.
+        if !isReleaseCandidate,
+           let range = version.range(of: "\\d+(?:\\.\\d+)*", options: .regularExpression) {
+            let core = version[range].split(separator: ".").compactMap { Int($0) }
+            if !core.isEmpty {
+                return (false, core)
+            }
+        }
+        return (isReleaseCandidate, numbers)
+    }
+}
+
+/// A release advertised by Google's official ACP registry
+/// (https://github.com/agentclientprotocol/registry/tree/main/antigravity-acp).
+/// Unlike the pinned `AntigravityACPRelease`, the registry entry carries no
+/// SHA-256 or byte counts, so the installer re-derives integrity from the
+/// download itself (HTTPS allow-listed host, exact two-member archive, ACP
+/// handshake validation) before activation.
+struct AntigravityACPRegistryRelease: Equatable, Sendable {
+    let version: String
+    let url: URL
+}
+
+enum AntigravityACPRegistry {
+    static let agentURL = URL(
+        string: "https://raw.githubusercontent.com/agentclientprotocol/registry/main/antigravity-acp/agent.json"
+    )!
+    static let downloadHost = "dl.google.com"
+    static let downloadPathPrefix = "/agy-extensions/releases/"
+    static let maximumArchiveBytes: Int64 = 1_500_000_000
+
+    /// Fetches the latest macOS ARM64 entry from the official registry.
+    /// Returns nil on any network or parsing failure so callers can fall back
+    /// to the pinned release.
+    static func fetchLatest() async -> AntigravityACPRegistryRelease? {
+        try? await fetchLatestThrowing()
+    }
+
+    static func fetchLatestThrowing() async throws -> AntigravityACPRegistryRelease {
+        var request = URLRequest(url: agentURL)
+        request.timeoutInterval = 15
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 15
+        let (data, response) = try await URLSession(configuration: configuration).data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            throw AntigravityACPError.downloadFailed("Could not reach the Antigravity release registry.")
+        }
+        return try parse(data)
+    }
+
+    /// Parses raw `agent.json` and returns the macOS ARM64 download.
+    /// Throws on unexpected shape or a download URL outside the allow-list.
+    static func parse(_ data: Data) throws -> AntigravityACPRegistryRelease {
+        guard data.count <= 1_024 * 1_024 else {
+            throw AntigravityACPError.downloadFailed("The Antigravity release registry returned an invalid response.")
+        }
+        struct AgentFile: Decodable {
+            struct Distribution: Decodable {
+                struct Binary: Decodable {
+                    let archive: String
+                }
+                let binary: [String: Binary]
+            }
+            let version: String
+            let distribution: Distribution
+        }
+        let file = try JSONDecoder().decode(AgentFile.self, from: data)
+        let version = file.version.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !version.isEmpty, version.utf8.count <= 64 else {
+            throw AntigravityACPError.downloadFailed("The Antigravity release registry returned an invalid version.")
+        }
+        // Registry keys are `darwin-aarch64`; accept the legacy `darwin-arm64` alias.
+        guard let entry = file.distribution.binary["darwin-aarch64"]
+            ?? file.distribution.binary["darwin-arm64"],
+            let url = URL(string: entry.archive) else {
+            throw AntigravityACPError.unsupportedPlatform
+        }
+        try validateDownloadURL(url)
+        return AntigravityACPRegistryRelease(version: version, url: url)
+    }
+
+    static func validateDownloadURL(_ url: URL) throws {
+        guard url.scheme == "https",
+              url.host == downloadHost,
+              url.user == nil, url.password == nil, url.fragment == nil,
+              url.path.hasPrefix(downloadPathPrefix),
+              url.pathExtension.lowercased() == "zip",
+              url.absoluteString.utf8.count <= 512 else {
+            throw AntigravityACPError.downloadFailed(
+                "The Antigravity release registry returned an unexpected download URL."
+            )
+        }
     }
 }
 
@@ -438,6 +571,114 @@ private final class AntigravityACPDownload: NSObject, URLSessionDownloadDelegate
     }
 }
 
+/// Download helper for registry releases, where the archive size is not known
+/// in advance. Enforces an absolute cap and reports the server-advertised
+/// length (when sane) as the progress total so the UI keeps working.
+private final class AntigravityACPRegistryDownload: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let destination: URL
+    private let maximumBytes: Int64
+    private let progress: @Sendable (Int64, Int64) -> Void
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<HTTPURLResponse, Error>?
+    private var session: URLSession?
+    private var task: URLSessionDownloadTask?
+
+    init(
+        destination: URL,
+        maximumBytes: Int64,
+        progress: @escaping @Sendable (Int64, Int64) -> Void
+    ) {
+        self.destination = destination
+        self.maximumBytes = maximumBytes
+        self.progress = progress
+    }
+
+    func start(url: URL) async throws -> HTTPURLResponse {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let configuration = URLSessionConfiguration.ephemeral
+                configuration.timeoutIntervalForRequest = 120
+                configuration.timeoutIntervalForResource = 45 * 60
+                let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+                let task = session.downloadTask(with: url)
+                lock.lock()
+                self.continuation = continuation
+                self.session = session
+                self.task = task
+                lock.unlock()
+                task.resume()
+            }
+        } onCancel: {
+            cancel()
+        }
+    }
+
+    func cancel() {
+        lock.lock()
+        let task = self.task
+        lock.unlock()
+        task?.cancel()
+        finish(.failure(CancellationError()))
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        guard totalBytesWritten <= maximumBytes else {
+            downloadTask.cancel()
+            finish(.failure(AntigravityACPError.downloadFailed(
+                "The Antigravity download exceeded the 1.5 GB safety limit. Nothing was installed."
+            )))
+            return
+        }
+        let total = totalBytesExpectedToWrite > 0 && totalBytesExpectedToWrite <= maximumBytes
+            ? totalBytesExpectedToWrite
+            : max(totalBytesWritten, 1)
+        progress(totalBytesWritten, total)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
+        do {
+            guard let response = downloadTask.response as? HTTPURLResponse else {
+                throw AntigravityACPError.downloadFailed("Google returned an invalid download response.")
+            }
+            try FileManager.default.moveItem(at: location, to: destination)
+            finish(.success(response))
+        } catch {
+            finish(.failure(error))
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didCompleteWithError error: (any Error)?
+    ) {
+        if let error { finish(.failure(error)) }
+    }
+
+    private func finish(_ result: Result<HTTPURLResponse, Error>) {
+        lock.lock()
+        let continuation = self.continuation
+        self.continuation = nil
+        let session = self.session
+        self.session = nil
+        task = nil
+        lock.unlock()
+        guard let continuation else { return }
+        session?.finishTasksAndInvalidate()
+        continuation.resume(with: result)
+    }
+}
+
 actor AntigravityACPInstaller {
     enum Phase: Sendable { case downloading, extracting, verifying }
 
@@ -507,6 +748,7 @@ actor AntigravityACPInstaller {
             try await validate(existing)
             try Task.checkCancellation()
             try activate(releaseID: release.sha256)
+            pruneOldVersions(keeping: release.sha256)
             return existing
         }
 
@@ -620,7 +862,170 @@ actor AntigravityACPInstaller {
             throw error
         }
         if let backup { try? fileManager.removeItem(at: backup) }
+        pruneOldVersions(keeping: release.sha256)
         return try completedRelease(id: release.sha256)
+    }
+
+    /// Installs a release advertised by the official registry. The archive
+    /// size and SHA-256 are unknown up front, so integrity comes from the
+    /// allow-listed HTTPS download, the exact two-member archive shape, and
+    /// the ACP handshake `validate` step. The content hash becomes the
+    /// version-directory name, and previously installed versions are removed
+    /// after activation so disk use does not grow with every update.
+    func installRegistryRelease(
+        release: AntigravityACPRegistryRelease,
+        forceReinstall: Bool,
+        progress: @escaping @Sendable (Int64, Int64) -> Void,
+        phase: @escaping @Sendable (Phase) -> Void,
+        validate: @escaping @Sendable (AntigravityACPInstallation) async throws -> Void
+    ) async throws -> AntigravityACPInstallation {
+        try AntigravityACPRegistry.validateDownloadURL(release.url)
+        try fileManager.createDirectory(at: layout.versionsDirectory, withIntermediateDirectories: true)
+        if forceReinstall, !leases.isEmpty {
+            throw AntigravityACPError.invalidInstallation(
+                "Antigravity is currently in use. Stop active work before reinstalling it."
+            )
+        }
+
+        let staging = layout.managedDirectory.appendingPathComponent(".install-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: staging, withIntermediateDirectories: false)
+        defer { try? fileManager.removeItem(at: staging) }
+
+        let archive = staging.appendingPathComponent("download.zip")
+        do {
+            phase(.downloading)
+            let response = try await AntigravityACPRegistryDownload(
+                destination: archive,
+                maximumBytes: AntigravityACPRegistry.maximumArchiveBytes,
+                progress: progress
+            ).start(url: release.url)
+            guard response.statusCode == 200 else {
+                throw AntigravityACPError.downloadFailed("Google did not return the Antigravity runtime download.")
+            }
+        } catch let error as AntigravityACPError {
+            throw error
+        } catch {
+            throw AntigravityACPError.downloadFailed("Could not download Antigravity from Google: \(error.localizedDescription)")
+        }
+
+        try Task.checkCancellation()
+        let archiveSize = try fileSize(archive)
+        guard archiveSize > 1_000_000, archiveSize <= AntigravityACPRegistry.maximumArchiveBytes else {
+            throw AntigravityACPError.downloadFailed(
+                "The Antigravity download has an unexpected size. Nothing was installed."
+            )
+        }
+        let digest = try sha256(of: archive)
+
+        let members = try processOutput("/usr/bin/unzip", ["-Z1", archive.path])
+            .split(whereSeparator: \Character.isNewline).map(String.init)
+        // Google's macOS archives contain exactly the ACP executable and harness.
+        let executableName = "agy_acp_server.par"
+        let harnessName = "localharness_external"
+        guard members == [executableName, harnessName]
+                || members == [harnessName, executableName] else {
+            throw AntigravityACPError.invalidInstallation(
+                "The archive must contain exactly the Antigravity executable and its harness."
+            )
+        }
+
+        let pair = staging.appendingPathComponent("pair", isDirectory: true)
+        phase(.extracting)
+        try fileManager.createDirectory(at: pair, withIntermediateDirectories: false)
+        try runProcess("/usr/bin/unzip", [
+            "-qq", "-j", archive.path, executableName, harnessName, "-d", pair.path,
+        ])
+        let executable = pair.appendingPathComponent(executableName)
+        let harness = pair.appendingPathComponent(harnessName)
+        let executableBytes = try fileSize(executable)
+        let harnessBytes = try fileSize(harness)
+        guard executableBytes > 1_000_000, harnessBytes > 1_000_000 else {
+            throw AntigravityACPError.invalidInstallation("The downloaded Antigravity runtime is incomplete.")
+        }
+        try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: harness.path)
+
+        let candidate = AntigravityACPInstallation(
+            executable: executable,
+            harness: harness,
+            version: release.version
+        )
+        phase(.verifying)
+        try await validate(candidate)
+        try Task.checkCancellation()
+
+        let destination = layout.versionsDirectory.appendingPathComponent(digest, isDirectory: true)
+        if !forceReinstall, fileManager.fileExists(atPath: destination.path) {
+            let existing = try completedRelease(id: digest)
+            guard existing.version == release.version else {
+                throw AntigravityACPError.invalidInstallation(
+                    "The existing managed release has the wrong version. Remove it before reinstalling."
+                )
+            }
+            phase(.verifying)
+            try await validate(existing)
+            try Task.checkCancellation()
+            try activate(releaseID: digest)
+            pruneOldVersions(keeping: digest)
+            return existing
+        }
+
+        let record = ReleaseRecord(
+            releaseId: digest,
+            version: release.version,
+            executable: AntigravityACPRelease.Member(name: executableName, bytes: executableBytes),
+            harness: AntigravityACPRelease.Member(name: harnessName, bytes: harnessBytes)
+        )
+        try JSONEncoder().encode(record).write(
+            to: pair.appendingPathComponent(".install-complete.json"), options: .atomic
+        )
+
+        var backup: URL?
+        if fileManager.fileExists(atPath: destination.path) {
+            guard leases.isEmpty else {
+                throw AntigravityACPError.invalidInstallation(
+                    "Antigravity is currently in use. Stop active work before reinstalling it."
+                )
+            }
+            let candidate = layout.versionsDirectory.appendingPathComponent(".previous-\(UUID().uuidString)")
+            try fileManager.moveItem(at: destination, to: candidate)
+            backup = candidate
+        }
+        do {
+            try fileManager.moveItem(at: pair, to: destination)
+            try activate(releaseID: digest)
+        } catch {
+            if fileManager.fileExists(atPath: destination.path) {
+                try? fileManager.removeItem(at: destination)
+            }
+            if let backup {
+                try? fileManager.moveItem(at: backup, to: destination)
+            }
+            throw error
+        }
+        if let backup { try? fileManager.removeItem(at: backup) }
+        pruneOldVersions(keeping: digest)
+        return try completedRelease(id: digest)
+    }
+
+    /// Removes every installed version except `keeping` (plus transient
+    /// staging entries). Best-effort: a cleanup failure never fails the update
+    /// itself, but the active runtime is always preserved.
+    func pruneOldVersions(keeping releaseID: String) {
+        guard let entries = try? fileManager.contentsOfDirectory(
+            at: layout.versionsDirectory,
+            includingPropertiesForKeys: nil
+        ) else { return }
+        for entry in entries {
+            let name = entry.lastPathComponent
+            guard name != releaseID else { continue }
+            // Only remove completed version directories (64-hex) or stale
+            // `.previous-` backups; never touch unrelated files.
+            let isVersion = name.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil
+            let isStaleBackup = name.hasPrefix(".previous-")
+            guard isVersion || isStaleBackup else { continue }
+            try? fileManager.removeItem(at: entry)
+        }
     }
 
     func removeManagedRuntime() throws {
@@ -774,10 +1179,21 @@ final class AntigravityACPManager {
 
     let layout: AntigravityACPLayout
     private let installer: AntigravityACPInstaller
+    /// Override for the live registry lookup. Nil means a real network fetch;
+    /// tests inject a closure to stay deterministic (or force the pinned path).
+    var registryProvider: (@Sendable () async -> AntigravityACPRegistryRelease?)?
+    /// The newest registry release seen by the last update check, when it is
+    /// newer than the installed runtime. `install()` uses it as the download
+    /// source so "Update Antigravity" installs what the check advertised.
+    private(set) var pendingRegistryRelease: AntigravityACPRegistryRelease?
 
-    init(layout: AntigravityACPLayout = .applicationSupport()) {
+    init(
+        layout: AntigravityACPLayout = .applicationSupport(),
+        registryProvider: (@Sendable () async -> AntigravityACPRegistryRelease?)? = nil
+    ) {
         self.layout = layout
         installer = AntigravityACPInstaller(layout: layout)
+        self.registryProvider = registryProvider
     }
 
     var isInstalled: Bool { installation != nil }
@@ -792,27 +1208,53 @@ final class AntigravityACPManager {
         }
     }
 
-    /// Like T3 Code, updates use the verified release shipped with the app.
-    /// This check only reads the installation record; it never launches ACP.
+    /// Checks Google's official ACP registry for a newer runtime, falling back
+    /// to the verified release shipped with the app when offline. This check
+    /// only reads the installation record and fetches the small registry JSON;
+    /// it never launches ACP.
     func checkForUpdates() async {
         guard !isBusy, updateState != .checking else { return }
         updateState = .checking
-        guard let release = AntigravityACPRelease.current else {
+        guard let pinned = AntigravityACPRelease.current else {
             updateState = .unsupported
             return
         }
+        let installed: AntigravityACPInstallation
         do {
-            let installed = try await installer.resolve()
-            updateState = installed.version == release.version
-                ? .upToDate(version: installed.version)
-                : .available(installed: installed.version, available: release.version)
-            lastUpdateCheck = Date()
+            installed = try await installer.resolve()
         } catch AntigravityACPError.notInstalled {
+            // Remember the newest release so a fresh install uses it.
+            pendingRegistryRelease = await latestRegistryRelease()
             updateState = .notInstalled
             lastUpdateCheck = Date()
+            return
         } catch {
             updateState = .failed(error.localizedDescription)
+            return
         }
+        let remote = await latestRegistryRelease()
+        if let remote, AntigravityACPRelease.isNewer(remote.version, than: installed.version) {
+            pendingRegistryRelease = remote
+            updateState = .available(installed: installed.version, available: remote.version)
+            lastUpdateCheck = Date()
+        } else if AntigravityACPRelease.isNewer(pinned.version, than: installed.version) {
+            pendingRegistryRelease = nil
+            updateState = .available(installed: installed.version, available: pinned.version)
+            lastUpdateCheck = Date()
+        } else {
+            // Installed is current (or newer than both known releases, e.g. a
+            // previously installed registry build while offline).
+            pendingRegistryRelease = nil
+            updateState = .upToDate(version: installed.version)
+            lastUpdateCheck = Date()
+        }
+    }
+
+    private func latestRegistryRelease() async -> AntigravityACPRegistryRelease? {
+        if let provider = registryProvider {
+            return await provider()
+        }
+        return await AntigravityACPRegistry.fetchLatest()
     }
 
     func startInstallation(reinstall: Bool = false) {
@@ -861,44 +1303,66 @@ final class AntigravityACPManager {
         defer { installationOperationID = nil }
         installationError = nil
         let previousAuthState = authState
-        guard let release = AntigravityACPRelease.current else {
+        guard AntigravityACPRelease.current != nil else {
             runtimeState = .failed(AntigravityACPError.unsupportedPlatform.localizedDescription)
             return
         }
-        runtimeState = .installing(phase: .downloading, downloaded: 0, total: release.archiveBytes)
-        do {
-            let installed = try await installer.install(
-                release: release,
-                forceReinstall: reinstall,
-                progress: { downloaded, total in
-                    Task { @MainActor [weak self] in
-                        guard let self, self.installationOperationID == operationID else { return }
-                        self.runtimeState = .installing(
-                            phase: .downloading, downloaded: downloaded, total: total
-                        )
-                    }
-                },
-                phase: { phase in
-                    Task { @MainActor [weak self] in
-                        guard let self, self.installationOperationID == operationID else { return }
-                        let bytes: (Int64, Int64)
-                        if case .installing(_, let downloaded, let total) = runtimeState {
-                            bytes = (downloaded, total)
-                        } else {
-                            bytes = (0, release.archiveBytes)
-                        }
-                        let mapped: InstallationPhase = switch phase {
-                        case .downloading: .downloading
-                        case .extracting: .extracting
-                        case .verifying: .verifying
-                        }
-                        runtimeState = .installing(phase: mapped, downloaded: bytes.0, total: bytes.1)
-                    }
-                },
-                validate: { candidate in
-                    try await AntigravityACPManager.validateInstallation(candidate)
+        let progress: @Sendable (Int64, Int64) -> Void = { downloaded, total in
+            Task { @MainActor [weak self] in
+                guard let self, self.installationOperationID == operationID else { return }
+                self.runtimeState = .installing(
+                    phase: .downloading, downloaded: downloaded, total: total
+                )
+            }
+        }
+        let phase: @Sendable (AntigravityACPInstaller.Phase) -> Void = { phase in
+            Task { @MainActor [weak self] in
+                guard let self, self.installationOperationID == operationID else { return }
+                let bytes: (Int64, Int64)
+                if case .installing(_, let downloaded, let total) = self.runtimeState {
+                    bytes = (downloaded, total)
+                } else {
+                    bytes = (0, 1)
                 }
-            )
+                let mapped: InstallationPhase = switch phase {
+                case .downloading: .downloading
+                case .extracting: .extracting
+                case .verifying: .verifying
+                }
+                self.runtimeState = .installing(phase: mapped, downloaded: bytes.0, total: bytes.1)
+            }
+        }
+        let validate: @Sendable (AntigravityACPInstallation) async throws -> Void = { candidate in
+            try await AntigravityACPManager.validateInstallation(candidate)
+        }
+        do {
+            let installed: AntigravityACPInstallation
+            if reinstall {
+                installed = try await reinstallCurrentRelease(progress: progress, phase: phase, validate: validate)
+            } else if let pending = pendingRegistryRelease {
+                runtimeState = .installing(phase: .downloading, downloaded: 0, total: 1)
+                installed = try await installer.installRegistryRelease(
+                    release: pending,
+                    forceReinstall: false,
+                    progress: progress,
+                    phase: phase,
+                    validate: validate
+                )
+                if installed.version == pending.version {
+                    pendingRegistryRelease = nil
+                }
+            } else if let pinned = AntigravityACPRelease.current {
+                runtimeState = .installing(phase: .downloading, downloaded: 0, total: pinned.archiveBytes)
+                installed = try await installer.install(
+                    release: pinned,
+                    forceReinstall: false,
+                    progress: progress,
+                    phase: phase,
+                    validate: validate
+                )
+            } else {
+                throw AntigravityACPError.unsupportedPlatform
+            }
             installationOperationID = nil
             installation = installed
             runtimeState = .ready(version: installed.version)
@@ -916,6 +1380,56 @@ final class AntigravityACPManager {
                 authState = .unavailable
             }
         }
+    }
+
+    /// Reinstalls whatever is currently installed: the pinned release when it
+    /// matches, otherwise the registry release matching the installed version.
+    /// Falls back to the newest known release for a fresh install.
+    private func reinstallCurrentRelease(
+        progress: @escaping @Sendable (Int64, Int64) -> Void,
+        phase: @escaping @Sendable (AntigravityACPInstaller.Phase) -> Void,
+        validate: @escaping @Sendable (AntigravityACPInstallation) async throws -> Void
+    ) async throws -> AntigravityACPInstallation {
+        let currentVersion = installation?.version ?? (try? await installer.resolve().version)
+        if let currentVersion,
+           let pinned = AntigravityACPRelease.current,
+           currentVersion == pinned.version {
+            runtimeState = .installing(phase: .downloading, downloaded: 0, total: pinned.archiveBytes)
+            return try await installer.install(
+                release: pinned, forceReinstall: true,
+                progress: progress, phase: phase, validate: validate
+            )
+        }
+        if let currentVersion,
+           let remote = await latestRegistryRelease(),
+           remote.version == currentVersion {
+            runtimeState = .installing(phase: .downloading, downloaded: 0, total: 1)
+            return try await installer.installRegistryRelease(
+                release: remote, forceReinstall: true,
+                progress: progress, phase: phase, validate: validate
+            )
+        }
+        // Unknown origin (or registry unreachable): install the newest known
+        // release without forcing, so an identical copy is simply reactivated.
+        if let pending = pendingRegistryRelease {
+            runtimeState = .installing(phase: .downloading, downloaded: 0, total: 1)
+            let installed = try await installer.installRegistryRelease(
+                release: pending, forceReinstall: false,
+                progress: progress, phase: phase, validate: validate
+            )
+            if installed.version == pending.version {
+                pendingRegistryRelease = nil
+            }
+            return installed
+        }
+        guard let pinned = AntigravityACPRelease.current else {
+            throw AntigravityACPError.unsupportedPlatform
+        }
+        runtimeState = .installing(phase: .downloading, downloaded: 0, total: pinned.archiveBytes)
+        return try await installer.install(
+            release: pinned, forceReinstall: true,
+            progress: progress, phase: phase, validate: validate
+        )
     }
 
     func remove() async {
