@@ -447,6 +447,7 @@ struct MainWindowView: View {
             isIndexingTranscripts = false
             return
         }
+        transcriptMatches = []
         do {
             try await Task.sleep(for: .milliseconds(250))
             try Task.checkCancellation()
