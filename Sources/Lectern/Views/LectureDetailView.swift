@@ -330,24 +330,23 @@ struct LectureDetailView: View {
            let provider = lecture.transcriptConnectionName,
            let model = lecture.transcriptModelID {
             ViewThatFits(in: .horizontal) {
-                // Keep the original single-row height when the detail pane is narrow.
-                HStack(spacing: 10) {
+                HStack(spacing: 14) {
                     transcriptProvenanceInfo(provider: provider, model: model)
-                        .frame(minWidth: 200, maxWidth: 260, alignment: .leading)
-                    Spacer(minLength: 4)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 0)
                     transcriptProvenanceActions
                         .fixedSize(horizontal: true, vertical: false)
                 }
 
-                HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 14) {
                     transcriptProvenanceInfo(provider: provider, model: model)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    compactProvenanceActions
+                    transcriptProvenanceActions
                 }
             }
-            .padding(10)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 
@@ -358,20 +357,22 @@ struct LectureDetailView: View {
             Group {
                 if let providerID = lecture.transcriptProviderRaw.flatMap(TranscriptionProviderID.init(rawValue:)),
                    providerID != .local {
-                    ProviderLogo(provider: providerID, size: 28)
+                    ProviderLogo(provider: providerID, size: 44)
                 } else {
                     Image(systemName: "macbook")
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(width: 28, height: 28)
-                        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 7))
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(LecternTheme.accent)
+                        .frame(width: 44, height: 44)
+                        .background(LecternTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 11))
                 }
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("Transcribed with \(provider)")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(LecternTheme.ink)
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.system(size: 10))
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .help(subtitle)
@@ -388,34 +389,33 @@ struct LectureDetailView: View {
     }
 
     private var transcriptProvenanceActions: some View {
-        HStack(spacing: 8) {
-            transcribeAgainButton(compact: false)
-            generateCleanTranscriptAndNotesButton(compact: false)
-        }
-    }
-
-    private var compactProvenanceActions: some View {
-        HStack(spacing: 6) {
-            transcribeAgainButton(compact: true)
-            generateCleanTranscriptAndNotesButton(compact: true)
-        }
-    }
-
-    private func transcribeAgainButton(compact: Bool) -> some View {
-        transcriptionPickerButton {
-            Group {
-                if compact {
-                    Image(systemName: "arrow.clockwise")
-                } else {
-                    Label("Transcribe again", systemImage: "arrow.clockwise")
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                transcribeAgainButton
+                generateCleanTranscriptAndNotesButton
             }
-            .font(.system(size: 11.5, weight: .medium))
+            .fixedSize(horizontal: true, vertical: false)
+
+            VStack(alignment: .leading, spacing: 10) {
+                transcribeAgainButton
+                generateCleanTranscriptAndNotesButton
+            }
+        }
+    }
+
+    private var transcribeAgainButton: some View {
+        transcriptionPickerButton {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 20, weight: .medium))
+                Text("Transcribe again")
+            }
+            .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(LecternTheme.ink)
-            .frame(width: compact ? 28 : nil, height: 28)
-            .padding(.horizontal, compact ? 0 : 10)
-            .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
         }
         .disabled(lecture.recording?.isPruned != false
@@ -425,20 +425,18 @@ struct LectureDetailView: View {
         .help("Choose a transcriber and transcribe this recording again")
     }
 
-    private func generateCleanTranscriptAndNotesButton(compact: Bool) -> some View {
+    private var generateCleanTranscriptAndNotesButton: some View {
         Button(action: onGenerate) {
-            Group {
-                if compact {
-                    Image(systemName: "doc.text")
-                } else {
-                    Label("Generate clean transcription & notes", systemImage: "doc.text")
-                }
+            HStack(spacing: 10) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 20, weight: .medium))
+                Text("Generate clean transcription & notes")
             }
-            .font(.system(size: 11.5, weight: .medium))
+            .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(.white)
-            .frame(width: compact ? 28 : nil, height: 28)
-            .padding(.horizontal, compact ? 0 : 10)
-            .background(Color(hex: "2168ED"), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .background(Color(hex: "2168ED"), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(generation.job(for: lecture.persistentModelID) != nil)
