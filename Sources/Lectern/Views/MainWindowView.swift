@@ -194,19 +194,19 @@ struct MainWindowView: View {
             Button {
                 capture.toggle(in: selectedCourse, source: source)
             } label: {
-                HStack(spacing: 13) {
+                HStack(spacing: 7) {
                     Circle()
                         .fill(LecternTheme.recordTint)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 12, height: 12)
                         .symbolEffect(.pulse, isActive: isLive)
                     Text(isLive ? "Stop Recording" : source.recordButtonTitle)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 12.5, weight: .semibold))
                 }
-                .padding(.horizontal, 27)
-                .frame(height: 54)
-                .contentShape(Rectangle())
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
             }
             .buttonStyle(.plain)
+            .frame(minWidth: isLive ? nil : 101)
             .help(isLive
                   ? "Stop recording"
                   : "Record into \(selectedCourse?.name ?? "Unfiled") using \(source.title.lowercased())")
@@ -214,7 +214,7 @@ struct MainWindowView: View {
             if !isLive {
                 Rectangle()
                     .fill(Color.primary.opacity(0.16))
-                    .frame(width: 1, height: 31)
+                    .frame(width: 1, height: 19)
 
                 Menu {
                     ForEach(CaptureSource.allCases) { item in
@@ -227,9 +227,9 @@ struct MainWindowView: View {
                     }
                 } label: {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(LecternTheme.ink)
-                        .frame(width: 56, height: 54)
+                        .frame(width: 38, height: 29)
                         .contentShape(Rectangle())
                 }
                 .menuStyle(.borderlessButton)
@@ -242,7 +242,6 @@ struct MainWindowView: View {
             Capsule().fill(isLive ? LecternTheme.recordTint.opacity(0.10) : LecternTheme.canvasCard)
         )
         .overlay(Capsule().strokeBorder(cardBorder, lineWidth: 1))
-        .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
         .foregroundStyle(LecternTheme.ink)
     }
 
