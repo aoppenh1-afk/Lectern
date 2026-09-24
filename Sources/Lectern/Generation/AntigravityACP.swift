@@ -864,7 +864,7 @@ final class AntigravityACPManager {
     private var pendingAuthorization: AntigravityACPAuthorization.Pending?
     private var installationTask: Task<Void, Never>?
     private var activeConnections: [UUID: ACPConnection] = [:]
-    private var didPruneLegacySessions = false
+    private var lastLegacySessionPrune: Date?
 
     let layout: AntigravityACPLayout
     private let installer: AntigravityACPInstaller
@@ -1167,8 +1167,8 @@ final class AntigravityACPManager {
     }
 
     private func pruneLegacySessionsIfIdle() async {
-        guard !didPruneLegacySessions else { return }
-        didPruneLegacySessions = await installer.pruneLegacySessionsIfIdle()
+        if let lastLegacySessionPrune, Date().timeIntervalSince(lastLegacySessionPrune) < 3_600 { return }
+        if await installer.pruneLegacySessionsIfIdle() { lastLegacySessionPrune = Date() }
     }
 
     private func stopActiveConnections() async {
