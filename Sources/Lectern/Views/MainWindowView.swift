@@ -217,23 +217,17 @@ struct MainWindowView: View {
             Button {
                 capture.toggle(in: selectedCourse, source: source)
             } label: {
-                HStack(spacing: 7) {
+                HStack(spacing: 13) {
                     Circle()
                         .fill(LecternTheme.recordTint)
-                        .frame(width: 8, height: 8)
+                        .frame(width: 18, height: 18)
                         .symbolEffect(.pulse, isActive: isLive)
                     Text(isLive ? "Stop Recording" : source.recordButtonTitle)
-                        .font(.system(size: 12.5, weight: .semibold))
-                    if !isLive {
-                        Text(GlobalRecordHotkey.displayLabel(
-                            keyCode: surfacePreferences.hotKeyCode,
-                            modifiers: surfacePreferences.hotKeyModifiers))
-                            .font(.system(size: 10).monospacedDigit())
-                            .foregroundStyle(.tertiary)
-                    }
+                        .font(.system(size: 17, weight: .semibold))
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
+                .padding(.horizontal, 27)
+                .frame(height: 54)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help(isLive
@@ -241,6 +235,10 @@ struct MainWindowView: View {
                   : "Record into \(selectedCourse?.name ?? "Unfiled") using \(source.title.lowercased())")
 
             if !isLive {
+                Rectangle()
+                    .fill(Color.primary.opacity(0.16))
+                    .frame(width: 1, height: 31)
+
                 Menu {
                     ForEach(CaptureSource.allCases) { item in
                         Button {
@@ -252,10 +250,9 @@ struct MainWindowView: View {
                     }
                 } label: {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.trailing, 12)
-                        .padding(.vertical, 7)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(LecternTheme.ink)
+                        .frame(width: 56, height: 54)
                         .contentShape(Rectangle())
                 }
                 .menuStyle(.borderlessButton)
@@ -265,9 +262,10 @@ struct MainWindowView: View {
             }
         }
         .background(
-            Capsule().fill(isLive ? LecternTheme.recordTint.opacity(0.10) : LecternTheme.cardFill)
+            Capsule().fill(isLive ? LecternTheme.recordTint.opacity(0.10) : LecternTheme.canvasCard)
         )
         .overlay(Capsule().strokeBorder(cardBorder, lineWidth: 1))
+        .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
         .foregroundStyle(LecternTheme.ink)
     }
 
