@@ -32,7 +32,7 @@ struct MainWindowView: View {
     @State private var searchText = ""
     @State private var transcriptMatches: Set<PersistentIdentifier> = []
     @State private var transcriptIDsByKey: [String: PersistentIdentifier] = [:]
-    @State private var transcriptSearchIndex = TranscriptSearchIndex()
+    private let transcriptSearchIndex = TranscriptSearchIndex.shared
     @State private var searchIndexReady = false
     @State private var searchRevision = 0
     @State private var isIndexingTranscripts = false

@@ -42,6 +42,7 @@ final class TranscriptSearchIndexTests: XCTestCase {
         XCTAssertNil(TranscriptSearchIndex.ftsQuery("m"))
         XCTAssertEqual(TranscriptSearchIndex.ftsQuery("microbio"), "\"microbio\"*")
         XCTAssertEqual(TranscriptSearchIndex.ftsQuery("cell-wall"), "\"cell\" AND \"wall\"*")
+        XCTAssertEqual(TranscriptSearchIndex.ftsQuery("mitochondria's"), "\"mitochondria\"*")
         XCTAssertEqual(TranscriptSearchIndex.ftsQuery("שלום"), "\"שלום\"*")
     }
 }

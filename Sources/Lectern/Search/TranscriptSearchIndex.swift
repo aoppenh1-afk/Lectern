@@ -6,16 +6,18 @@ import SwiftData
 /// only tokens and row IDs. Connections are scoped to each operation so search
 /// has no permanent SQLite page cache or background worker.
 actor TranscriptSearchIndex {
+    static let shared = TranscriptSearchIndex()
+
     struct Document: Sendable {
         let key: String
         let revision: Double
         let text: String
     }
 
-    private let fileURL: URL?
+    private var resolvedURL: URL?
 
     init(fileURL: URL? = nil) {
-        self.fileURL = fileURL
+        self.resolvedURL = fileURL
     }
 
     static func key(for id: PersistentIdentifier) -> String? {
@@ -24,11 +26,17 @@ actor TranscriptSearchIndex {
         return (try? encoder.encode(id))?.base64EncodedString()
     }
 
-    private func database() throws -> TranscriptSearchDatabase {
-        let url = try fileURL ?? LecternStoreLocation.preparedStoreURL()
-            .deletingLastPathComponent()
-            .appendingPathComponent("TranscriptSearch.sqlite")
-        return try TranscriptSearchDatabase(url: url)
+    private func database(readOnly: Bool = false) throws -> TranscriptSearchDatabase {
+        let url: URL
+        if let resolvedURL {
+            url = resolvedURL
+        } else {
+            url = try LecternStoreLocation.preparedStoreURL()
+                .deletingLastPathComponent()
+                .appendingPathComponent("TranscriptSearch.sqlite")
+            resolvedURL = url
+        }
+        return try TranscriptSearchDatabase(url: url, readOnly: readOnly)
     }
 
     func revisions() throws -> [String: Double] {
@@ -46,7 +54,7 @@ actor TranscriptSearchIndex {
 
     func search(_ text: String) throws -> [String] {
         guard let query = Self.ftsQuery(text) else { return [] }
-        return try database().search(query)
+        return try database(readOnly: true).search(query)
     }
 
     /// User text is tokenized before it reaches MATCH, so punctuation and FTS
@@ -54,9 +62,9 @@ actor TranscriptSearchIndex {
     /// prefix, which makes live typing useful without a larger prefix index.
     static func ftsQuery(_ text: String) -> String? {
         let words = text.components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { !$0.isEmpty }
+            .filter { $0.unicodeScalars.count >= 2 }
             .prefix(8)
-        guard let last = words.last, last.unicodeScalars.count >= 2 else { return nil }
+        guard let last = words.last else { return nil }
         let exact = words.dropLast().map { "\"\($0)\"" }
         return (exact + ["\"\(last)\"*"]).joined(separator: " AND ")
     }
@@ -65,22 +73,28 @@ actor TranscriptSearchIndex {
 private final class TranscriptSearchDatabase {
     private var handle: OpaquePointer?
 
-    init(url: URL) throws {
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
-        )
-        guard sqlite3_open_v2(url.path, &handle,
-                              SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX,
-                              nil) == SQLITE_OK else {
+    init(url: URL, readOnly: Bool) throws {
+        if !readOnly {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+        }
+        let flags = readOnly
+            ? SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX
+            : SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX
+        guard sqlite3_open_v2(url.path, &handle, flags, nil) == SQLITE_OK else {
             throw failure("Open transcript search index")
         }
         // SQLite's default cache is about 2 MB per connection. Short-lived
         // connections and a 512 KiB cap bound the app's search-specific RAM.
         do {
+            sqlite3_busy_timeout(handle, 1_000)
             try execute("PRAGMA cache_size=-512")
             try execute("PRAGMA mmap_size=0")
-            try execute("CREATE TABLE IF NOT EXISTS documents (id INTEGER PRIMARY KEY, lecture_key TEXT NOT NULL UNIQUE, revision REAL NOT NULL)")
-            try execute("CREATE VIRTUAL TABLE IF NOT EXISTS transcript_fts USING fts5(body, content='', contentless_delete=1, detail=none, tokenize='unicode61 remove_diacritics 2')")
+            if !readOnly {
+                try execute("CREATE TABLE IF NOT EXISTS documents (id INTEGER PRIMARY KEY, lecture_key TEXT NOT NULL UNIQUE, revision REAL NOT NULL)")
+                try execute("CREATE VIRTUAL TABLE IF NOT EXISTS transcript_fts USING fts5(body, content='', contentless_delete=1, detail=none, tokenize='unicode61 remove_diacritics 2')")
+            }
         } catch {
             if let handle { sqlite3_close(handle) }
             handle = nil
