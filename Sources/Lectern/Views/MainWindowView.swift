@@ -30,6 +30,13 @@ struct MainWindowView: View {
     @State private var selectedLecture: Lecture?
     @State private var showingNewCourse = false
     @State private var searchText = ""
+    @State private var transcriptMatches: Set<PersistentIdentifier> = []
+    @State private var transcriptIDsByKey: [String: PersistentIdentifier] = [:]
+    private let transcriptSearchIndex = TranscriptSearchIndex.shared
+    @State private var searchIndexReady = false
+    @State private var searchRevision = 0
+    @State private var isIndexingTranscripts = false
+    @State private var transcriptSearchError: String?
     @State private var importError: String?
     @State private var generateTarget: Lecture?
     @State private var exportTarget: Lecture?
@@ -60,6 +67,17 @@ struct MainWindowView: View {
         .onChange(of: selection) { _, _ in
             selectedLecture = nil
             searchText = ""
+        }
+        .onChange(of: lectures.map(\.status)) { _, _ in
+            searchIndexReady = false
+            searchRevision += 1
+        }
+        .onChange(of: lectures.count) { _, _ in
+            searchIndexReady = false
+            searchRevision += 1
+        }
+        .task(id: "\(searchText)|\(searchRevision)") {
+            await updateTranscriptMatches()
         }
         .sheet(item: $generateTarget) { lecture in
             GenerateSheet(lecture: lecture)
@@ -298,6 +316,12 @@ struct MainWindowView: View {
             TextField("Search", text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
+                .help("Search lecture titles, courses, and transcripts")
+            if isIndexingTranscripts && !searchText.isEmpty {
+                ProgressView()
+                    .controlSize(.mini)
+                    .frame(width: 12, height: 12)
+            }
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
@@ -407,11 +431,111 @@ struct MainWindowView: View {
 
     // MARK: - Lecture list
 
+    @MainActor
+    private func updateTranscriptMatches() async {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            transcriptMatches = []
+            transcriptSearchError = nil
+            isIndexingTranscripts = false
+            return
+        }
+        // A one-character query is useful for title search, but would produce
+        // a very broad transcript lookup and unnecessary disk work.
+        guard TranscriptSearchIndex.ftsQuery(query) != nil else {
+            transcriptMatches = []
+            isIndexingTranscripts = false
+            return
+        }
+        transcriptMatches = []
+        do {
+            try await Task.sleep(for: .milliseconds(250))
+            try Task.checkCancellation()
+            if !searchIndexReady {
+                isIndexingTranscripts = true
+                let isComplete = try await synchronizeTranscriptIndex()
+                try Task.checkCancellation()
+                searchIndexReady = isComplete
+                isIndexingTranscripts = false
+            }
+            let matchedKeys = try await transcriptSearchIndex.search(query)
+            try Task.checkCancellation()
+            transcriptMatches = Set(matchedKeys.compactMap { transcriptIDsByKey[$0] })
+            transcriptSearchError = searchIndexReady ? nil
+                : "A transcript has not finished saving. Search will retry with your next query."
+        } catch is CancellationError {
+            isIndexingTranscripts = false
+        } catch {
+            isIndexingTranscripts = false
+            transcriptSearchError = error.localizedDescription
+            transcriptMatches = []
+        }
+    }
+
+    @MainActor
+    private func synchronizeTranscriptIndex() async throws -> Bool {
+        let indexedRevisions = try await transcriptSearchIndex.revisions()
+        var currentKeys: Set<String> = []
+        var idsByKey: [String: PersistentIdentifier] = [:]
+        var batch: [TranscriptSearchIndex.Document] = []
+        var hasUnpersistedTranscript = false
+
+        for lecture in lectures where lecture.status == .ready {
+            try Task.checkCancellation()
+            guard let key = TranscriptSearchIndex.key(for: lecture.persistentModelID) else { continue }
+            let revision = (lecture.transcriptCompletedAt ?? lecture.capturedAt).timeIntervalSince1970
+            if indexedRevisions[key] == revision {
+                currentKeys.insert(key)
+                idsByKey[key] = lecture.persistentModelID
+                continue
+            }
+            // A short-lived context keeps the first search's backfill from
+            // retaining every transcript in the window's long-lived context.
+            guard let text = try rawTranscript(for: lecture.persistentModelID),
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                // Ready bundles may legitimately have no raw transcript. A
+                // transcript visible only in the main context is different:
+                // leave the index unready so the next search retries it.
+                if lecture.hasCompletedRawTranscript { hasUnpersistedTranscript = true }
+                continue
+            }
+            currentKeys.insert(key)
+            idsByKey[key] = lecture.persistentModelID
+            batch.append(.init(key: key, revision: revision, text: text))
+            if batch.count == 4 {
+                try await transcriptSearchIndex.upsert(batch)
+                batch.removeAll(keepingCapacity: true)
+                await Task.yield()
+            }
+        }
+        try Task.checkCancellation()
+        if !batch.isEmpty { try await transcriptSearchIndex.upsert(batch) }
+        try await transcriptSearchIndex.removeMissing(keeping: currentKeys)
+        try Task.checkCancellation()
+        transcriptIDsByKey = idsByKey
+        return !hasUnpersistedTranscript
+    }
+
+    @MainActor
+    private func rawTranscript(for id: PersistentIdentifier) throws -> String? {
+        let context = ModelContext(modelContext.container)
+        var descriptor = FetchDescriptor<Lecture>(predicate: #Predicate { $0.persistentModelID == id })
+        descriptor.fetchLimit = 1
+        guard let lecture = try context.fetch(descriptor).first,
+              !lecture.isDeleted else { return nil }
+        return lecture.artifact(of: .rawTranscript)?.content
+    }
+
     private var visibleLectures: [Lecture] {
         if !searchText.isEmpty {
             return lectures.filter {
-                $0.title.localizedCaseInsensitiveContains(searchText) ||
-                ($0.course?.name.localizedCaseInsensitiveContains(searchText) ?? false)
+                (allowedCourseIDs == nil || $0.course.map {
+                    allowedCourseIDs?.contains($0.persistentModelID) ?? false
+                } == true) && (
+                    $0.title.localizedCaseInsensitiveContains(searchText) ||
+                    ($0.course?.name.localizedCaseInsensitiveContains(searchText) ?? false) ||
+                    transcriptMatches.contains($0.persistentModelID)
+                )
             }
         }
         switch selection {
@@ -439,6 +563,12 @@ struct MainWindowView: View {
                 Text("\(visibleLectures.count) lecture\(visibleLectures.count == 1 ? "" : "s")")
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
+                if !searchText.isEmpty, transcriptSearchError != nil {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 10))
+                        .foregroundStyle(LecternTheme.warningTint)
+                        .help(transcriptSearchError ?? "Transcript search unavailable")
+                }
                 Spacer()
                 if selectedCourse != nil, searchText.isEmpty {
                     Button {
@@ -606,6 +736,11 @@ struct MainWindowView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
+                    if !searchText.isEmpty, transcriptMatches.contains(lecture.persistentModelID) {
+                        Text("Transcript match")
+                            .font(.system(size: 10))
+                            .foregroundStyle(LecternTheme.accent)
+                    }
                 }
                 Spacer(minLength: 8)
                 if !isRenaming {
@@ -815,11 +950,11 @@ struct MainWindowView: View {
                              label: "Lectures",
                              icon: "waveform",
                              tint: LecternTheme.processingTint)
-                    statCard(value: "\(lectures.flatMap(\.artifacts).count)",
+                    statCard(value: "\((try? modelContext.fetchCount(FetchDescriptor<Artifact>())) ?? 0)",
                              label: "Materials",
                              icon: "doc.text",
                              tint: .purple)
-                    statCard(value: "\(lectures.flatMap(\.flashcards).count)",
+                    statCard(value: "\((try? modelContext.fetchCount(FetchDescriptor<Flashcard>())) ?? 0)",
                              label: "Flashcards",
                              icon: "rectangle.on.rectangle.angled",
                              tint: .teal)
