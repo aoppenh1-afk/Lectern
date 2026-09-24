@@ -333,7 +333,7 @@ struct LectureDetailView: View {
                 // Keep the original single-row height when the detail pane is narrow.
                 HStack(spacing: 10) {
                     transcriptProvenanceInfo(provider: provider, model: model)
-                        .fixedSize(horizontal: true, vertical: false)
+                        .frame(minWidth: 200, maxWidth: 260, alignment: .leading)
                     Spacer(minLength: 4)
                     transcriptProvenanceActions
                         .fixedSize(horizontal: true, vertical: false)
@@ -352,7 +352,9 @@ struct LectureDetailView: View {
     }
 
     private func transcriptProvenanceInfo(provider: String, model: String) -> some View {
-        HStack(spacing: 12) {
+        let subtitle = [model, lecture.transcriptCompletedAt?.formatted(date: .abbreviated, time: .shortened)]
+            .compactMap { $0 }.joined(separator: "  ·  ")
+        return HStack(spacing: 12) {
             Group {
                 if let providerID = lecture.transcriptProviderRaw.flatMap(TranscriptionProviderID.init(rawValue:)),
                    providerID != .local {
@@ -368,15 +370,17 @@ struct LectureDetailView: View {
                 Text("Transcribed with \(provider)")
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
-                Text([model, lecture.transcriptCompletedAt?.formatted(date: .abbreviated, time: .shortened)].compactMap { $0 }.joined(separator: "  ·  "))
+                Text(subtitle)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .help(subtitle)
                 if let fallback = lecture.transcriptFallbackSummary {
                     Text(fallback)
                         .font(.system(size: 10))
                         .foregroundStyle(LecternTheme.warningTint)
                         .lineLimit(1)
+                        .help(fallback)
                 }
             }
         }
