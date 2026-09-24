@@ -21,7 +21,8 @@ final class AntigravityACPTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let layout = AntigravityACPLayout(root: root)
-        let manager = AntigravityACPManager(layout: layout)
+        // Force the pinned path so the test never touches the network.
+        let manager = AntigravityACPManager(layout: layout, registryProvider: { nil })
         let release = try XCTUnwrap(AntigravityACPRelease.current)
 
         await manager.checkForUpdates()
@@ -43,6 +44,155 @@ final class AntigravityACPTests: XCTestCase {
         try Data("broken record".utf8).write(to: layout.activeRecord)
         await manager.checkForUpdates()
         guard case .failed = manager.updateState else { return XCTFail("Corruption must not look up to date.") }
+    }
+
+    @MainActor
+    func testUpdateCheckOffersRegistryReleaseWhenNewer() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = AntigravityACPLayout(root: root)
+        let release = try XCTUnwrap(AntigravityACPRelease.current)
+        try writeInstalledFixture(layout: layout, version: release.version)
+        let remote = AntigravityACPRegistryRelease(
+            version: "1.2.1",
+            url: URL(string: "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.2.1-darwin-arm64.zip")!
+        )
+        let manager = AntigravityACPManager(layout: layout, registryProvider: { remote })
+        await manager.checkForUpdates()
+        XCTAssertEqual(manager.updateState, .available(installed: release.version, available: "1.2.1"))
+        XCTAssertEqual(manager.pendingRegistryRelease, remote)
+    }
+
+    @MainActor
+    func testUpdateCheckStaysCurrentWhenRegistryMatchesInstalled() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = AntigravityACPLayout(root: root)
+        let release = try XCTUnwrap(AntigravityACPRelease.current)
+        try writeInstalledFixture(layout: layout, version: release.version)
+        let manager = AntigravityACPManager(
+            layout: layout,
+            registryProvider: {
+                AntigravityACPRegistryRelease(
+                    version: release.version,
+                    url: URL(string: "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-agy_acp_server_1.1.1-darwin-arm64.zip")!
+                )
+            }
+        )
+        await manager.checkForUpdates()
+        XCTAssertEqual(manager.updateState, .upToDate(version: release.version))
+        XCTAssertNil(manager.pendingRegistryRelease)
+    }
+
+    func testReleaseVersionComparisonHandlesBothVersionFormats() {
+        XCTAssertTrue(AntigravityACPRelease.isNewer("1.2.1", than: "agy_acp_server_1.1.1"))
+        XCTAssertTrue(AntigravityACPRelease.isNewer("agy_acp_server_1.1.1", than: "agy_acp_server_20260818_01_RC01"))
+        XCTAssertFalse(AntigravityACPRelease.isNewer("agy_acp_server_1.1.1", than: "agy_acp_server_1.1.1"))
+        XCTAssertFalse(AntigravityACPRelease.isNewer("1.1.1", than: "1.2.1"))
+        XCTAssertEqual(
+            AntigravityACPRelease.compare("agy_acp_server_1.1.1", "1.1.1"),
+            .orderedSame
+        )
+    }
+
+    func testRegistryParsingAcceptsOfficialDownloadAndRejectsOthers() throws {
+        let valid = """
+        {"id":"antigravity-acp","version":"1.2.1","distribution":{"binary":{
+        "darwin-aarch64":{"archive":"https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.2.1-darwin-arm64.zip","cmd":"./agy_acp_server.par"},
+        "linux-x86_64":{"archive":"https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.2.1-linux-x86_64.zip","cmd":"./agy_acp_server.par"}}}}
+        """
+        let parsed = try AntigravityACPRegistry.parse(Data(valid.utf8))
+        XCTAssertEqual(parsed.version, "1.2.1")
+        XCTAssertEqual(
+            parsed.url.absoluteString,
+            "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.2.1-darwin-arm64.zip"
+        )
+
+        let legacyKey = """
+        {"version":"1.2.1","distribution":{"binary":{
+        "darwin-arm64":{"archive":"https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.2.1-darwin-arm64.zip"}}}}
+        """
+        XCTAssertNoThrow(try AntigravityACPRegistry.parse(Data(legacyKey.utf8)))
+
+        let hostile = """
+        {"version":"9.9.9","distribution":{"binary":{
+        "darwin-aarch64":{"archive":"https://example.invalid/agy-acp-server.zip"}}}}
+        """
+        XCTAssertThrowsError(try AntigravityACPRegistry.parse(Data(hostile.utf8)))
+
+        let missing = """
+        {"version":"1.2.1","distribution":{"binary":{
+        "linux-x86_64":{"archive":"https://dl.google.com/agy-extensions/releases/linux/agy-acp-server-1.2.1-linux-x86_64.zip"}}}}
+        """
+        XCTAssertThrowsError(try AntigravityACPRegistry.parse(Data(missing.utf8)))
+    }
+
+    func testPruningRemovesOldVersionsButKeepsActive() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Lectern-ACP-Prune-Test-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = AntigravityACPLayout(root: root)
+        let activeID = String(repeating: "a", count: 64)
+        let oldID = String(repeating: "b", count: 64)
+        try writeInstalledFixture(layout: layout, version: "new", releaseID: activeID)
+        // Point the active record at the new release, then add a stale one.
+        let activeRecord = try Data(contentsOf: layout.activeRecord)
+        try writeInstalledFixture(layout: layout, version: "old", releaseID: oldID)
+        try activeRecord.write(to: layout.activeRecord)
+        // A stale backup left by an interrupted install must also go.
+        let staleBackup = layout.versionsDirectory.appendingPathComponent(".previous-stale")
+        try FileManager.default.createDirectory(at: staleBackup, withIntermediateDirectories: true)
+        // An unrelated file must be left alone.
+        let unrelated = layout.versionsDirectory.appendingPathComponent("notes.txt")
+        try Data("keep".utf8).write(to: unrelated)
+
+        let installer = AntigravityACPInstaller(layout: layout)
+        await installer.pruneOldVersions(keeping: activeID)
+
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: layout.versionsDirectory.appendingPathComponent(activeID).path
+        ))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: layout.versionsDirectory.appendingPathComponent(oldID).path
+        ))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staleBackup.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelated.path))
+        // The active runtime still resolves after pruning.
+        let pruned = try await installer.resolve()
+        XCTAssertEqual(pruned.version, "new")
+    }
+
+    func testPruningDefersWhileRuntimeIsLeased() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Lectern-ACP-Prune-Lease-Test-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let layout = AntigravityACPLayout(root: root)
+        let activeID = String(repeating: "a", count: 64)
+        let oldID = String(repeating: "b", count: 64)
+        try writeInstalledFixture(layout: layout, version: "new", releaseID: activeID)
+        let activeRecord = try Data(contentsOf: layout.activeRecord)
+        try writeInstalledFixture(layout: layout, version: "old", releaseID: oldID)
+        try activeRecord.write(to: layout.activeRecord)
+
+        let installer = AntigravityACPInstaller(layout: layout)
+        let acquired = try await installer.acquire()
+        await installer.pruneOldVersions(keeping: activeID)
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: layout.versionsDirectory.appendingPathComponent(oldID).path
+            ),
+            "A leased runtime must survive pruning."
+        )
+
+        await installer.release(leaseID: acquired.leaseID)
+        await installer.pruneOldVersions(keeping: activeID)
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: layout.versionsDirectory.appendingPathComponent(oldID).path
+            )
+        )
+        let resolved = try await installer.resolve()
+        XCTAssertEqual(resolved.version, "new")
     }
 
     func testFailedUpdateValidationKeepsPreviousRuntimeActive() async throws {

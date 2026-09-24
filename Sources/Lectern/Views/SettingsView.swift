@@ -1113,7 +1113,7 @@ private struct AgentsPane: View {
         case .unchecked: return "Updates have not been checked."
         case .checking: return "Checking for updates…"
         case .notInstalled: return "Install Antigravity to get started."
-        case .upToDate: return "Antigravity is up to date for this version of Lectern."
+        case .upToDate: return "Antigravity is up to date."
         case .available: return "An Antigravity update is available."
         case .unsupported: return "No managed runtime is available for this Mac."
         case .failed: return "Could not check for updates."
@@ -1121,12 +1121,17 @@ private struct AgentsPane: View {
     }
 
     private var updateDetail: String? {
+        let explanation = "Checks Google's official Antigravity release registry."
         switch antigravityACP.updateState {
         case .available(let installed, let available):
             return "Installed: \(installed) · Available: \(available)"
+        case .upToDate(let version):
+            if let checked = antigravityACP.lastUpdateCheck {
+                return "Installed: \(version) · Checked \(checked.formatted(date: .abbreviated, time: .shortened)). \(explanation)"
+            }
+            return "Installed: \(version). \(explanation)"
         case .failed(let message): return message
         default:
-            let explanation = "Checks the verified release included with Lectern. Newer releases arrive with Lectern updates."
             if let checked = antigravityACP.lastUpdateCheck {
                 return "Checked \(checked.formatted(date: .abbreviated, time: .shortened)). \(explanation)"
             }
@@ -1153,9 +1158,14 @@ private struct AgentsPane: View {
     private var runtimeDetail: String? {
         switch antigravityACP.runtimeState {
         case .notInstalled, .cancelled:
-            return "Downloads 316 MB directly from Google. Your existing agy CLI is separate and is not used."
+            return "Downloads the official runtime directly from Google. Your existing agy CLI is separate and is not used."
         case .ready(let version):
-            return "Google release \(version) · SHA-256 verified"
+            // Only the pinned release is SHA-256 checked against a known hash;
+            // registry releases are validated by archive shape and ACP handshake.
+            if version == AntigravityACPRelease.current?.version {
+                return "Google release \(version) · SHA-256 verified"
+            }
+            return "Google release \(version) · Validated"
         case .failed(let message):
             return message
         default:
