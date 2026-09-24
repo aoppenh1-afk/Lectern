@@ -749,9 +749,11 @@ struct MainWindowView: View {
     @ViewBuilder
     private var detailPane: some View {
         if let selectedLecture {
-            LectureDetailView(lecture: selectedLecture) {
-                attachReferenceMaterials(to: selectedLecture)
-            }
+            LectureDetailView(
+                lecture: selectedLecture,
+                onAttachFiles: { attachReferenceMaterials(to: selectedLecture) },
+                onGenerate: { generateTarget = selectedLecture }
+            )
             .id(selectedLecture.persistentModelID)
         } else {
             dashboardHome
