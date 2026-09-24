@@ -452,15 +452,16 @@ struct MainWindowView: View {
             try Task.checkCancellation()
             if !searchIndexReady {
                 isIndexingTranscripts = true
-                try await synchronizeTranscriptIndex()
+                let isComplete = try await synchronizeTranscriptIndex()
                 try Task.checkCancellation()
-                searchIndexReady = true
+                searchIndexReady = isComplete
                 isIndexingTranscripts = false
             }
             let matchedKeys = try await transcriptSearchIndex.search(query)
             try Task.checkCancellation()
             transcriptMatches = Set(matchedKeys.compactMap { transcriptIDsByKey[$0] })
-            transcriptSearchError = nil
+            transcriptSearchError = searchIndexReady ? nil
+                : "A transcript has not finished saving. Search will retry with your next query."
         } catch is CancellationError {
             isIndexingTranscripts = false
         } catch {
@@ -471,11 +472,12 @@ struct MainWindowView: View {
     }
 
     @MainActor
-    private func synchronizeTranscriptIndex() async throws {
+    private func synchronizeTranscriptIndex() async throws -> Bool {
         let indexedRevisions = try await transcriptSearchIndex.revisions()
         var currentKeys: Set<String> = []
         var idsByKey: [String: PersistentIdentifier] = [:]
         var batch: [TranscriptSearchIndex.Document] = []
+        var hasUnpersistedTranscript = false
 
         for lecture in lectures where lecture.status == .ready {
             try Task.checkCancellation()
@@ -489,7 +491,13 @@ struct MainWindowView: View {
             // A short-lived context keeps the first search's backfill from
             // retaining every transcript in the window's long-lived context.
             guard let text = try rawTranscript(for: lecture.persistentModelID),
-                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                // Ready bundles may legitimately have no raw transcript. A
+                // transcript visible only in the main context is different:
+                // leave the index unready so the next search retries it.
+                if lecture.hasCompletedRawTranscript { hasUnpersistedTranscript = true }
+                continue
+            }
             currentKeys.insert(key)
             idsByKey[key] = lecture.persistentModelID
             batch.append(.init(key: key, revision: revision, text: text))
@@ -504,6 +512,7 @@ struct MainWindowView: View {
         try await transcriptSearchIndex.removeMissing(keeping: currentKeys)
         try Task.checkCancellation()
         transcriptIDsByKey = idsByKey
+        return !hasUnpersistedTranscript
     }
 
     @MainActor
