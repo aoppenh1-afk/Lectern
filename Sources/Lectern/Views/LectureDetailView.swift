@@ -377,6 +377,7 @@ struct LectureDetailView: View {
             transcribeAgainButton
             generateCleanTranscriptAndNotesButton
         }
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var transcribeAgainButton: some View {
@@ -384,7 +385,6 @@ struct LectureDetailView: View {
             Label("Transcribe again", systemImage: "arrow.clockwise")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(LecternTheme.ink)
-                .fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 14)
                 .frame(height: 44)
                 .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -402,7 +402,7 @@ struct LectureDetailView: View {
             Label("Generate clean transcription & notes", systemImage: "doc.text")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
-                .fixedSize(horizontal: true, vertical: false)
+                .multilineTextAlignment(.center)
                 .padding(.horizontal, 14)
                 .frame(height: 44)
                 .background(Color(hex: "2168ED"), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
