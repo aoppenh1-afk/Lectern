@@ -193,6 +193,9 @@ struct CourseChatWorkspaceTests {
         #expect(sessions.count == 3)
         #expect((sessions[0]["params"] as? [String: Any])?["cwd"] as? String == first.directory.path)
         #expect((sessions[2]["params"] as? [String: Any])?["cwd"] as? String == second.directory.path)
+        let selectedModels = requests.filter { $0["method"] as? String == "session/set_config_option" }
+            .compactMap { ($0["params"] as? [String: Any])?["value"] as? String }
+        #expect(selectedModels == ["model-a", "model-b", "model-b"])
     }
 
     @Test func cancellationDuringConnectionDoesNotReplaceTheNextSession() async throws {
@@ -270,7 +273,7 @@ for line in sys.stdin:
         result = {'protocolVersion': 1, 'agentCapabilities': {}, 'authMethods': []}
     elif method == 'session/new':
         cwd = req['params']['cwd']
-        result = {'sessionId': 'fixture', 'configOptions': [{'id': 'model', 'name': 'Model', 'category': 'model', 'type': 'select', 'currentValue': 'test-model', 'options': [{'value': 'test-model', 'name': 'Test'}]}]}
+        result = {'sessionId': 'fixture', 'configOptions': [{'id': 'model', 'name': 'Model', 'category': 'model', 'type': 'select', 'currentValue': 'test-model', 'options': [{'value': value, 'name': value} for value in ['test-model', 'model-a', 'model-b']]}]}
     elif method == 'session/prompt':
         if 'FAIL_REQUEST' in json.dumps(req['params']['prompt']):
             print(json.dumps({'jsonrpc': '2.0', 'id': req['id'], 'error': {'code': -32000, 'message': 'Fixture failure'}}), flush=True)
