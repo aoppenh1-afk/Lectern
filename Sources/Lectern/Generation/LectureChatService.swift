@@ -509,7 +509,7 @@ final class LectureChatService {
             session = try await connection.newSession(workingDirectory: workspaceDirectory)
         }
 
-        await connection.applyGenerationSettings(
+        try await connection.applyGenerationSettings(
             session: session,
             model: modelOverride,
             thinkingLevel: thinkingLevel.rawValue

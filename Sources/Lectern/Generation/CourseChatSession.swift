@@ -74,7 +74,7 @@ final class CourseChatSession {
                         thinkingLevel: AntigravityACPClient.effort(for: thinkingLevel)
                     )
                 } else {
-                    await connection.applyGenerationSettings(session: session, model: modelOverride,
+                    try await connection.applyGenerationSettings(session: session, model: modelOverride,
                                                              thinkingLevel: thinkingLevel.rawValue)
                 }
                 try Task.checkCancellation()

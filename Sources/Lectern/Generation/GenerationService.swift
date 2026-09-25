@@ -466,7 +466,7 @@ final class GenerationService {
                 profile: profile,
                 workspaceDirectory: workspaceDirectory
             )
-            await connection.applyGenerationSettings(
+            try await connection.applyGenerationSettings(
                 session: session,
                 model: modelOverride,
                 thinkingLevel: thinkingLevel.rawValue

@@ -114,6 +114,7 @@
 		5A1C342E86A814306DF037E5 /* banner-yu-sample.json in Resources */ = {isa = PBXBuildFile; fileRef = 725694B4047C98A2D135A9C2 /* banner-yu-sample.json */; };
 		5BA88FED8AAA4DF17E087287 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE5C3AABA6B34AD14F5DB646 /* AppUpdater.swift */; };
 		5BC92167A2C70F9FD1E0AC0D /* TranscriptionProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87CA75D98C0B0A79B24C31A6 /* TranscriptionProviders.swift */; };
+		5C50725450AE41AB8799FD90 /* CodexACPModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE7C96F09E2E6AAE301ACC7B /* CodexACPModelTests.swift */; };
 		5CC2CA3F302C627237B9794E /* CompletionNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165645A8C3854D55C5824601 /* CompletionNotifier.swift */; };
 		5D0E6B5F3A3CEC54B91B9C44 /* NotesMarkdownConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD3E8ECFA5DBAF53FDF24214 /* NotesMarkdownConverter.swift */; };
 		5D4CA351DF51CD0C2C7A4A92 /* Course.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB56BD82F43139025F591D2F /* Course.swift */; };
@@ -137,6 +138,7 @@
 		6A84AD8F988068C3C6298016 /* LecternApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B528438D307A5B4FB6EAF1B /* LecternApp.swift */; };
 		6A99822377127DED59924502 /* LocalModelAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7484EB4DB7F42BE66D0D748 /* LocalModelAvailability.swift */; };
 		6AC221B5CC644CE1D388095D /* SurfacePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363051532AA63A00332E82D7 /* SurfacePreferences.swift */; };
+		6BED6B745EEF9343963D311E /* TranscriptSearchIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B03E539CC61DDBD10FC01C43 /* TranscriptSearchIndexTests.swift */; };
 		6C8B2B6804CFA43DFC1D5537 /* AnkiConnectClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3217A5B8A37DD8207DD0478 /* AnkiConnectClient.swift */; };
 		6CEA910FD49F1BE8BB05BCCF /* ShiurImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C5B6AFA684E43B8FEA1573E /* ShiurImportSheet.swift */; };
 		6D66EC24A6173D2D503D4894 /* CanvasZoomReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2470516AC63AAE0B25C2D906 /* CanvasZoomReminderService.swift */; };
@@ -251,6 +253,7 @@
 		C6BE2709DE71706BE06B1C66 /* AISessionPool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9555190D715A73B287877CCD /* AISessionPool.swift */; };
 		C755955D46BFA91077FBA354 /* YUTorahSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8E8D62B339AAE8CDACF807 /* YUTorahSearchIndex.swift */; };
 		C7C73BFFDE8077303DBA5C1B /* ReferenceMaterialPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A8D31EBDA459CA5FB32589 /* ReferenceMaterialPicker.swift */; };
+		C869E495F17C18FCE0F8AD1A /* TranscriptSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 635A6925B66AFC792CA9184A /* TranscriptSearchIndex.swift */; };
 		C8BC1C2E0A3508982ACADCB0 /* TranscriptionQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D56AFC425AC6CD11467211 /* TranscriptionQueueTests.swift */; };
 		C8BD1E39D756D4404C06735D /* LecternBundleOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2569701F584ADDB6AF95EB1D /* LecternBundleOptions.swift */; };
 		C90B7860B0E62A59D4F48341 /* SubscriptionEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8910AF0204135B690C41D851 /* SubscriptionEditorView.swift */; };
@@ -268,6 +271,7 @@
 		D33336F8549D248B331D5048 /* TranscriptionReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E39D3732B1EA6046B6E88E /* TranscriptionReliabilityTests.swift */; };
 		D6FF932DFA12DA10522A8EDA /* YUAcademicCalendarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4B3824CB1D4AC6708E4167 /* YUAcademicCalendarTests.swift */; };
 		D70150D05BE3678C91D5E626 /* TranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439436382A9383B21132AFA7 /* TranscriptionService.swift */; };
+		D7DC50640EA47B280CA52062 /* TranscriptSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 635A6925B66AFC792CA9184A /* TranscriptSearchIndex.swift */; };
 		D850E1E9B74B2D1B0CBF2E16 /* CanvasClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */; };
 		D990E2BB9EF4969A3CB445F4 /* LectureDocumentExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 061C2A9944E44D8A633CC026 /* LectureDocumentExportService.swift */; };
 		D9D1469B4019AF2087255DFE /* LecternCloudSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF5BD9751EBEF1FED8E0699F /* LecternCloudSnapshot.swift */; };
@@ -389,6 +393,7 @@
 		61B8478F30090A0838FA7BCC /* ChatMarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMarkdownRenderer.swift; sourceTree = "<group>"; };
 		627A2CDC9029D01B87C36A0C /* CourseSynthesisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseSynthesisService.swift; sourceTree = "<group>"; };
 		6293D7F84B3E2FE505739AF8 /* TranscriptSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSegment.swift; sourceTree = "<group>"; };
+		635A6925B66AFC792CA9184A /* TranscriptSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSearchIndex.swift; sourceTree = "<group>"; };
 		6751001A8F37F6C85CC1E4FC /* TranscriptionChunkConcurrencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionChunkConcurrencyTests.swift; sourceTree = "<group>"; };
 		6AC2F44F19A8CD8C4379AC82 /* LectureChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureChatView.swift; sourceTree = "<group>"; };
 		6B21977294E61876D5A79076 /* GlobalRecordHotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalRecordHotkey.swift; sourceTree = "<group>"; };
@@ -425,6 +430,7 @@
 		A80840764862370BCD46CACE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A9D3AE061392BC596F79D58F /* MCPSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSettingsView.swift; sourceTree = "<group>"; };
 		AF5F8AD0523C9B706BEB2A80 /* YUFinalExam.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUFinalExam.swift; sourceTree = "<group>"; };
+		B03E539CC61DDBD10FC01C43 /* TranscriptSearchIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSearchIndexTests.swift; sourceTree = "<group>"; };
 		B1636BFF993825C1A1D7F801 /* LectureImportPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureImportPicker.swift; sourceTree = "<group>"; };
 		B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntigravityACPTests.swift; sourceTree = "<group>"; };
 		B3217A5B8A37DD8207DD0478 /* AnkiConnectClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnkiConnectClient.swift; sourceTree = "<group>"; };
@@ -456,6 +462,7 @@
 		D877127DC8DE4B1DC47FD222 /* CaptureSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSourceTests.swift; sourceTree = "<group>"; };
 		DAEF1816A1425DA0E733D8F2 /* GenerationConcurrencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationConcurrencyTests.swift; sourceTree = "<group>"; };
 		DC884E8F1288033F883B48CF /* Flashcard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Flashcard.swift; sourceTree = "<group>"; };
+		DE7C96F09E2E6AAE301ACC7B /* CodexACPModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexACPModelTests.swift; sourceTree = "<group>"; };
 		DEFFE93A6E024028A8D2535C /* YUFinalsScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUFinalsScheduleTests.swift; sourceTree = "<group>"; };
 		DF820DB24255443A5561D031 /* GoogleDocsError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDocsError.swift; sourceTree = "<group>"; };
 		E4A00E389C268DAA3F3B2249 /* LecternBundleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LecternBundleService.swift; sourceTree = "<group>"; };
@@ -694,6 +701,7 @@
 				A1D551E9087618C5ABA17D11 /* CanvasZoomInvitationTests.swift */,
 				D877127DC8DE4B1DC47FD222 /* CaptureSourceTests.swift */,
 				795B08D1A7D6BBE0408B836A /* ChatStudyMaterialTests.swift */,
+				DE7C96F09E2E6AAE301ACC7B /* CodexACPModelTests.swift */,
 				2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */,
 				5EFC9513E7B49CB7D61BB270 /* CourseChatWorkspaceTests.swift */,
 				F2ECE882547DAE6ABCD5EC51 /* ExportAvailabilityTests.swift */,
@@ -707,6 +715,7 @@
 				518365DD00A2D4A18C56E752 /* TranscriptionProviderTests.swift */,
 				19D56AFC425AC6CD11467211 /* TranscriptionQueueTests.swift */,
 				D1E39D3732B1EA6046B6E88E /* TranscriptionReliabilityTests.swift */,
+				B03E539CC61DDBD10FC01C43 /* TranscriptSearchIndexTests.swift */,
 				FB4B3824CB1D4AC6708E4167 /* YUAcademicCalendarTests.swift */,
 				2A52EC7E25317184992745DA /* YUBannerScheduleTests.swift */,
 				DEFFE93A6E024028A8D2535C /* YUFinalsScheduleTests.swift */,
@@ -860,6 +869,14 @@
 			path = Generation;
 			sourceTree = "<group>";
 		};
+		DCFF841C08AAD572F62E6E98 /* Search */ = {
+			isa = PBXGroup;
+			children = (
+				635A6925B66AFC792CA9184A /* TranscriptSearchIndex.swift */,
+			);
+			path = Search;
+			sourceTree = "<group>";
+		};
 		E426C66DE1F37069936FFF25 /* Capture */ = {
 			isa = PBXGroup;
 			children = (
@@ -905,6 +922,7 @@
 				32B2723A56AB6D65DEFBC786 /* Onboarding */,
 				79DF3FC9D9044DFF8596F9CB /* Playback */,
 				EB5FA05316086CBB9824A308 /* Polish */,
+				DCFF841C08AAD572F62E6E98 /* Search */,
 				47E62AF6D84ADFFB56F07C78 /* Sources */,
 				2489DBF6B64B0D74CD8BEA6F /* System */,
 				BF45E89D7A9ABE2958901FAB /* Theme */,
@@ -1063,6 +1081,7 @@
 				CD2B69B1C89D6EB5DABE99C9 /* ChatStudyMaterial.swift in Sources */,
 				CABD6D162811234B10E2B754 /* ChatStudyMaterialSheet.swift in Sources */,
 				3E33F385DAAC6FCB6B1566F3 /* ChatStudyMaterialTests.swift in Sources */,
+				5C50725450AE41AB8799FD90 /* CodexACPModelTests.swift in Sources */,
 				4120AFA2BDA35DD20981806A /* Color+Hex.swift in Sources */,
 				5F48CA518FE926E6F2B01953 /* CompletionNotificationTests.swift in Sources */,
 				B0183D74ECA0C677FCFD815A /* CompletionNotifier.swift in Sources */,
@@ -1147,6 +1166,8 @@
 				30F7B378A5B8ADCF0625B18A /* SuperAppShellView.swift in Sources */,
 				6AC221B5CC644CE1D388095D /* SurfacePreferences.swift in Sources */,
 				4BBF4BC45D57B67037B3D8EB /* SystemAudioCapture.swift in Sources */,
+				D7DC50640EA47B280CA52062 /* TranscriptSearchIndex.swift in Sources */,
+				6BED6B745EEF9343963D311E /* TranscriptSearchIndexTests.swift in Sources */,
 				7F0009FE113361CACCC6C656 /* TranscriptSegment.swift in Sources */,
 				06133C6E092C241645CD641E /* TranscriptionChunkConcurrencyTests.swift in Sources */,
 				6A76C2ADF7EFA80AF37CFE81 /* TranscriptionChunkStore.swift in Sources */,
@@ -1294,6 +1315,7 @@
 				E2247E43FA042CD00F6D8F62 /* SuperAppShellView.swift in Sources */,
 				CB51F1710B7BFE7BFED515EE /* SurfacePreferences.swift in Sources */,
 				276F21DE6B35560E7A147181 /* SystemAudioCapture.swift in Sources */,
+				C869E495F17C18FCE0F8AD1A /* TranscriptSearchIndex.swift in Sources */,
 				54CC63CA6BCF1FC7456E54AF /* TranscriptSegment.swift in Sources */,
 				3C13E32B51810AAE1406DF8C /* TranscriptionChunkStore.swift in Sources */,
 				3C19C3525862F290CD24851F /* TranscriptionEngine.swift in Sources */,

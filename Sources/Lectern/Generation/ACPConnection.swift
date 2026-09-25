@@ -103,13 +103,25 @@ final class ACPConnection: @unchecked Sendable {
             throw ACPError.spawnFailed("\(profile.executablePath) not found")
         }
 
-        var environment = ProcessInfo.processInfo.environment
-        environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + (environment["PATH"] ?? "")
+        let environment = spawnEnvironment(profile: profile)
         return try await connect(
             executableURL: URL(fileURLWithPath: executable),
             arguments: profile.arguments,
             environment: environment
         )
+    }
+
+    static func spawnEnvironment(
+        profile: AgentProfile,
+        base: [String: String] = ProcessInfo.processInfo.environment
+    ) -> [String: String] {
+        var environment = base
+        environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + (environment["PATH"] ?? "")
+        if profile.id == AgentProfiles.codexID,
+           let codex = AgentModelCatalogLoader.resolveCodexCLI(from: profile, environment: environment) {
+            environment["CODEX_PATH"] = codex
+        }
+        return environment
     }
 
     static func connect(
@@ -332,16 +344,33 @@ final class ACPConnection: @unchecked Sendable {
         )
     }
 
-    /// Applies the user's model and thinking selections through config
-    /// options (T3 Code's path), falling back to `session/set_model`.
-    func applyGenerationSettings(session: SessionInfo, model: String?, thinkingLevel: String) async {
+    /// Applies the user's model and thinking selections through ACP config
+    /// options, falling back to `session/set_model` for older agents.
+    func applyGenerationSettings(session: SessionInfo, model: String?, thinkingLevel: String) async throws {
         if let model, !model.isEmpty {
-            if let option = session.option(category: "model") {
-                let value = Self.bestValueMatch(target: model, in: option.values.map(\.id)) ?? model
-                await setConfigOption(sessionID: session.id, configID: option.id, value: value)
-            } else {
-                let value = Self.bestValueMatch(target: model, in: session.availableModelIDs) ?? model
-                await setModel(sessionID: session.id, modelID: value)
+            let option = session.option(category: "model")
+            let available = option?.values.map(\.id) ?? session.availableModelIDs
+            guard available.isEmpty || Self.bestValueMatch(target: model, in: available) != nil else {
+                throw ACPError.requestFailed(
+                    code: -32602,
+                    message: "Model '\(model)' is unavailable in the ACP session. Choose an available model or update the agent."
+                )
+            }
+            let value = Self.bestValueMatch(target: model, in: available) ?? model
+            do {
+                if let option {
+                    try await requireConfigOption(sessionID: session.id, configID: option.id, value: value)
+                } else {
+                    _ = try await request(
+                        method: "session/set_model",
+                        params: ["sessionId": session.id, "modelId": value]
+                    )
+                }
+            } catch {
+                throw ACPError.requestFailed(
+                    code: -32602,
+                    message: "Could not select model '\(model)' in the ACP session: \(error.localizedDescription)"
+                )
             }
         }
 

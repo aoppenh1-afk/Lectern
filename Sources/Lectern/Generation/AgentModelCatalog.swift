@@ -23,9 +23,9 @@ struct AgentModelCatalog: Sendable {
     static let empty = AgentModelCatalog(models: [], currentID: nil)
 }
 
-/// Loads the models ChatGPT (Codex) and OpenCode actually expose, the same
-/// way T3 Code does: Codex `app-server` `model/list`, OpenCode `opencode models`
-/// filtered to signed-in providers.
+/// Loads the models ChatGPT (Codex) and OpenCode actually expose: Codex via
+/// `app-server` `model/list`, OpenCode via `opencode models` filtered to
+/// signed-in providers.
 enum AgentModelCatalogLoader {
     private static let cacheTTL: TimeInterval = 5 * 60
     private static let mutex = Mutex()
@@ -150,7 +150,14 @@ enum AgentModelCatalogLoader {
         return CodexPage(models: models, nextCursor: cursor?.isEmpty == true ? nil : cursor)
     }
 
-    static func resolveCodexCLI(from profile: AgentProfile) -> String? {
+    static func resolveCodexCLI(
+        from profile: AgentProfile,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String? {
+        if let configured = environment["CODEX_PATH"],
+           FileManager.default.isExecutableFile(atPath: configured) {
+            return configured
+        }
         if let found = AgentProfiles.resolveExecutable("codex") { return found }
 
         let spawn = profile.executablePath
@@ -158,7 +165,8 @@ enum AgentModelCatalogLoader {
             let candidate = String(spawn.dropLast("codex-acp".count)) + "codex"
             if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
         }
-        if spawn.lowercased().contains("codex"), FileManager.default.isExecutableFile(atPath: spawn) {
+        if URL(fileURLWithPath: spawn).lastPathComponent == "codex",
+           FileManager.default.isExecutableFile(atPath: spawn) {
             return spawn
         }
         return nil
