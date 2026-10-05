@@ -128,19 +128,24 @@ struct SuperAppShellView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            commandSidebar
-            destination
-                .workspaceCard()
-                .padding(.top, 12)
-                .padding(.bottom, 12)
-                .padding(.trailing, 12)
-                .padding(.leading, 8)
+        // Match the window. A minimum wider than the window is centered, so
+        // leaving fullscreen clips the sidebar and the trailing controls.
+        GeometryReader { proxy in
+            HStack(spacing: 0) {
+                commandSidebar
+                destination
+                    .workspaceCard()
+                    .padding(.top, 12)
+                    .padding(.bottom, 12)
+                    .padding(.trailing, 12)
+                    .padding(.leading, 8)
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+            .clipped()
         }
         .appCanvas()
         .ignoresSafeArea()
         .background(WindowConfigurationView())
-        .frame(minWidth: 1180, minHeight: 760)
         .task(priority: .utility) {
             // Let SwiftUI commit the cached dashboard before maintenance touches SwiftData.
             try? await Task.sleep(for: .milliseconds(450))
@@ -302,7 +307,7 @@ struct SuperAppShellView: View {
 
     private var destination: some View {
         destinationView(for: selection)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder

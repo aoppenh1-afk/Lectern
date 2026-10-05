@@ -120,6 +120,7 @@
 		5D4CA351DF51CD0C2C7A4A92 /* Course.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB56BD82F43139025F591D2F /* Course.swift */; };
 		5F08F096764B873351ED1A90 /* QuizReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E407430088644634374A45C /* QuizReviewView.swift */; };
 		5F48CA518FE926E6F2B01953 /* CompletionNotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AE3E3D9CC694034BC136541 /* CompletionNotificationTests.swift */; };
+		6030CB2FD2D2544A6FBD869C /* LectureLibraryColumnsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9C879B215319AC8AE06A0DE /* LectureLibraryColumnsTests.swift */; };
 		60DEBBDDA8C0AAD05944FE97 /* ShiurSubscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43BAFC671A118892D77577AD /* ShiurSubscription.swift */; };
 		632ECC37941AD9BFB8C66895 /* LectureDocumentExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 061C2A9944E44D8A633CC026 /* LectureDocumentExportService.swift */; };
 		641EFB3A6575F12F62A44257 /* CanvasModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C125CBCA32F7C013115044A9 /* CanvasModels.swift */; };
@@ -428,6 +429,7 @@
 		A1D551E9087618C5ABA17D11 /* CanvasZoomInvitationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomInvitationTests.swift; sourceTree = "<group>"; };
 		A763F772641D5D2F5F79CDB9 /* CanvasSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasSettingsView.swift; sourceTree = "<group>"; };
 		A80840764862370BCD46CACE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A9C879B215319AC8AE06A0DE /* LectureLibraryColumnsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureLibraryColumnsTests.swift; sourceTree = "<group>"; };
 		A9D3AE061392BC596F79D58F /* MCPSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSettingsView.swift; sourceTree = "<group>"; };
 		AF5F8AD0523C9B706BEB2A80 /* YUFinalExam.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUFinalExam.swift; sourceTree = "<group>"; };
 		B03E539CC61DDBD10FC01C43 /* TranscriptSearchIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSearchIndexTests.swift; sourceTree = "<group>"; };
@@ -709,6 +711,7 @@
 				BA475B8E4EACE8E555128177 /* GoogleDocsSyncTests.swift */,
 				4423ED80F0768A3752F0DC45 /* GoogleOAuthConfigurationTests.swift */,
 				46C4BC4B87A44CE7C458F8C7 /* LecternCloudSharingTests.swift */,
+				A9C879B215319AC8AE06A0DE /* LectureLibraryColumnsTests.swift */,
 				60F064ED1D8D8F65643B9E53 /* NotesMarkdownTests.swift */,
 				6751001A8F37F6C85CC1E4FC /* TranscriptionChunkConcurrencyTests.swift */,
 				47F3381A1B1C6B6A3BBD716F /* TranscriptionConcurrentACPTests.swift */,
@@ -1130,6 +1133,7 @@
 				45CD9772D6C4F694F70ECC83 /* LectureExportAvailability.swift in Sources */,
 				809986650E99301152093682 /* LectureImportPicker.swift in Sources */,
 				AB2FECAA6D4132BAFE9B08BA /* LectureImportService.swift in Sources */,
+				6030CB2FD2D2544A6FBD869C /* LectureLibraryColumnsTests.swift in Sources */,
 				0BE6A96BF3F7762C36D2F872 /* LiveBookmark.swift in Sources */,
 				54EDF39C4881E27E83B1287F /* LocalModelAvailability.swift in Sources */,
 				E465A572EDFE4E4DE5C2EE56 /* MCPSettingsView.swift in Sources */,

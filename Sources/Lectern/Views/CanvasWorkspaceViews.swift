@@ -40,7 +40,8 @@ struct StudioDropdown<Value: Hashable>: View {
             }
             .foregroundStyle(LecternTheme.ink)
             .padding(.horizontal, 11)
-            .frame(width: width, height: 38)
+            .frame(minWidth: min(120, width), idealWidth: width, maxWidth: width)
+            .frame(height: 38)
             .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
             .shadow(color: Color.black.opacity(0.04), radius: 5, y: 1)
@@ -1833,23 +1834,7 @@ struct CanvasAssignmentsView: View {
 
     var body: some View {
         StudioPage(title: "Assignments", subtitle: "Fall 2026 work, filterable by course and status") {
-            HStack {
-                Picker("Filter", selection: $filter) { ForEach(Filter.allCases) { Text($0.rawValue).tag($0) } }
-                    .pickerStyle(.segmented).frame(width: 380)
-                Spacer()
-                StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: 230, icon: "book.closed")
-                TextField("Search assignments", text: $search).textFieldStyle(.roundedBorder).frame(width: 260)
-                Button { showingAddSheet = true } label: {
-                    Label("Add Assignment", systemImage: "plus")
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .help("Add a personal assignment")
-            }
+            assignmentFilters
             ScrollView {
                 LazyVStack(spacing: 10) {
                     if visible.isEmpty { ContentUnavailableView("No assignments", systemImage: "checklist", description: Text("Nothing matches this view.")) }
@@ -1865,6 +1850,63 @@ struct CanvasAssignmentsView: View {
         .sheet(item: $editingAssignment) { assignment in
             ManualAssignmentSheet(editing: assignment, courses: courses)
         }
+    }
+
+    /// One row when the card is wide, two when a windowed frame would
+    /// otherwise push the add button past the window edge.
+    private var assignmentFilters: some View {
+        ViewThatFits(in: .horizontal) {
+            assignmentFilterRow(pickerWidth: 380, courseWidth: 230, searchWidth: 260, spacing: 16)
+            assignmentFilterRow(pickerWidth: 300, courseWidth: 168, searchWidth: 150, spacing: 8)
+            VStack(alignment: .leading, spacing: 10) {
+                filterPicker
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: 200, icon: "book.closed")
+                    TextField("Search assignments", text: $search)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(minWidth: 0, maxWidth: .infinity)
+                    addAssignmentButton
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func assignmentFilterRow(pickerWidth: CGFloat, courseWidth: CGFloat, searchWidth: CGFloat, spacing: CGFloat) -> some View {
+        HStack(spacing: 8) {
+            filterPicker.frame(width: pickerWidth)
+            Color.clear.frame(width: spacing)
+            StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: courseWidth, icon: "book.closed")
+            TextField("Search assignments", text: $search)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: searchWidth)
+            addAssignmentButton
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var filterPicker: some View {
+        Picker("Filter", selection: $filter) {
+            ForEach(Filter.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .accessibilityLabel("Filter")
+    }
+
+    private var addAssignmentButton: some View {
+        Button { showingAddSheet = true } label: {
+            Label("Add Assignment", systemImage: "plus")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .fixedSize(horizontal: true, vertical: true)
+        .help("Add a personal assignment")
     }
 
     @ViewBuilder

@@ -252,6 +252,7 @@ struct LecternApp: App {
                 }
         }
         .modelContainer(container)
+        .defaultSize(width: 1280, height: 820)
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .appInfo) {
