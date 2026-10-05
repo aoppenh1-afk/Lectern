@@ -834,26 +834,39 @@ extension View {
 /// Configures the hosting window for edge-to-edge rendering without an opaque titlebar.
 struct WindowConfigurationView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async {
-            if let window = view.window {
-                window.titlebarAppearsTransparent = true
-                window.titleVisibility = .hidden
-                window.styleMask.insert(.fullSizeContentView)
-                window.isOpaque = false
-                window.backgroundColor = .clear
-            }
-        }
-        return view
+        WindowConfiguringView()
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        if let window = nsView.window {
-            window.titlebarAppearsTransparent = true
-            window.titleVisibility = .hidden
-            window.styleMask.insert(.fullSizeContentView)
-            window.isOpaque = false
-            window.backgroundColor = .clear
+        (nsView as? WindowConfiguringView)?.configureWindow()
+    }
+}
+
+private final class WindowConfiguringView: NSView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        configureWindow()
+    }
+
+    func configureWindow() {
+        guard let window else { return }
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.styleMask.insert(.fullSizeContentView)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+
+        // SwiftUI's old minimum was wider than a restored window, and the
+        // overflow was centered. Keep a usable floor on the window itself.
+        let minimum = NSSize(width: 1024, height: 680)
+        if window.contentMinSize != minimum {
+            window.contentMinSize = minimum
         }
+        let content = window.contentRect(forFrameRect: window.frame).size
+        guard content.width + 1 < minimum.width || content.height + 1 < minimum.height else { return }
+        window.setContentSize(NSSize(
+            width: max(content.width, minimum.width),
+            height: max(content.height, minimum.height)
+        ))
     }
 }
