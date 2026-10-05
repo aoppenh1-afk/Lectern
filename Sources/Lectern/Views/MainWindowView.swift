@@ -105,6 +105,16 @@ struct MainWindowView: View {
         return nil
     }
 
+    private var uploadAudioHelp: String {
+        if let selectedCourse {
+            "Upload audio to \(selectedCourse.name) for transcription"
+        } else if selection == .unfiled {
+            "Upload audio to Unfiled for transcription"
+        } else {
+            "Select a course to upload audio"
+        }
+    }
+
     private var visibleCourses: [Course] {
         guard let allowedCourseIDs else { return courses }
         return courses.filter { allowedCourseIDs.contains($0.persistentModelID) }
@@ -152,10 +162,9 @@ struct MainWindowView: View {
                 .foregroundStyle(LecternTheme.ink)
             }
             .buttonStyle(.plain)
-            .disabled(selectedCourse == nil)
-            .opacity(selectedCourse == nil ? 0.45 : 1)
-            .help(selectedCourse.map { "Upload audio to \($0.name) for transcription" }
-                  ?? "Select a course to upload audio")
+            .disabled(selection == nil)
+            .opacity(selection == nil ? 0.45 : 1)
+            .help(uploadAudioHelp)
 
             Spacer()
 
@@ -894,12 +903,12 @@ struct MainWindowView: View {
         }
     }
 
-    private func importAudioLecture(autoTranscribe: Bool = false) {
+    private func importAudioLecture(into course: Course? = nil, autoTranscribe: Bool = false) {
         guard let url = LectureImportPicker.chooseAudioFile() else { return }
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
         do {
-            let lecture = try capture.importAudio(at: url, into: selectedCourse)
+            let lecture = try capture.importAudio(at: url, into: course ?? selectedCourse)
             if autoTranscribe {
                 selectedLecture = lecture
                 if transcriptionPreferences.source != .askEachTime {
@@ -1019,7 +1028,13 @@ struct MainWindowView: View {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let color = LecternTheme.coursePalette[visibleCourses.count % LecternTheme.coursePalette.count]
-        modelContext.insert(Course(name: trimmed, colorHex: color, language: language))
+        let course = Course(name: trimmed, colorHex: color, language: language)
+        modelContext.insert(course)
+        try? modelContext.save()
+        // Select the new course so toolbar actions (Upload Audio, Record)
+        // target it immediately. Otherwise selection stays on Unfiled and
+        // the first audio import into a new course appears to do nothing.
+        selection = .course(course)
     }
 
     private func deleteCourse(_ course: Course) {
