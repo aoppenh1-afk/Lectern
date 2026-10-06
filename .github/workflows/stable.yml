@@ -1,0 +1,128 @@
+name: Stable release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable version (major.minor or major.minor.patch)
+        required: true
+        type: string
+      notes:
+        description: Release notes
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stable-release
+  cancel-in-progress: false
+
+jobs:
+  publish-stable:
+    name: Test and publish stable release
+    if: github.ref == 'refs/heads/main'
+    environment: release-signing
+    runs-on: macos-26
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      LECTERN_GOOGLE_CLIENT_ID: ${{ vars.LECTERN_GOOGLE_CLIENT_ID }}
+      LECTERN_GOOGLE_CLIENT_SECRET: ${{ vars.LECTERN_GOOGLE_CLIENT_SECRET }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Import original release signing identity
+        timeout-minutes: 3
+        env:
+          SIGNING_P12_BASE64: ${{ secrets.LECTERN_SIGNING_P12_BASE64 }}
+          SIGNING_P12_PASSWORD: ${{ secrets.LECTERN_SIGNING_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          if [[ -z "$SIGNING_P12_BASE64" || -z "$SIGNING_P12_PASSWORD" ]]; then
+            echo '::error::Configure LECTERN_SIGNING_P12_BASE64 and LECTERN_SIGNING_P12_PASSWORD in the release-signing environment using the original release certificate. Ad-hoc updates reset recording permissions.'
+            exit 1
+          fi
+          KEYCHAIN_PATH="$RUNNER_TEMP/lectern-signing.keychain-db"
+          P12_PATH="$RUNNER_TEMP/lectern-signing.p12"
+          CERT_PATH="$RUNNER_TEMP/lectern-signing.pem"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          printf '%s' "$SIGNING_P12_BASE64" | base64 --decode > "$P12_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P "$SIGNING_P12_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+          security find-certificate -c 'Lectern Release Signing' -p "$KEYCHAIN_PATH" > "$CERT_PATH"
+          source scripts/release-signing.sh
+          FINGERPRINT="$(openssl x509 -in "$CERT_PATH" -noout -fingerprint -sha1 | cut -d= -f2 | tr -d ':')"
+          [[ "$FINGERPRINT" == "$LECTERN_RELEASE_CERTIFICATE" ]] || { echo '::error::Wrong release certificate'; exit 1; }
+          # User trust changes can wait for a GUI authorization dialog. This
+          # disposable hosted runner permits noninteractive admin trust setup.
+          echo 'Trusting verified release certificate on the temporary runner'
+          sudo -n security add-trusted-cert -d -r trustRoot -p codeSign -k "$KEYCHAIN_PATH" "$CERT_PATH"
+          REQUIRE_CODE_SIGN_IDENTITY=1 resolve_lectern_signing_identity
+          rm -f "$P12_PATH"
+
+      - name: Show macOS / Xcode / SDK
+        run: |
+          set -euo pipefail
+          sw_vers
+          xcodebuild -version
+          git log --oneline -3
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Validate release version and source
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || { echo 'Invalid version'; exit 1; }
+          if git rev-parse --verify "refs/tags/v$RELEASE_VERSION" >/dev/null 2>&1; then
+            echo 'Release tag already exists'
+            exit 1
+          fi
+          [[ "$(git rev-parse HEAD)" == "$(git ls-remote origin refs/heads/main | cut -f1)" ]] || { echo 'Main advanced; dispatch again'; exit 1; }
+          python3 - <<'PYVERSION'
+          import os, re
+          from pathlib import Path
+          current = re.search(r'MARKETING_VERSION: "([^"]+)"', Path('project.yml').read_text())[1]
+          def version(value):
+              parts = tuple(map(int, value.split('.')))
+              return parts + (0,) * (3 - len(parts))
+          assert version(os.environ['RELEASE_VERSION']) > version(current), 'Version must increase'
+          PYVERSION
+
+      - name: Test before publishing
+        run: |
+          set -euo pipefail
+          bash scripts/test-release-signing.sh
+          bash scripts/test-dev-release-signing.sh
+          xcodegen generate
+          xcodebuild -scheme Lectern -destination 'platform=macOS' -derivedDataPath .build/TestDerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=- test
+          bash scripts/test-document-export.sh
+          # Discard only generated project drift; release.sh regenerates it with the new version.
+          git restore -- Lectern.xcodeproj/project.pbxproj Support/Info.plist
+
+      - name: Publish stable release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_NOTES: ${{ inputs.notes }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          scripts/release.sh "$RELEASE_VERSION" --notes "$RELEASE_NOTES"

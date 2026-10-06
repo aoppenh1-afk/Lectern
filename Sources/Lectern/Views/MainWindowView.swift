@@ -50,15 +50,10 @@ struct MainWindowView: View {
         VStack(spacing: 0) {
             toolbar
             Divider()
-            HStack(spacing: 0) {
-                sidebar
-                Divider()
-                listColumn
-                Divider()
-                detailPane
-            }
+            libraryColumns
         }
         .background(LecternTheme.panelFill)
+        .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
         .task {
             if selection == nil {
                 selection = visibleCourses.first.map { SidebarSelection.course($0) } ?? .unfiled
@@ -103,6 +98,16 @@ struct MainWindowView: View {
     private var selectedCourse: Course? {
         if case .course(let course) = selection { return course }
         return nil
+    }
+
+    private var uploadAudioHelp: String {
+        if let selectedCourse {
+            "Upload audio to \(selectedCourse.name) for transcription"
+        } else if selection == .unfiled {
+            "Upload audio to Unfiled for transcription"
+        } else {
+            "Select a course to upload audio"
+        }
     }
 
     private var visibleCourses: [Course] {
@@ -152,10 +157,9 @@ struct MainWindowView: View {
                 .foregroundStyle(LecternTheme.ink)
             }
             .buttonStyle(.plain)
-            .disabled(selectedCourse == nil)
-            .opacity(selectedCourse == nil ? 0.45 : 1)
-            .help(selectedCourse.map { "Upload audio to \($0.name) for transcription" }
-                  ?? "Select a course to upload audio")
+            .disabled(selection == nil)
+            .opacity(selection == nil ? 0.45 : 1)
+            .help(uploadAudioHelp)
 
             Spacer()
 
@@ -203,6 +207,25 @@ struct MainWindowView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var libraryColumns: some View {
+        GeometryReader { proxy in
+            let columns = LectureLibraryColumns.fit(proxy.size.width)
+            HStack(spacing: 0) {
+                sidebar
+                    .frame(width: columns.courses)
+                Divider()
+                listColumn
+                    .frame(width: columns.lectures)
+                Divider()
+                detailPane
+                    .frame(width: columns.detail)
+                    .clipped()
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+        }
     }
 
     private var recordButton: some View {
@@ -304,7 +327,7 @@ struct MainWindowView: View {
 
             Spacer()
         }
-        .frame(width: 244)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(LecternTheme.panelFill)
     }
 
@@ -398,6 +421,8 @@ struct MainWindowView: View {
                     .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? LecternTheme.sidebarSelectedText : LecternTheme.ink)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(minWidth: 0, alignment: .leading)
                 Spacer()
                 Text("\(course.lectures.count)")
                     .font(.system(size: 11).monospacedDigit())
@@ -611,7 +636,7 @@ struct MainWindowView: View {
                 }
             }
         }
-        .frame(width: 316)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     /// Add-lecture entry point: record now or import an existing audio file.
@@ -731,6 +756,8 @@ struct MainWindowView: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(LecternTheme.ink)
                             .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(minWidth: 0, alignment: .leading)
                     }
                     Text("\(lecture.course?.name ?? "Unfiled") · \(shortDate(lecture)) · \(durationLabel(lecture))\(lecture.language == .hebrewEnglish ? " · En+עב" : "")")
                         .font(.system(size: 11))
@@ -894,12 +921,12 @@ struct MainWindowView: View {
         }
     }
 
-    private func importAudioLecture(autoTranscribe: Bool = false) {
+    private func importAudioLecture(into course: Course? = nil, autoTranscribe: Bool = false) {
         guard let url = LectureImportPicker.chooseAudioFile() else { return }
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
         do {
-            let lecture = try capture.importAudio(at: url, into: selectedCourse)
+            let lecture = try capture.importAudio(at: url, into: course ?? selectedCourse)
             if autoTranscribe {
                 selectedLecture = lecture
                 if transcriptionPreferences.source != .askEachTime {
@@ -1019,7 +1046,13 @@ struct MainWindowView: View {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let color = LecternTheme.coursePalette[visibleCourses.count % LecternTheme.coursePalette.count]
-        modelContext.insert(Course(name: trimmed, colorHex: color, language: language))
+        let course = Course(name: trimmed, colorHex: color, language: language)
+        modelContext.insert(course)
+        try? modelContext.save()
+        // Select the new course so toolbar actions (Upload Audio, Record)
+        // target it immediately. Otherwise selection stays on Unfiled and
+        // the first audio import into a new course appears to do nothing.
+        selection = .course(course)
     }
 
     private func deleteCourse(_ course: Course) {
@@ -1038,6 +1071,44 @@ struct MainWindowView: View {
 
     private func durationLabel(_ lecture: Lecture) -> String {
         Duration.seconds(lecture.duration).formatted(.time(pattern: .hourMinuteSecond))
+    }
+}
+
+/// Course, lecture, and detail widths for the library inside the workspace card.
+/// The detail stays wide enough for the transcribe controls; the lists give up
+/// width first when the window is not fullscreen.
+struct LectureLibraryColumns: Equatable {
+    var courses: CGFloat
+    var lectures: CGFloat
+    var detail: CGFloat
+
+    static let coursesMax: CGFloat = 244
+    static let lecturesMax: CGFloat = 316
+    static let coursesMin: CGFloat = 176
+    static let lecturesMin: CGFloat = 210
+    static let detailMin: CGFloat = 360
+
+    static func fit(_ totalWidth: CGFloat) -> LectureLibraryColumns {
+        let dividers: CGFloat = 2
+        let usable = max(0, totalWidth - dividers)
+        var courses = coursesMax
+        var lectures = lecturesMax
+        var detail = usable - courses - lectures
+        if detail < detailMin {
+            var deficit = detailMin - detail
+            let fromLectures = min(max(0, lectures - lecturesMin), deficit)
+            lectures -= fromLectures
+            deficit -= fromLectures
+            let fromCourses = min(max(0, courses - coursesMin), deficit)
+            courses -= fromCourses
+            detail = usable - courses - lectures
+        }
+        if detail < 0 {
+            courses = min(coursesMin, usable)
+            lectures = min(lecturesMin, max(0, usable - courses))
+            detail = max(0, usable - courses - lectures)
+        }
+        return LectureLibraryColumns(courses: courses, lectures: lectures, detail: detail)
     }
 }
 

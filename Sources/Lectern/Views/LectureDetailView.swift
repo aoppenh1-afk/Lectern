@@ -41,8 +41,8 @@ struct LectureDetailView: View {
                 }
                 .padding(.horizontal, 28)
                 .padding(.vertical, 24)
-                .frame(maxWidth: LecternTheme.readingWidth + 56)
-                .frame(maxWidth: .infinity)
+                .frame(minWidth: 0, maxWidth: LecternTheme.readingWidth + 56)
+                .frame(minWidth: 0, maxWidth: .infinity)
             }
             .onChange(of: jumpRequest) { _, _ in
                 guard let offset = jumpBookmarkOffset,
@@ -70,10 +70,10 @@ struct LectureDetailView: View {
                     .font(.system(size: 26, weight: .bold, design: .serif))
                     .foregroundStyle(LecternTheme.ink)
                     .textFieldStyle(.plain)
-                    .lineLimit(2)
+                    .lineLimit(1...4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                     .help("Click to rename this lecture")
-
-                Spacer(minLength: 12)
 
                 Button(action: onAttachFiles) {
                     Label("Add files", systemImage: "paperclip.badge.plus")
@@ -83,6 +83,7 @@ struct LectureDetailView: View {
                         .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
+                .fixedSize(horizontal: true, vertical: true)
                 .foregroundStyle(.secondary)
                 .help("Attach notes or slides to this lecture")
             }
@@ -96,9 +97,14 @@ struct LectureDetailView: View {
                         Text(course.name)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .frame(minWidth: 0, alignment: .leading)
                     }
                 }
                 MetaText(heroMeta)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             }
 
             if let sourceSummary = lecture.sourceProvenanceSummary {
@@ -156,28 +162,23 @@ struct LectureDetailView: View {
         switch lecture.status {
         case .recorded:
             SurfaceCard(padding: 14) {
-                HStack(spacing: 12) {
-                    Image(systemName: "waveform.badge.plus")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(LecternTheme.accent)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(lecture.statusMessage ?? "Recording saved")
-                            .font(.system(size: 13, weight: .medium))
-                        Text("Transcription will start only when you choose it.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        recordedSummary
+                        Spacer(minLength: 12)
+                        recordingLanguagePicker
+                        transcribeNowButton
+                        transcriptionChoiceMenu(label: "Choose transcriber")
                     }
-                    Spacer()
-                    recordingLanguagePicker
-                    Button("Transcribe") {
-                        transcription.retranscribe(lecture, as: lecture.language)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        recordedSummary
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        recordedControls
                     }
-                    .prominentAction()
-                    .tint(LecternTheme.accent)
-                    .disabled(transcription.isQueuedOrRunning(lectureID: lecture.persistentModelID)
-                              || transcription.isCancelling(lectureID: lecture.persistentModelID))
-                    transcriptionChoiceMenu(label: "Choose transcriber")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         case .transcribing:
             SurfaceCard(padding: 14) {
@@ -286,6 +287,58 @@ struct LectureDetailView: View {
                 : nil,
             language: lecture.language
         ).progressSubtitle(connectionName: lecture.transcriptConnectionName)
+    }
+
+    private var recordedSummary: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "waveform.badge.plus")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(LecternTheme.accent)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(lecture.statusMessage ?? "Recording saved")
+                    .font(.system(size: 13, weight: .medium))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Transcription will start only when you choose it.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(minWidth: 0, alignment: .leading)
+        }
+    }
+
+    private var recordedControls: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                recordingLanguagePicker
+                Spacer(minLength: 8)
+                transcribeNowButton
+                transcriptionChoiceMenu(label: "Choose transcriber")
+            }
+            .fixedSize(horizontal: true, vertical: false)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    recordingLanguagePicker
+                    Spacer(minLength: 8)
+                    transcribeNowButton
+                }
+                transcriptionChoiceMenu(label: "Choose transcriber", fillsWidth: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var transcribeNowButton: some View {
+        Button("Transcribe") {
+            transcription.retranscribe(lecture, as: lecture.language)
+        }
+        .prominentAction()
+        .tint(LecternTheme.accent)
+        .disabled(transcription.isQueuedOrRunning(lectureID: lecture.persistentModelID)
+                  || transcription.isCancelling(lectureID: lecture.persistentModelID))
+        .fixedSize(horizontal: true, vertical: true)
     }
 
     private var recordingLanguagePicker: some View {
@@ -453,7 +506,7 @@ struct LectureDetailView: View {
         .help("Generate clean transcription & notes")
     }
 
-    private func transcriptionChoiceMenu(label: String) -> some View {
+    private func transcriptionChoiceMenu(label: String, fillsWidth: Bool = false) -> some View {
         transcriptionPickerButton {
             HStack(spacing: 8) {
                 Text(label)
@@ -467,13 +520,18 @@ struct LectureDetailView: View {
             .foregroundStyle(LecternTheme.ink)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .frame(minWidth: 160)
+            .frame(
+                minWidth: fillsWidth ? 0 : 160,
+                maxWidth: fillsWidth ? .infinity : nil,
+                alignment: .leading
+            )
             .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
             }
         }
+        .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
     }
 
     private func transcriptionPickerButton<Content: View>(@ViewBuilder label: () -> Content) -> some View {
