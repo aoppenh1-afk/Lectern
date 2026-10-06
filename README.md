@@ -117,7 +117,15 @@ Releases currently use a persistent self-signed certificate. This preserves the 
 
 Builds and releases are pinned to the original `Lectern Release Signing` certificate fingerprint in `scripts/release-signing.sh`. On another Mac, import the existing `.p12` backup into your login Keychain. Creating a new certificate with the same name does not preserve Keychain access. The setup helper is only for establishing a new identity, not restoring this app's release identity.
 
-Run a release with:
+Stable releases can be published from any environment with repository workflow access:
+
+```sh
+gh workflow run stable.yml --ref main -f version=2.8 -f notes="What changed"
+```
+
+The manual workflow tests the app on a macOS runner, imports the original signing identity from the `release-signing` environment, and runs the release script below. Dispatch it on `main` with a version higher than the current version.
+
+On a Mac with the original signing identity, run a release with:
 
 ```bash
 scripts/release.sh 1.3.1 --notes "What changed"
