@@ -26,7 +26,7 @@ Do not combine transcription with note-taking. Never summarize, outline, explain
 - In audio mode, retain natural spoken wording and false starts when they affect meaning. In cleanup mode, remove filler, stutters, abandoned false starts, and accidental duplicate fragments.
 - Repair only what the audio or nearby context supports. Mark unintelligible audio as `[unclear]`. Use `[unclear: likely TERM]` only when the evidence supports that likely reading.
 - Represent a meaningful sound such as `[laughter]` or `[long pause]` sparingly. Do not narrate ordinary silence or room noise.
-- Preserve code-switching where it occurs. Keep surrounding English in English and recognizable Hebrew or Aramaic terminology in Hebrew script.
+- Preserve code-switching where it occurs. Keep surrounding English in English and recognizable Hebrew or Aramaic terminology in Hebrew script, subject to the English-spelling exceptions in the shiur branch below.
 
 ## English lecture branch
 
@@ -37,13 +37,14 @@ Do not combine transcription with note-taking. Never summarize, outline, explain
 
 Expect English, Hebrew, Aramaic, and Yeshivish vocabulary inside the same sentence.
 
-- Render recognizable Torah terms, source names, masechtos, sefarim, pesukim, and halachic vocabulary in standard Hebrew script, even when speech recognition used Latin transliteration or a similar-sounding English word.
+- Render recognizable Torah terms, source names, masechtos, sefarim, pesukim, and halachic vocabulary in standard Hebrew script, except for the English spellings listed below, even when speech recognition used Latin transliteration or a similar-sounding English word.
+- In both audio transcription and transcript cleanup, keep `davening`, `leining`, `bentching`, `shul`, `yahrzeit`, `yeshiva`, and `chavrusa` in English spelling, including their inflected forms such as `daven`, `davened`, `lein`, and `leined`. Keep other Torah terms in Hebrew script unless the student requests another exception. Preserve Hebrew wording in source quotations.
 - Use English for the connective reasoning. A natural mixed sentence looks like: `The גמ׳ asks on תוס׳, and רש״י answers that the מוחזק keeps the ממון.`
 - Prefer the user's established forms: `גמ׳`, `תוס׳`, `רש״י`, `רמב״ן`, `רמב״ם`, `רא״ש`, `רשב״א`, `משנה`, `מיגו`, `שבועה`, `חזקה`, `עדים`, `ספק`, `מוחזק`, `יחלוקו`, `ממון`, `תפיסה`, `קנין`, `טענה`, `הלכה`, `דין`, `ק״ו`, `ד״ה`, `ב״ד`, `נ״מ`, and `המע״ה`.
 - Use the exact source abbreviation when it is recognizable. Do not expand `גמ׳` to `גמרא` or `תוס׳` to `תוספות` merely for formality.
 - Write the Hebrew gershayim `״` and geresh `׳`, not ASCII `"` or `'`. Write daf references the way the student does: `דף ב.` for the first עמוד and `דף ב:` for the second.
 - Do not add ניקוד. Do not append an English translation after every Hebrew term.
-- Keep a Latin transliteration only when the speaker explicitly discusses that spelling or the intended Hebrew form cannot be established safely.
+- For terms outside the English-spelling exceptions above, keep a Latin transliteration only when the speaker explicitly discusses that spelling or the intended Hebrew form cannot be established safely.
 - Preserve separate שיטות, קושיות, תירוצים, and cases as separate speech. Do not resolve a מחלוקת for the speaker.
 - When the speaker reads a line of גמ׳, רש״י, or תוס׳ aloud, transcribe the quoted line in Hebrew script and keep the explanation that follows in English.
 
