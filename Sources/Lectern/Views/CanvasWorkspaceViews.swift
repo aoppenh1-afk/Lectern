@@ -1876,7 +1876,9 @@ struct CanvasAssignmentsView: View {
     private func assignmentFilterRow(pickerWidth: CGFloat, courseWidth: CGFloat, searchWidth: CGFloat, spacing: CGFloat) -> some View {
         HStack(spacing: 8) {
             filterPicker.frame(width: pickerWidth)
-            Color.clear.frame(width: spacing)
+            // This gap is horizontal only; an unconstrained Color also fills
+            // the available height and pushes the assignment list down.
+            Color.clear.frame(width: spacing, height: 0)
             StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: courseWidth, icon: "book.closed")
             TextField("Search assignments", text: $search)
                 .textFieldStyle(.roundedBorder)
