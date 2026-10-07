@@ -131,7 +131,7 @@ struct SuperAppShellView: View {
         // Match the window. A minimum wider than the window is centered, so
         // leaving fullscreen clips the sidebar and the trailing controls.
         GeometryReader { proxy in
-            HStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 0) {
                 commandSidebar
                 destination
                     .workspaceCard()

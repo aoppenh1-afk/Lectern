@@ -299,7 +299,9 @@ struct CanvasCalendarView: View {
     }
 
     private var monthView: some View {
-        VStack(spacing: 0) {
+        // Keep the six-week grid inside the window instead of making the
+        // entire workspace taller when there is less vertical room.
+        ScrollView(.vertical) {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 0) {
                 ForEach(Calendar.current.shortWeekdaySymbols, id: \.self) { Text($0.uppercased()).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 9) }
                 ForEach(monthDates, id: \.self) { day in monthCell(day) }
@@ -399,7 +401,6 @@ struct CanvasCalendarView: View {
                 }
             }
         }
-        .frame(minHeight: 580)
     }
 
     private func weekDayHeader(_ day: Date) -> some View {
@@ -1863,10 +1864,10 @@ struct CanvasAssignmentsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) {
                     StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: 200, icon: "book.closed")
+                    addAssignmentButton
                     TextField("Search assignments", text: $search)
                         .textFieldStyle(.roundedBorder)
                         .frame(minWidth: 0, maxWidth: .infinity)
-                    addAssignmentButton
                 }
             }
         }
@@ -1880,10 +1881,10 @@ struct CanvasAssignmentsView: View {
             // the available height and pushes the assignment list down.
             Color.clear.frame(width: spacing, height: 0)
             StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: courseWidth, icon: "book.closed")
+            addAssignmentButton
             TextField("Search assignments", text: $search)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: searchWidth)
-            addAssignmentButton
         }
         .fixedSize(horizontal: true, vertical: false)
     }

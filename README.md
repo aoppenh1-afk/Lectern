@@ -134,7 +134,7 @@ The command above explicitly uses ad-hoc signing for a local build. Maintainers 
 xcodebuild -scheme Lectern -destination 'platform=macOS' test
 ```
 
-See [GitHub automation](.github/README.md) for CI checks, security scans, dependency
+See [GitHub automation](.github/AUTOMATION.md) for CI checks, security scans, dependency
 updates, and the checks that still need a local run.
 
 ## Install this repo for the user
