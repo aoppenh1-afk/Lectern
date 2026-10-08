@@ -92,19 +92,62 @@ struct ChatStudyMaterial: Codable, Identifiable {
 
     static func parse(_ response: String, request: ChatStudyRequest,
                       sourceLabels: [String], modelInfo: String) throws -> Self {
-        var json = response.trimmingCharacters(in: .whitespacesAndNewlines)
-        if json.hasPrefix("```"), let firstBreak = json.firstIndex(of: "\n"), json.hasSuffix("```") {
-            json = String(json[json.index(after: firstBreak)..<json.index(json.endIndex, offsetBy: -3)])
-        }
-        let payload: Payload
-        do { payload = try JSONDecoder().decode(Payload.self, from: Data(json.utf8)) }
-        catch { throw MaterialError.invalid("The AI returned an unreadable draft. Try generating it again.") }
+        let payload = try decodePayload(from: response)
         let material = Self(kind: request.kind, title: payload.title.trimmed,
                             markdown: payload.markdown?.trimmed ?? "",
                             cards: payload.cards ?? [], questions: payload.questions ?? [],
                             sourceLabels: sourceLabels, modelInfo: modelInfo)
         try material.validate()
         return material
+    }
+
+    /// ACP can stream progress text before the final JSON. Accept one complete
+    /// payload inside that text, without repairing or salvaging partial decks.
+    private static func decodePayload(from response: String) throws -> Payload {
+        let decoder = JSONDecoder()
+        if let payload = try? decoder.decode(Payload.self, from: Data(response.utf8)) {
+            return payload
+        }
+
+        var start: String.Index?
+        var depth = 0
+        var inString = false
+        var escaped = false
+        var payload: Payload?
+        for index in response.indices {
+            let character = response[index]
+            if start == nil {
+                guard character == "{" else { continue }
+                start = index
+                depth = 1
+                continue
+            }
+            if inString {
+                if escaped { escaped = false }
+                else if character == "\\" { escaped = true }
+                else if character == "\"" { inString = false }
+                continue
+            }
+            if character == "\"" { inString = true }
+            else if character == "{" { depth += 1 }
+            else if character == "}" {
+                depth -= 1
+                guard depth == 0, let candidateStart = start else { continue }
+                let candidate = Data(response[candidateStart...index].utf8)
+                if let decoded = try? decoder.decode(Payload.self, from: candidate) {
+                    // Multiple drafts are ambiguous. Never quietly choose one.
+                    guard payload == nil else {
+                        throw MaterialError.invalid("The AI returned multiple drafts in one response. Try generating it again.")
+                    }
+                    payload = decoded
+                }
+                start = nil
+            }
+        }
+        guard let payload else {
+            throw MaterialError.invalid("The AI returned an incomplete or unreadable draft. Try generating it again.")
+        }
+        return payload
     }
 
     func validate() throws {

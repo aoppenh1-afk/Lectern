@@ -132,7 +132,7 @@ struct SettingsView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                if section != .mcp {
+                if section != .mcp && section != .agents {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(section.title)
                             .font(.system(size: 28, weight: .bold, design: .serif))
@@ -870,191 +870,96 @@ struct GoogleDocsPane: View {
 // MARK: - Agents
 
 private struct AgentsPane: View {
+    @Environment(\.openURL) private var openURL
     @State private var codexCommand = ""
     @State private var opencodeCommand = ""
     @State private var detections: [AgentDetection] = []
     @State private var detectionMessage: String?
+    @State private var codexSignIn = CodexSignIn()
+    @State private var terminalMessages: [String: String] = [:]
+    @State private var terminalErrors: [String: String] = [:]
+    @State private var openingTerminal: Set<String> = []
     @State private var antigravityACP = AntigravityACPManager.shared
     @State private var callbackURL = ""
     @State private var confirmsRuntimeRemoval = false
     @State private var confirmsActiveSignOut = false
 
-    private var macName: String {
-        Host.current().localizedName ?? "this Mac"
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            SettingsCard {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(alignment: .top, spacing: 12) {
-                        agentIcon("sparkles", tint: LecternTheme.accent)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 8) {
-                                Text("Antigravity")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(LecternTheme.ink)
-
-                                antigravityStatusChip
-                            }
-
-                            Text("Antigravity runs locally on \(macName).")
-                                .font(.system(size: 11.5))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Button {
-                            Task {
-                                await antigravityACP.refresh()
-                                detectAndApply()
-                            }
-                        } label: {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(antigravityACP.isBusy || antigravityACP.updateState == .checking)
-                    }
-                    .padding(16)
-
-                    agentsDivider
-
-                    antigravitySection(
-                        icon: "shippingbox",
-                        title: "Runtime",
-                        message: runtimeMessage,
-                        detail: runtimeDetail
-                    ) {
-                        runtimeActions
-                    }
-
-                    if case .installing(.downloading, let downloaded, let total) = antigravityACP.runtimeState {
-                        VStack(alignment: .leading, spacing: 5) {
-                            ProgressView(value: Double(downloaded), total: Double(max(total, 1)))
-                            Text("\(formatBytes(downloaded)) of \(formatBytes(total))")
-                                .font(.system(size: 10.5).monospacedDigit())
-                                .foregroundStyle(.tertiary)
-                        }
-                        .padding(.horizontal, 48)
-                        .padding(.bottom, 14)
-                    }
-
-                    agentsDivider
-
-                    antigravitySection(
-                        icon: "arrow.down.circle",
-                        title: "Updates",
-                        message: updateMessage,
-                        detail: updateDetail
-                    ) {
-                        VStack(alignment: .trailing, spacing: 8) {
-                            if case .available = antigravityACP.updateState {
-                                Button("Update Antigravity") { antigravityACP.startInstallation() }
-                                    .buttonStyle(.borderedProminent)
-                            }
-                            Button("Check for updates") {
-                                Task { await antigravityACP.checkForUpdates() }
-                            }
-                        }
-                        .controlSize(.small)
-                        .disabled(antigravityACP.isBusy || antigravityACP.updateState == .checking)
-                    }
-
-                    if let error = antigravityACP.installationError {
-                        Text(error)
-                            .font(.system(size: 11))
-                            .foregroundStyle(LecternTheme.warningTint)
-                            .padding(.horizontal, 48)
-                            .padding(.bottom, 14)
-                    }
-
-                    agentsDivider
-
-                    antigravitySection(
-                        icon: "person.crop.circle",
-                        title: "Google account",
-                        message: accountMessage,
-                        detail: accountDetail
-                    ) {
-                        accountActions
-                    }
-
-                    if case .waitingForBrowser = antigravityACP.authState {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("If the browser could not reach the local callback, paste its complete http://127.0.0.1:… URL here.")
-                                .font(.system(size: 10.5))
-                                .foregroundStyle(.tertiary)
-                            HStack(spacing: 8) {
-                                SecureField("Local callback URL", text: $callbackURL)
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.system(size: 10.5).monospaced())
-                                Button("Continue") {
-                                    let value = callbackURL
-                                    callbackURL = ""
-                                    Task { await antigravityACP.completeSignIn(callbackURL: value) }
-                                }
-                                .controlSize(.small)
-                                .disabled(callbackURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            }
-                            if let detail = antigravityACP.authDetail {
-                                Text(detail).font(.system(size: 10.5)).foregroundStyle(LecternTheme.warningTint)
-                            }
-                        }
-                        .padding(.horizontal, 48)
-                        .padding(.bottom, 14)
-                    }
+        VStack(alignment: .leading, spacing: 24) {
+            HStack(alignment: .top, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Your agents")
+                        .font(.system(size: 34, weight: .semibold))
+                        .tracking(-1.1)
+                        .foregroundStyle(LecternTheme.ink)
+                    Text("Connect an account to turn lectures into study material.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
                 }
+                Spacer(minLength: 0)
+                Button {
+                    detectAndApply()
+                    if !antigravityACP.isBusy, antigravityACP.updateState != .checking {
+                        Task { await antigravityACP.refresh() }
+                    }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(AgentActionStyle())
+                .help("Check for newly installed agents and refresh Antigravity's account.")
+                .padding(.top, 6)
             }
 
             if let detectionMessage {
-                HStack(spacing: 7) {
-                    Image(systemName: "info.circle.fill")
-                        .foregroundStyle(LecternTheme.accent)
-                    Text(detectionMessage)
-                        .font(.system(size: 11))
+                Label(detectionMessage, systemImage: "info.circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("agents.refreshResult")
+            }
+
+            antigravityCard
+
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Already have an agent?")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(LecternTheme.ink)
+                    Spacer(minLength: 8)
+                    Text("One is all you need.")
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 4)
-            }
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    SectionLabel(title: "Other agents")
-                    Spacer()
-                    Text("Lectern only needs one agent.")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.tertiary)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 270), spacing: 16)], spacing: 16) {
+                    providerCard(
+                        id: AgentProfiles.codexID,
+                        title: "Codex",
+                        caption: "Create notes and images with your ChatGPT account.",
+                        text: $codexCommand
+                    )
+                    providerCard(
+                        id: AgentProfiles.opencodeID,
+                        title: "OpenCode",
+                        caption: "Use the models and providers you've connected to OpenCode.",
+                        text: $opencodeCommand
+                    )
                 }
-
-                providerCard(
-                    id: AgentProfiles.codexID,
-                    icon: "bubble.left.and.text.bubble.right",
-                    title: "ChatGPT (Codex)",
-                    caption: "Uses your existing ChatGPT sign-in and supports image generation.",
-                    text: $codexCommand
-                )
-
-                providerCard(
-                    id: AgentProfiles.opencodeID,
-                    icon: "terminal",
-                    title: "OpenCode",
-                    caption: "Uses the providers already configured in OpenCode.",
-                    text: $opencodeCommand
-                )
             }
         }
+        .frame(maxWidth: 880, alignment: .leading)
         .onAppear {
             loadCommands()
-            detections = otherAgentDetections()
+            detectAndApply(showMessage: false)
         }
         .task {
             await antigravityACP.refresh()
         }
         .onDisappear {
+            codexSignIn.cancel()
             saveCommands()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            detectAndApply(showMessage: false)
         }
         .confirmationDialog(
             "Remove the downloaded Antigravity runtime?",
@@ -1080,6 +985,160 @@ private struct AgentsPane: View {
         }
     }
 
+    private var antigravityCard: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .center, spacing: 14) {
+                AgentProviderLogo(profileID: AgentProfiles.antigravityID)
+                    .frame(width: 40, height: 40)
+                    .frame(width: 56, height: 56)
+                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 17))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Antigravity")
+                        .font(.system(size: 23, weight: .semibold))
+                        .tracking(-0.5)
+                        .foregroundStyle(LecternTheme.ink)
+                    Text("Google account · Set up in Lectern")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                antigravityStatusChip
+            }
+
+            Text(antigravityACP.isInstalled
+                 ? "Use your Google account for notes, flashcards, quizzes, and transcription."
+                 : "Notes, flashcards, quizzes, and transcription. Connect your Google account to get started.")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    antigravitySetupActions
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    antigravitySetupActions
+                }
+            }
+
+            if case .installing(.downloading, let downloaded, let total) = antigravityACP.runtimeState {
+                VStack(alignment: .leading, spacing: 6) {
+                    ProgressView(value: Double(downloaded), total: Double(max(total, 1)))
+                        .tint(LecternTheme.accent)
+                    Text("\(formatBytes(downloaded)) of \(formatBytes(total))")
+                        .font(.system(size: 12).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text(antigravityACP.isInstalled ? (accountDetail ?? accountMessage) : (runtimeDetail ?? runtimeMessage))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            if let error = antigravityACP.installationError {
+                agentNotice(error, isError: true)
+            }
+            if case .failed(let message) = antigravityACP.authState {
+                agentNotice(message, isError: true)
+            }
+
+            if case .waitingForBrowser = antigravityACP.authState {
+                DisclosureGroup("Having trouble returning from your browser?") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Paste the complete http://127.0.0.1:… callback URL from your browser.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        SecureField("Local callback URL", text: $callbackURL)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Continue") {
+                            let value = callbackURL
+                            callbackURL = ""
+                            Task { await antigravityACP.completeSignIn(callbackURL: value) }
+                        }
+                        .buttonStyle(AgentActionStyle(primary: true))
+                        .disabled(callbackURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        if let detail = antigravityACP.authDetail {
+                            agentNotice(detail, isError: true)
+                        }
+                    }
+                    .padding(.top, 12)
+                }
+                .font(.system(size: 12, weight: .medium))
+            }
+
+            if antigravityACP.isInstalled {
+                DisclosureGroup("Manage Antigravity") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(runtimeDetail ?? runtimeMessage)
+                            .font(.system(size: 12, weight: .medium))
+                        Text(updateMessage)
+                            .font(.system(size: 12))
+                        if let detail = updateDetail {
+                            Text(detail)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        VStack(alignment: .leading, spacing: 10) {
+                            Button("Check for updates") {
+                                Task { await antigravityACP.checkForUpdates() }
+                            }
+                            .buttonStyle(AgentActionStyle())
+                            .disabled(antigravityACP.isBusy || antigravityACP.updateState == .checking)
+                            runtimeActions
+                        }
+                        if case .signedIn = antigravityACP.authState {
+                            Button("Sign out of Google") { signOutAntigravity() }
+                                .buttonStyle(AgentActionStyle())
+                        }
+                    }
+                    .padding(.top, 14)
+                }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(LecternTheme.canvasCard)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(LinearGradient(
+                            colors: [LecternTheme.accent.opacity(0.09), LecternTheme.accent.opacity(0.015)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(LecternTheme.accent.opacity(0.16), lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var antigravitySetupActions: some View {
+        if !antigravityACP.isInstalled {
+            runtimeActions
+        }
+        accountActions
+        if case .available = antigravityACP.updateState {
+            Button("Update Antigravity") { antigravityACP.startInstallation() }
+                .buttonStyle(AgentActionStyle())
+                .disabled(antigravityACP.isBusy)
+        }
+    }
+
+    private func signOutAntigravity() {
+        if antigravityACP.hasActiveWork {
+            confirmsActiveSignOut = true
+        } else {
+            Task { await antigravityACP.signOut() }
+        }
+    }
+
     private func loadCommands() {
         codexCommand = AgentProfiles.profile(id: AgentProfiles.codexID)?.command ?? ""
         opencodeCommand = AgentProfiles.profile(id: AgentProfiles.opencodeID)?.command ?? ""
@@ -1090,18 +1149,22 @@ private struct AgentsPane: View {
         AgentProfiles.setCommand(opencodeCommand, for: AgentProfiles.opencodeID)
     }
 
-    private func detectAndApply() {
+    private func detectAndApply(showMessage: Bool = true) {
         saveCommands()
         detections = AgentDetector.applyDetected(otherAgentDetections())
         loadCommands()
+        guard showMessage else { return }
         let found = detections.filter(\.isInstalled).map(\.title)
         detectionMessage = found.isEmpty
-            ? "No agents found. Install one with the commands shown above, then detect again."
-            : "Found \(found.joined(separator: ", ")). Spawn commands updated."
+            ? "Codex and OpenCode were not detected. Use Download or Install in Terminal below, then refresh."
+            : "Detected \(found.joined(separator: ", ")). Use Sign in to connect an account."
     }
 
     private func otherAgentDetections() -> [AgentDetection] {
-        AgentDetector.detectAll().filter { $0.profileID != AgentProfiles.antigravityID }
+        AgentDetector.detectAll(commands: [
+            AgentProfiles.codexID: codexCommand,
+            AgentProfiles.opencodeID: opencodeCommand,
+        ])
     }
 
     private func detection(for id: String) -> AgentDetection? {
@@ -1137,14 +1200,14 @@ private struct AgentsPane: View {
     private var runtimeMessage: String {
         switch antigravityACP.runtimeState {
         case .checking: return "Checking the managed runtime…"
-        case .notInstalled: return "Install the official Antigravity runtime before signing in."
+        case .notInstalled: return "Download Antigravity, then sign in with Google."
         case .installing(let phase, _, _):
             switch phase {
             case .downloading: return "Downloading Antigravity…"
             case .extracting: return "Extracting the verified runtime…"
             case .verifying: return "Checking the downloaded runtime…"
             }
-        case .ready: return "Official Antigravity ACP runtime installed."
+        case .ready: return "Antigravity is installed on this Mac."
         case .cancelled: return "Antigravity installation was cancelled."
         case .failed: return "Antigravity needs attention."
         }
@@ -1153,9 +1216,9 @@ private struct AgentsPane: View {
     private var runtimeDetail: String? {
         switch antigravityACP.runtimeState {
         case .notInstalled, .cancelled:
-            return "Downloads 316 MB directly from Google. Your existing agy CLI is separate and is not used."
+            return "Downloads about 316 MB directly from Google."
         case .ready(let version):
-            return "Google release \(version) · SHA-256 verified"
+            return "Version \(version)"
         case .failed(let message):
             return message
         default:
@@ -1178,10 +1241,10 @@ private struct AgentsPane: View {
     private var accountDetail: String? {
         switch antigravityACP.authState {
         case .signedOut:
-            return "Lectern uses an isolated ACP profile; your Antigravity CLI sign-in is intentionally not reused."
+            return "Sign in here even if you already use the Antigravity app on this Mac."
         case .waitingForBrowser:
             return antigravityACP.authDetail
-                ?? "The local ACP process receives Google's redirect and stores its own token in Lectern."
+                ?? "Return to Lectern after finishing sign-in in your browser."
         case .failed(let message):
             return message
         default: return nil
@@ -1192,13 +1255,14 @@ private struct AgentsPane: View {
     private var runtimeActions: some View {
         switch antigravityACP.runtimeState {
         case .notInstalled:
-            Button("Install Antigravity") { antigravityACP.startInstallation() }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
+            Button { antigravityACP.startInstallation() } label: {
+                Label("Download Antigravity", systemImage: "arrow.down.circle")
+            }
+            .buttonStyle(AgentActionStyle(primary: true))
+            .accessibilityIdentifier("agents.antigravity.download")
         case .cancelled, .failed:
             Button("Retry installation") { antigravityACP.startInstallation() }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonStyle(AgentActionStyle(primary: true))
         case .ready:
             HStack(spacing: 6) {
                 if case .available = antigravityACP.updateState {
@@ -1213,13 +1277,13 @@ private struct AgentsPane: View {
                     confirmsRuntimeRemoval = true
                 }
             }
-            .controlSize(.small)
+            .buttonStyle(AgentActionStyle())
             .disabled(antigravityACP.isBusy || antigravityACP.updateState == .checking)
         case .checking:
             ProgressView().controlSize(.small)
         case .installing:
             Button("Cancel") { antigravityACP.cancelInstallation() }
-                .controlSize(.small)
+                .buttonStyle(AgentActionStyle())
         }
     }
 
@@ -1230,49 +1294,55 @@ private struct AgentsPane: View {
             Button("Sign in with Google") {
                 Task { await antigravityACP.signIn() }
             }
-            .controlSize(.small)
+            .buttonStyle(AgentActionStyle(primary: true))
             .disabled(!antigravityACP.isInstalled)
         case .waitingForBrowser:
             HStack(spacing: 6) {
                 Button("Open browser again") { antigravityACP.openAuthorizationURLAgain() }
                 Button("Cancel") { antigravityACP.cancelSignIn() }
             }
-            .controlSize(.small)
+            .buttonStyle(AgentActionStyle())
         case .signedIn:
-            Button("Sign out") {
-                if antigravityACP.hasActiveWork {
-                    confirmsActiveSignOut = true
-                } else {
-                    Task { await antigravityACP.signOut() }
-                }
-            }
-                .controlSize(.small)
+            Label("Google connected", systemImage: "checkmark.circle.fill")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(LecternTheme.successTint)
         case .signingIn:
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Button("Cancel") { antigravityACP.cancelSignIn() }.controlSize(.small)
+                Button("Cancel") { antigravityACP.cancelSignIn() }.buttonStyle(AgentActionStyle())
             }
         case .signingOut:
             ProgressView().controlSize(.small)
         case .unavailable:
-            EmptyView()
+            Button("Sign in with Google") {}
+                .buttonStyle(AgentActionStyle())
+                .disabled(true)
+                .help("Download Antigravity before signing in.")
         }
     }
 
-    private var antigravityStatusChip: StatusChip {
+    private var antigravityStatusChip: some View {
         switch (antigravityACP.runtimeState, antigravityACP.authState) {
         case (.ready, .signedIn):
-            return StatusChip("Ready", LecternTheme.successTint, icon: "checkmark")
+            return agentStatus("Connected", tint: LecternTheme.successTint)
+        case (.ready, .signingIn), (.ready, .waitingForBrowser):
+            return agentStatus("Signing in", tint: LecternTheme.accent)
+        case (.ready, .signingOut):
+            return agentStatus("Signing out", tint: .secondary)
+        case (.ready, .failed):
+            return agentStatus("Sign-in failed", tint: LecternTheme.warningTint)
         case (.ready, _):
-            return StatusChip("Sign-in needed", LecternTheme.warningTint, icon: "person.crop.circle.badge.exclamationmark")
+            return agentStatus("Sign in needed", tint: LecternTheme.warningTint)
         case (.installing, _):
-            return StatusChip("Installing", LecternTheme.accent, icon: "arrow.down.circle")
+            return agentStatus("Installing", tint: LecternTheme.accent)
         case (.cancelled, _):
-            return StatusChip("Cancelled", .secondary, icon: "xmark.circle")
+            return agentStatus("Cancelled", tint: .secondary)
         case (.failed, _):
-            return StatusChip("Needs attention", LecternTheme.warningTint, icon: "exclamationmark.triangle")
+            return agentStatus("Needs attention", tint: LecternTheme.warningTint)
+        case (.checking, _):
+            return agentStatus("Checking", tint: .secondary)
         default:
-            return StatusChip("Not installed", .secondary, icon: "circle.dashed")
+            return agentStatus("Not installed", tint: .secondary)
         }
     }
 
@@ -1280,107 +1350,246 @@ private struct AgentsPane: View {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 
-    private var agentsDivider: some View {
-        Rectangle()
-            .fill(Color.primary.opacity(0.07))
-            .frame(height: 1)
-            .padding(.leading, 52)
-    }
-
-    @ViewBuilder
-    private func antigravitySection<Actions: View>(
-        icon: String,
-        title: String,
-        message: String,
-        detail: String?,
-        @ViewBuilder actions: () -> Actions
-    ) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(LecternTheme.accent)
-                .frame(width: 20, height: 20)
-
-            VStack(alignment: .leading, spacing: 4) {
-                SectionLabel(title: title)
-                Text(message)
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(LecternTheme.ink)
-                if let detail {
-                    Text(detail)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(2)
-                        .truncationMode(.middle)
-                        .textSelection(.enabled)
-                }
-            }
-
-            Spacer(minLength: 12)
-            actions()
-        }
-        .padding(16)
-    }
-
     private func providerCard(
         id: String,
-        icon: String,
         title: String,
         caption: String,
         text: Binding<String>
     ) -> some View {
         let detection = detection(for: id)
+        let isInstalled = detection?.isInstalled == true
+        let setup = AgentSetup.forProfile(id)!
 
-        return SettingsCard {
-            HStack(alignment: .top, spacing: 12) {
-                agentIcon(icon, tint: .secondary)
-
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: 8) {
-                        Text(title)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(LecternTheme.ink)
-
-                        if let detection {
-                            statusChip(for: detection.status)
-                        }
-                    }
-
-                    Text(caption)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.tertiary)
-
-                    TextField("Spawn command", text: text, prompt: Text("/path/to/agent"))
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
-                        .font(.system(size: 11).monospaced())
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                AgentProviderLogo(profileID: id)
+                    .frame(width: 28, height: 28)
+                    .frame(width: 48, height: 48)
+                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14))
+                Spacer(minLength: 8)
+                if id == AgentProfiles.codexID, isInstalled, codexSignIn.state == .signedIn {
+                    agentStatus("Connected", tint: LecternTheme.successTint)
+                } else {
+                    agentStatus(
+                        isInstalled ? "Detected" : "Not installed",
+                        tint: isInstalled ? LecternTheme.successTint : .secondary
+                    )
                 }
             }
-            .padding(14)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.system(size: 20, weight: .semibold))
+                    .tracking(-0.4)
+                    .foregroundStyle(LecternTheme.ink)
+                Text(caption)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(minHeight: 36, alignment: .topLeading)
+            }
+
+            if !isInstalled {
+                VStack(alignment: .leading, spacing: 12) {
+                    Button {
+                        openURL(setup.downloadURL)
+                    } label: {
+                        Label("Download", systemImage: "arrow.down")
+                    }
+                    .buttonStyle(AgentActionStyle(primary: true, stretches: true))
+                    .help("Open the official download and installation instructions.")
+                    .accessibilityIdentifier("agents.\(id).download")
+
+                    Button {
+                        openSetupTerminal(command: setup.installCommand, for: id, isSignIn: false)
+                    } label: {
+                        Label("Install in Terminal", systemImage: "arrow.up.right")
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(LecternTheme.accent)
+                    .buttonStyle(.plain)
+                    .disabled(openingTerminal.contains(id))
+                    .accessibilityIdentifier("agents.\(id).install")
+                }
+            } else {
+                providerAccountActions(id: id)
+            }
+
+            if let error = terminalErrors[id] {
+                agentNotice(error, isError: true)
+            } else if let message = terminalMessages[id] {
+                agentNotice(message)
+            }
+
+            DisclosureGroup("Advanced setup") {
+                VStack(alignment: .leading, spacing: 12) {
+                    if !isInstalled {
+                        Text(setup.installRequirement)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        HStack(alignment: .top, spacing: 10) {
+                            Text(setup.installCommand)
+                                .font(.system(size: 12).monospaced())
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            Button {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(setup.installCommand, forType: .string)
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                            }
+                            .buttonStyle(.plain)
+                            .help("Copy installation command")
+                            .accessibilityLabel("Copy \(title) installation command")
+                        }
+                        .padding(12)
+                        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    Text("Agent command")
+                        .font(.system(size: 12, weight: .medium))
+                    TextField("Agent command", text: text, prompt: Text("/path/to/agent"))
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12).monospaced())
+                        .accessibilityIdentifier("agents.\(id).command")
+                    Text("Use a custom location, then click Refresh.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 14)
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.secondary)
+            .padding(.top, 2)
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.025), radius: 16, x: 0, y: 6)
+        .onChange(of: text.wrappedValue) { _, _ in
+            if id == AgentProfiles.codexID { codexSignIn.reset() }
         }
     }
 
-    private func agentIcon(_ name: String, tint: Color) -> some View {
-        Image(systemName: name)
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(tint)
-            .frame(width: 36, height: 36)
-            .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    @ViewBuilder
+    private func providerAccountActions(id: String) -> some View {
+        if id == AgentProfiles.codexID {
+            switch codexSignIn.state {
+            case .signingIn:
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Finish sign-in in your browser.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("Cancel sign-in") { codexSignIn.cancel() }
+                        .buttonStyle(AgentActionStyle(stretches: true))
+                }
+            case .signedIn:
+                Label("ChatGPT connected", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(LecternTheme.successTint)
+                    .frame(height: 44)
+            case .idle, .failed:
+                Button("Sign in with ChatGPT") {
+                    saveCommands()
+                    if let profile = AgentProfiles.profile(id: id) {
+                        codexSignIn.start(profile: profile)
+                    }
+                }
+                .buttonStyle(AgentActionStyle(primary: true, stretches: true))
+                .accessibilityIdentifier("agents.codex.signIn")
+                if case .failed(let message) = codexSignIn.state {
+                    agentNotice(message, isError: true)
+                } else {
+                    Text("Continues in your browser.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } else {
+            Button("Sign in to a provider") {
+                guard let path = detection(for: id)?.executablePath else { return }
+                openSetupTerminal(command: "\(AgentSetup.shellQuote(path)) auth login", for: id, isSignIn: true)
+            }
+            .buttonStyle(AgentActionStyle(primary: true, stretches: true))
+            .disabled(openingTerminal.contains(id))
+            .accessibilityIdentifier("agents.opencode.signIn")
+            Text("Choose your provider in Terminal.")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
     }
 
-    private func statusChip(for status: AgentDetection.Status) -> StatusChip {
-        switch status {
-        case .ready:
-            return StatusChip("Ready", LecternTheme.successTint, icon: "checkmark")
-        case .installedNotSignedIn:
-            return StatusChip(
-                "Sign-in needed",
-                LecternTheme.warningTint,
-                icon: "person.crop.circle.badge.exclamationmark"
-            )
-        case .notInstalled:
-            return StatusChip("Not installed", .secondary, icon: "circle.dashed")
+    private func agentStatus(_ title: String, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(tint).frame(width: 5, height: 5)
+            Text(title).font(.system(size: 11, weight: .medium))
         }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(tint.opacity(0.075), in: Capsule())
+        .fixedSize()
+    }
+
+    private func agentNotice(_ message: String, isError: Bool = false) -> some View {
+        Text(message)
+            .font(.system(size: 12))
+            .foregroundStyle(isError ? LecternTheme.warningTint : .secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func openSetupTerminal(command: String, for id: String, isSignIn: Bool) {
+        guard !openingTerminal.contains(id) else { return }
+        openingTerminal.insert(id)
+        terminalErrors[id] = nil
+        terminalMessages[id] = nil
+        Task {
+            defer { openingTerminal.remove(id) }
+            do {
+                try await AgentSetup.openTerminal(command: command)
+                terminalMessages[id] = isSignIn
+                    ? "Finish sign-in in Terminal, then return to Lectern."
+                    : "Finish installation in Terminal, then return to Lectern and click Refresh."
+            } catch {
+                terminalErrors[id] = error.localizedDescription
+            }
+        }
+    }
+
+}
+
+private struct AgentActionStyle: ButtonStyle {
+    var primary = false
+    var stretches = false
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var hovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        let destructive = configuration.role == .destructive
+        return configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .fixedSize(horizontal: !stretches, vertical: true)
+            .frame(maxWidth: stretches ? .infinity : nil)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .foregroundStyle(primary ? (colorScheme == .dark ? Color.black : .white) : (destructive ? LecternTheme.recordTint : LecternTheme.ink))
+            .background {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(primary ? LecternTheme.accent : (destructive ? LecternTheme.recordTint : Color.primary).opacity(hovered ? 0.075 : 0.045))
+            }
+            .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.35)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .onHover { hovered = $0 }
+            .animation(.easeOut(duration: 0.14), value: hovered)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 

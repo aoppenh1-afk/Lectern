@@ -120,6 +120,28 @@ struct CourseChatWorkspaceTests {
         withExtendedLifetime(container) {}
     }
 
+    @Test func streamedProgressAndFinalJSONProduceOneCompleteFlashcardDraft() async throws {
+        let (container, course, root) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let workspace = try CourseChatWorkspace.prepare(root: root, courseID: course.persistentModelID,
+            source: source([.init(id: "doc", label: "Slides", content: "Source")]), images: [])
+        let log = root.appendingPathComponent("requests.jsonl")
+        let session = CourseChatSession(connect: Self.factory(log: log))
+        defer { session.close() }
+        let request = ChatStudyRequest(kind: .flashcards)
+        let answer = try await session.answer(question: "FLASHCARD_PROGRESS_FIXTURE", workspace: workspace,
+            history: "", studyInstruction: request.instruction,
+            profile: .init(id: "fake", title: "Fake", command: "fake"),
+            thinkingLevel: .medium, modelOverride: nil)
+        #expect(answer.hasPrefix("Reading selected sources."))
+        let material = try ChatStudyMaterial.parse(answer, request: request, sourceLabels: ["Slides"], modelInfo: "Test")
+        #expect(material.cards.count == 165)
+        #expect(material.cards.first?.front == "Concept 1?")
+        #expect(material.cards.last?.front == "Concept 165?")
+        #expect(material.sourceLabels == ["Slides"])
+        withExtendedLifetime(container) {}
+    }
+
     @Test func antigravityReceivesNativeSourcesAndImagesOncePerSession() async throws {
         let (container, course, root) = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -277,6 +299,13 @@ for line in sys.stdin:
     elif method == 'session/prompt':
         if 'FAIL_REQUEST' in json.dumps(req['params']['prompt']):
             print(json.dumps({'jsonrpc': '2.0', 'id': req['id'], 'error': {'code': -32000, 'message': 'Fixture failure'}}), flush=True)
+            continue
+        if 'FLASHCARD_PROGRESS_FIXTURE' in json.dumps(req['params']['prompt']):
+            draft = {'title': 'Complete deck', 'markdown': '', 'questions': [],
+                     'cards': [{'front': f'Concept {i}?', 'back': f'Explanation {i}'} for i in range(1, 166)]}
+            for chunk in ['Reading selected sources.', 'Checking coverage.', json.dumps(draft)]:
+                print(json.dumps({'jsonrpc': '2.0', 'method': 'session/update', 'params': {'sessionId': 'fixture', 'update': {'sessionUpdate': 'agent_message_chunk', 'content': {'type': 'text', 'text': chunk}}}}), flush=True)
+            print(json.dumps({'jsonrpc': '2.0', 'id': req['id'], 'result': {'stopReason': 'end_turn'}}), flush=True)
             continue
         with open(os.path.join(cwd, 'sources.json')) as index:
             entries = json.load(index)['sources']

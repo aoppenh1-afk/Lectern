@@ -74,7 +74,7 @@ Antigravity uses native attachments, supplied once when a session starts. Changi
 
 ## Other agents
 
-Antigravity ACP is the default. **Settings › Agents** manages its runtime and Google account separately, and detects other supported agents on this Mac (ChatGPT via `codex-acp`, OpenCode).
+Antigravity ACP is the default. **Settings › Agents** downloads its runtime and connects your Google account. For ChatGPT via `codex-acp` and OpenCode, the page provides official download instructions, installation in Terminal, and sign-in buttons. Click Refresh after installation. Custom agent commands are under Advanced.
 
 All three use the bundled [Lectern notes skill](.agents/skills/lectern-notes/SKILL.md), which contains separate layouts for English lectures and English-Hebrew shiurim. No separate skill installation or access to the author's notes is needed. Google Docs sync keeps headings and lists left to right and uses invisible left-to-right marks around Hebrew phrases so surrounding punctuation and numbers stay in the LTR sentence. The export format version is part of the sync hash, so the next sync can reformat existing notes without regenerating them.
 

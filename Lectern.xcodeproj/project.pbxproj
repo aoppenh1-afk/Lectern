@@ -47,6 +47,7 @@
 		245A024BB2B4E7D289D59A9A /* ParakeetTDT in Frameworks */ = {isa = PBXBuildFile; productRef = 7B77D7F08E734597FB340D71 /* ParakeetTDT */; };
 		246D6AABE4A01260E36A1011 /* CanvasClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C1EE93C6209753BED8A1B4 /* CanvasClient.swift */; };
 		250B6EB5912C682A7137A23F /* YUFinalsSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB30B351B774CF546F7DCEA2 /* YUFinalsSchedule.swift */; };
+		259B5BD4A0A6EEC72446A999 /* AgentSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A77CCAC7E4602917EB1DB95 /* AgentSetup.swift */; };
 		25E0EBCA6B9B36768A41F813 /* YUTorahSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8E8D62B339AAE8CDACF807 /* YUTorahSearchIndex.swift */; };
 		262317A2F9B261FFB523B187 /* GoogleDocsSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA475B8E4EACE8E555128177 /* GoogleDocsSyncTests.swift */; };
 		26B56FA6D70AEFB77DB4E9D4 /* TranscriptionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D65BB56BA83F5089F0629283 /* TranscriptionSettingsView.swift */; };
@@ -225,6 +226,7 @@
 		AD1F309C1FFE5AF6F8947FB9 /* YUBannerSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16548935BD37C8BD9ACB0A66 /* YUBannerSyncService.swift */; };
 		AD86591E3E90890763F6171D /* GoogleDocsError.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF820DB24255443A5561D031 /* GoogleDocsError.swift */; };
 		ADCF18761810159B2C10E977 /* RetentionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29CA61043373B5435D7F00F2 /* RetentionService.swift */; };
+		ADF160B2E02D1C747E9A853B /* AgentSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A77CCAC7E4602917EB1DB95 /* AgentSetup.swift */; };
 		AE87750815836CE9030CEE46 /* CourseSynthesisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD87EB0581FBD62DD9CC2F0B /* CourseSynthesisView.swift */; };
 		AF158A8A8DCE27EF8BDF060E /* SubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85330EAFA97A4A66B2B2E9A0 /* SubscriptionsView.swift */; };
 		B0183D74ECA0C677FCFD815A /* CompletionNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 165645A8C3854D55C5824601 /* CompletionNotifier.swift */; };
@@ -283,6 +285,7 @@
 		DE83CC21E9DEB842323A72C7 /* ShiurAutomationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264D4BFEED3B376DCCA86F0F /* ShiurAutomationService.swift */; };
 		DEA2627708C2C4172F0A4B08 /* AppAuth in Frameworks */ = {isa = PBXBuildFile; productRef = F13AF31704ECBCAC1405015C /* AppAuth */; };
 		DF356657AAF2E959F04C90CE /* RecordingFileLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DEC6C81E9D90FFBE3C748F /* RecordingFileLedger.swift */; };
+		DFB95A458FE3D0AA1250F269 /* AgentSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A9C9ABEC2ACB0D03A9CDF8E /* AgentSetupTests.swift */; };
 		E00FE364F12EC89F2D5290B7 /* GoogleDocsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBF49011BFA6F50BCA8A7598 /* GoogleDocsClient.swift */; };
 		E02651D90C68A1CFBF3CDCEE /* MeetingAudioTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20159E2CD18F89CA247F90E6 /* MeetingAudioTarget.swift */; };
 		E18F44EF0D299FB70D15D910 /* AgentProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13E515E0B5FEBA11763B7DA /* AgentProfile.swift */; };
@@ -338,7 +341,9 @@
 		19629351EB498E76FFBC6AF2 /* lectern-transcription */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "lectern-transcription"; path = ".agents/skills/lectern-transcription"; sourceTree = SOURCE_ROOT; };
 		19D56AFC425AC6CD11467211 /* TranscriptionQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionQueueTests.swift; sourceTree = "<group>"; };
 		1A11419823C0A975075BD958 /* LectureImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LectureImportService.swift; sourceTree = "<group>"; };
+		1A77CCAC7E4602917EB1DB95 /* AgentSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSetup.swift; sourceTree = "<group>"; };
 		1A8E8D62B339AAE8CDACF807 /* YUTorahSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSearchIndex.swift; sourceTree = "<group>"; };
+		1A9C9ABEC2ACB0D03A9CDF8E /* AgentSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSetupTests.swift; sourceTree = "<group>"; };
 		1B431E6A4C6DD679E2D7C259 /* YUTorahSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSearchService.swift; sourceTree = "<group>"; };
 		1B5002DE6320201A09808F4D /* CaptureSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSource.swift; sourceTree = "<group>"; };
 		1DE3C5081C885AB547B647B4 /* YUTorahSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YUTorahSearchView.swift; sourceTree = "<group>"; };
@@ -693,6 +698,7 @@
 		57C666E0599B31DACFA50FC1 /* LecternTests */ = {
 			isa = PBXGroup;
 			children = (
+				1A9C9ABEC2ACB0D03A9CDF8E /* AgentSetupTests.swift */,
 				46B0A73CBDD0911E346B86BB /* AISessionPoolTests.swift */,
 				B27296A6FA26EF1BF3A5C5C5 /* AntigravityACPTests.swift */,
 				E84584CA17279DC67909F94C /* AppUpdaterTests.swift */,
@@ -855,6 +861,7 @@
 				07DF18B64B18FC06E4CC2F90 /* AgentDetector.swift */,
 				9C260A0B06C75ACB5BBD3905 /* AgentModelCatalog.swift */,
 				A13E515E0B5FEBA11763B7DA /* AgentProfile.swift */,
+				1A77CCAC7E4602917EB1DB95 /* AgentSetup.swift */,
 				9555190D715A73B287877CCD /* AISessionPool.swift */,
 				17BFE16C6F2F14A491896949 /* AntigravityACP.swift */,
 				BC033C863FC2C24BF7943DEE /* AntigravityACPClient.swift */,
@@ -1051,6 +1058,8 @@
 				EC58924FF09B859FC286942E /* AgentDetector.swift in Sources */,
 				ACA048B3824A159AAA10E94A /* AgentModelCatalog.swift in Sources */,
 				03AAB9FA7E7D37008040AF60 /* AgentProfile.swift in Sources */,
+				ADF160B2E02D1C747E9A853B /* AgentSetup.swift in Sources */,
+				DFB95A458FE3D0AA1250F269 /* AgentSetupTests.swift in Sources */,
 				6C8B2B6804CFA43DFC1D5537 /* AnkiConnectClient.swift in Sources */,
 				92BA99F1D8777D835D66AFCF /* AntigravityACP.swift in Sources */,
 				CBE08C8D503A31D46BFC2FA9 /* AntigravityACPClient.swift in Sources */,
@@ -1219,6 +1228,7 @@
 				4BCD52D700A21B47DC5A6A35 /* AgentDetector.swift in Sources */,
 				7EFD4FF5B0C51EF749EEAEF3 /* AgentModelCatalog.swift in Sources */,
 				E18F44EF0D299FB70D15D910 /* AgentProfile.swift in Sources */,
+				259B5BD4A0A6EEC72446A999 /* AgentSetup.swift in Sources */,
 				FD91D9A3281EA0A3E2804653 /* AnkiConnectClient.swift in Sources */,
 				7AADBA9597A6FB92B7749D65 /* AntigravityACP.swift in Sources */,
 				8B4271F2568269D617E665C4 /* AntigravityACPClient.swift in Sources */,

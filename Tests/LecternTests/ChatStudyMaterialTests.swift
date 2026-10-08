@@ -6,6 +6,40 @@ import AppKit
 
 @MainActor
 struct ChatStudyMaterialTests {
+    @Test func parsesCompleteDeckAfterAgentProgressMessages() throws {
+        // Codex ACP streams commentary and the final JSON into the same response.
+        let cards = (1...165).map {
+            ChatStudyMaterial.Card(front: "Concept \($0)?", back: "Explanation \($0), with {braces}, [brackets], and \"quotes\".")
+        }
+        let payload = ChatStudyMaterial.Payload(title: "Complete deck", markdown: "", cards: cards, questions: [])
+        let json = String(decoding: try JSONEncoder().encode(payload), as: UTF8.self)
+        for response in [
+            "I'll read the selected sources in sections." + "Both files overlap, so I'll preserve their unique details." + json,
+            "I checked sources.json.\n```json\n" + json + "\n```\nThe draft is ready."
+        ] {
+            let material = try ChatStudyMaterial.parse(response, request: .init(kind: .flashcards),
+                                                      sourceLabels: ["Lecture", "Slides"], modelInfo: "Luna")
+            #expect(material.cards.count == 165)
+            #expect(material.cards.map(\.front) == cards.map(\.front))
+            #expect(material.cards.map(\.back) == cards.map(\.back))
+        }
+    }
+
+    @Test func rejectsTruncatedDeckInsteadOfAcceptingPartialCards() {
+        let response = #"Reading sources.{"title":"Deck","cards":[{"front":"First?","back":"Answer"},{"front":"Second?","back":"Cut off"#
+        #expect(throws: (any Error).self) {
+            try ChatStudyMaterial.parse(response, request: .init(kind: .flashcards), sourceLabels: [], modelInfo: "Test")
+        }
+    }
+
+    @Test func rejectsAmbiguousMultipleDrafts() {
+        let draft = #"{"title":"Deck","cards":[{"front":"Question?","back":"Answer"}]}"#
+        #expect(throws: (any Error).self) {
+            try ChatStudyMaterial.parse(draft + "\nRevised:\n" + draft, request: .init(kind: .flashcards),
+                                        sourceLabels: [], modelInfo: "Test")
+        }
+    }
+
     @Test func flashcardCountDefaultsToAuto() {
         #expect(ChatStudyRequest(kind: .flashcards).count == nil)
     }

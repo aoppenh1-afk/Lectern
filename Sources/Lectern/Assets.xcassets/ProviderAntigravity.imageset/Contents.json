@@ -1,0 +1,15 @@
+{
+  "images": [
+    {
+      "filename": "antigravity.png",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "https://antigravity.google/press",
+    "version": 1
+  },
+  "properties": {
+    "template-rendering-intent": "original"
+  }
+}

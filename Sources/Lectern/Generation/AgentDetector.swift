@@ -50,29 +50,34 @@ enum AgentDetector {
             title: "ChatGPT (Codex)",
             executables: ["codex-acp"],
             arguments: "",
-            installHint: "brew install codex-acp"
+            installHint: AgentSetup.codex.installCommand
         ),
         Candidate(
             profileID: AgentProfiles.opencodeID,
-            title: "opencode",
+            title: "OpenCode",
             executables: ["opencode"],
             arguments: "acp",
-            installHint: "brew install opencode"
+            installHint: AgentSetup.opencode.installCommand
         ),
     ]
 
     static func detectAll(
-        resolve: (String) -> String? = AgentProfiles.resolveExecutable
+        resolve: (String) -> String? = AgentProfiles.resolveExecutable,
+        commands: [String: String] = [:]
     ) -> [AgentDetection] {
         candidates.map { candidate in
-            let path = candidate.executables.lazy.compactMap(resolve).first
+            let configured = commands[candidate.profileID]?
+                .split(whereSeparator: \.isWhitespace).map(String.init) ?? []
+            let configuredPath = configured.first.flatMap(resolve)
+            let path = configuredPath ?? candidate.executables.lazy.compactMap(resolve).first
             let status: AgentDetection.Status
             if path == nil {
                 status = .notInstalled
             } else {
                 status = .ready
             }
-            let command = path.map { candidate.arguments.isEmpty ? $0 : "\($0) \(candidate.arguments)" }
+            let arguments = configuredPath == nil ? candidate.arguments : configured.dropFirst().joined(separator: " ")
+            let command = path.map { arguments.isEmpty ? $0 : "\($0) \(arguments)" }
             return AgentDetection(
                 profileID: candidate.profileID,
                 title: candidate.title,

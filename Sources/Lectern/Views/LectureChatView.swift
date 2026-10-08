@@ -1339,7 +1339,7 @@ struct AgentProviderLogo: View {
     private var assetName: String {
         switch profileID {
         case AgentProfiles.codexID: return "ProviderOpenAI"
-        case AgentProfiles.antigravityID: return "TranscriptionGemini"
+        case AgentProfiles.antigravityID: return "ProviderAntigravity"
         default: return "ProviderOpenCode"
         }
     }
