@@ -835,7 +835,7 @@ private struct CourseSynthesisComposer: View {
     @State private var countPickerOpen = false
     @State private var difficultyPickerOpen = false
     @State private var formatPickerOpen = false
-    @State private var itemCount: Int? = 10
+    @State private var itemCount: Int? = nil
     @State private var difficulty = "Standard"
     @State private var quizFormat = "Mixed"
     @State private var confirmingClear = false
@@ -873,7 +873,8 @@ private struct CourseSynthesisComposer: View {
                         .popover(isPresented: $countPickerOpen, arrowEdge: .bottom) {
                             CourseCountPicker(
                                 selection: $itemCount,
-                                isPresented: $countPickerOpen
+                                isPresented: $countPickerOpen,
+                                kind: creationKind
                             )
                         }
 
@@ -1076,6 +1077,7 @@ private struct CourseGoalPicker: View {
 private struct CourseCountPicker: View {
     @Binding var selection: Int?
     @Binding var isPresented: Bool
+    let kind: ChatStudyKind
 
     private let fixedCounts = [5, 10, 15, 20, 30]
 
@@ -1088,7 +1090,7 @@ private struct CourseCountPicker: View {
                 .padding(.top, 10)
                 .padding(.bottom, 3)
 
-            optionRow(title: "Auto", subtitle: "AI decides", isSelected: selection == nil) {
+            optionRow(title: "Auto", subtitle: kind == .flashcards ? "Full coverage" : "AI decides", isSelected: selection == nil) {
                 selection = nil
                 isPresented = false
             }

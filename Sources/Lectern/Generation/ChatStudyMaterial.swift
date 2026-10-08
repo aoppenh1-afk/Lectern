@@ -16,13 +16,24 @@ enum ChatStudyKind: String, Codable, CaseIterable, Identifiable {
 
 struct ChatStudyRequest {
     var kind: ChatStudyKind
-    /// Nil means the model decides how many items the sources support.
-    var count: Int? = 10
+    /// Nil means Auto. Flashcards cover the complete in-scope material.
+    var count: Int? = nil
     var difficulty = "Standard"
     var quizFormat = "Mixed"
     var usesTopicOnly = false
 
     private var countInstruction: String {
+        if kind == .flashcards {
+            if let count {
+                return """
+                Produce \(count) items. This is a requested review selection, not a guarantee of complete coverage. The student's explicit request takes priority over this count: if they ask for a complete or comprehensive deck, inventory all in-scope material and check every inventory item against the cards, adding as many cards as needed for full coverage. A phrase such as "even if it means 100 cards" permits the size needed for coverage; it is not a target or cap.
+                """
+            }
+            return """
+            Auto means complete coverage of the in-scope material, with no arbitrary card-count cap. Read every selected source in manageable sections before drafting; use the student's topic or scope to decide what is in scope, not a desire to keep the deck short. The student's explicit request takes priority over amount defaults. A phrase such as "even if it means 100 cards" permits the size needed for coverage; it is not a target or cap.
+            \(Prompts.flashcardCoverageRules)
+            """
+        }
         guard let count else {
             return "Decide how many items to produce from the sources: make one focused item per key idea, no filler and no padding. Usually 5 to 20 items, never more than 30."
         }
@@ -102,8 +113,8 @@ struct ChatStudyMaterial: Codable, Identifiable {
         case .notes, .studyGuide:
             guard !markdown.trimmed.isEmpty else { throw MaterialError.invalid("The draft is empty.") }
         case .flashcards:
-            guard (1...100).contains(cards.count), cards.allSatisfy({ !$0.front.trimmed.isEmpty && !$0.back.trimmed.isEmpty }) else {
-                throw MaterialError.invalid("Each flashcard needs a question and an answer. Generate 1 to 100 cards.")
+            guard !cards.isEmpty, cards.allSatisfy({ !$0.front.trimmed.isEmpty && !$0.back.trimmed.isEmpty }) else {
+                throw MaterialError.invalid("A flashcard deck needs at least one card, and each card needs a question and an answer.")
             }
         case .quiz:
             guard (1...100).contains(questions.count) else { throw MaterialError.invalid("A quiz needs 1 to 100 questions.") }

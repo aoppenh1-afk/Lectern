@@ -178,12 +178,21 @@ enum Prompts {
         """
     }
 
+    /// Shared by lecture generation and the course chat's Auto amount.
+    static let flashcardCoverageRules = """
+    - Create a complete flashcard deck. Coverage determines the card count; there is no target count or upper limit. Produce 100 or more cards when the material needs them. Do not stop at a familiar small-deck size or pad a short source to reach a number.
+    - Inventory the in-scope material in source order before writing cards: every topic and subtopic, definition, mechanism or reasoning step, distinction, formula and its conditions, named view, supporting example, application, and exception that the student needs to learn. Skip repetition and non-study chatter, not substantive details.
+    - Make enough atomic cards to cover every inventory item. A broad overview card does not cover the separate facts, steps, comparisons, or exceptions beneath it. Deduplicate repeated ideas across sources without dropping unique details.
+    - Before returning the deck, check every inventory item against the cards and add cards for anything missing. Keep this inventory and coverage check internal; return only the requested JSON.
+    - Keep answers concise, but never shorten the deck by omitting material or bundling unrelated facts. Do not call a condensed selection complete or claim coverage of unreadable or unavailable material.
+    """
+
     static func flashcards(cleanedTranscript: String, language: LectureLanguage = .english) -> String {
         """
         You are creating Anki flashcards from a lecture transcript.
         \(shiurStudySection(language))
         Rules:
-        - Produce 12-20 cards covering every key concept, definition, mechanism, and example from the lecture.
+        \(flashcardCoverageRules)
         - Atomic: one fact per card. Front is a specific question (never yes/no); back is a concise self-sufficient answer.
         - Use the lecture's terminology exactly. Do not invent content that was not covered or implied.
         - Output STRICT JSON only: an array of objects with keys "front" and "back" (both strings). No markdown fences, no commentary.

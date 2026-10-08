@@ -5,15 +5,15 @@ final class AntigravityACPTests: XCTestCase {
     func testPinnedGoogleReleaseMatchesVerifiedT3CodeAsset() throws {
         let release = try XCTUnwrap(AntigravityACPRelease.current)
 
-        XCTAssertEqual(release.version, "agy_acp_server_1.1.1")
+        XCTAssertEqual(release.version, "1.3.0")
         XCTAssertEqual(
             release.url.absoluteString,
-            "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-agy_acp_server_1.1.1-darwin-arm64.zip"
+            "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.3.0-darwin-arm64.zip"
         )
-        XCTAssertEqual(release.sha256, "fdfa915652cdb7ba8085cc8fffed072cbe009251aa2c951aabdda07a8c28a189")
-        XCTAssertEqual(release.archiveBytes, 316_014_828)
-        XCTAssertEqual(release.executable, .init(name: "agy_acp_server.par", bytes: 802_163_856))
-        XCTAssertEqual(release.harness, .init(name: "localharness_external", bytes: 116_766_704))
+        XCTAssertEqual(release.sha256, "7cd97045f7b4fe81175a107cdf16f9c51484e3c78a5162cae415338bb6aa5b88")
+        XCTAssertEqual(release.archiveBytes, 111_456_962)
+        XCTAssertEqual(release.executable, .init(name: "agy_acp_server.par", bytes: 278_535_456))
+        XCTAssertEqual(release.harness, .init(name: "localharness_external", bytes: 118_611_392))
     }
 
     @MainActor
@@ -35,6 +35,12 @@ final class AntigravityACPTests: XCTestCase {
             installed: "agy_acp_server_20260818_01_RC01", available: release.version
         ))
         XCTAssertEqual(manager.authState, .unavailable)
+
+        try writeInstalledFixture(layout: layout, version: "agy_acp_server_1.1.1")
+        await manager.checkForUpdates()
+        XCTAssertEqual(manager.updateState, .available(
+            installed: "agy_acp_server_1.1.1", available: "1.3.0"
+        ))
 
         try writeInstalledFixture(layout: layout, version: release.version)
         await manager.checkForUpdates()

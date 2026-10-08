@@ -1111,9 +1111,9 @@ private struct AgentsPane: View {
     private var updateMessage: String {
         switch antigravityACP.updateState {
         case .unchecked: return "Updates have not been checked."
-        case .checking: return "Checking for updates…"
+        case .checking: return "Checking the installed Antigravity version…"
         case .notInstalled: return "Install Antigravity to get started."
-        case .upToDate: return "Antigravity is up to date for this version of Lectern."
+        case .upToDate(let version): return "Antigravity \(version) matches Lectern's verified release."
         case .available: return "An Antigravity update is available."
         case .unsupported: return "No managed runtime is available for this Mac."
         case .failed: return "Could not check for updates."

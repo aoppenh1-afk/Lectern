@@ -6,6 +6,50 @@ import AppKit
 
 @MainActor
 struct ChatStudyMaterialTests {
+    @Test func flashcardCountDefaultsToAuto() {
+        #expect(ChatStudyRequest(kind: .flashcards).count == nil)
+    }
+
+    @Test func autoFlashcardsRequireFullCoverageWithoutSmallDeckLimits() {
+        let chat = ChatStudyRequest(kind: .flashcards, count: nil).instruction
+        let lecture = Prompts.flashcards(cleanedTranscript: "Lecture source")
+        for prompt in [chat, lecture] {
+            #expect(prompt.contains("Inventory"))
+            #expect(prompt.contains("check every inventory item"))
+            #expect(prompt.contains("100 or more"))
+            #expect(!prompt.contains("never more than 30"))
+            #expect(!prompt.contains("12-20"))
+        }
+        #expect(chat.contains("even if it means 100 cards"))
+        #expect(chat.contains("Read every selected source"))
+    }
+
+    @Test func fixedFlashcardCountAndQuizPolicyRemainExplicit() {
+        let fixed = ChatStudyRequest(kind: .flashcards, count: 15).instruction
+        #expect(fixed.contains("Produce 15 items."))
+        #expect(fixed.contains("student's explicit request takes priority"))
+        #expect(!fixed.contains("100 or more"))
+        let quiz = ChatStudyRequest(kind: .quiz, count: nil).instruction
+        #expect(quiz.contains("never more than 30"))
+        #expect(!quiz.contains("complete flashcard deck"))
+    }
+
+    @Test func largeFlashcardDeckParsesAndSavesEveryCard() throws {
+        let cards = (1...125).map {
+            ChatStudyMaterial.Card(front: "Concept \($0)?", back: "Explanation \($0)")
+        }
+        let payload = ChatStudyMaterial.Payload(title: "Complete deck", markdown: "", cards: cards, questions: [])
+        let response = String(decoding: try JSONEncoder().encode(payload), as: UTF8.self)
+        let material = try ChatStudyMaterial.parse(response, request: .init(kind: .flashcards),
+                                                  sourceLabels: ["Lecture"], modelInfo: "Test")
+        let (container, course, service, turnID) = try fixture(material)
+        let lecture = try service.saveMaterial(material, turnID: turnID, course: course,
+                                               lectureID: nil, newLectureTitle: "Complete deck")
+        let saved = try ModelContext(container).fetch(FetchDescriptor<Flashcard>())
+        #expect(lecture.flashcards.count == 125)
+        #expect(Set(saved.map(\.front)) == Set(cards.map(\.front)))
+    }
+
     private func fixture(_ material: ChatStudyMaterial) throws -> (ModelContainer, Course, CourseSynthesisService, UUID) {
         let container = try ModelContainer(for: Course.self, Lecture.self, ShiurSubscription.self,
                                            configurations: ModelConfiguration(isStoredInMemoryOnly: true))

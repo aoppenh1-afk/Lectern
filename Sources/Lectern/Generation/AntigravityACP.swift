@@ -16,16 +16,17 @@ struct AntigravityACPRelease: Equatable, Sendable {
     let executable: Member
     let harness: Member
 
-    /// Pinned to the Google registry release verified by T3 Code on 2026-09-03.
+    /// Official Google release, matching T3 Code's 2026-10-05 pin.
+    /// Archive hash and member sizes independently checked on 2026-10-08.
     static var current: AntigravityACPRelease? {
         #if arch(arm64)
         AntigravityACPRelease(
-            version: "agy_acp_server_1.1.1",
-            url: URL(string: "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-agy_acp_server_1.1.1-darwin-arm64.zip")!,
-            sha256: "fdfa915652cdb7ba8085cc8fffed072cbe009251aa2c951aabdda07a8c28a189",
-            archiveBytes: 316_014_828,
-            executable: .init(name: "agy_acp_server.par", bytes: 802_163_856),
-            harness: .init(name: "localharness_external", bytes: 116_766_704)
+            version: "1.3.0",
+            url: URL(string: "https://dl.google.com/agy-extensions/releases/macos/agy-acp-server-1.3.0-darwin-arm64.zip")!,
+            sha256: "7cd97045f7b4fe81175a107cdf16f9c51484e3c78a5162cae415338bb6aa5b88",
+            archiveBytes: 111_456_962,
+            executable: .init(name: "agy_acp_server.par", bytes: 278_535_456),
+            harness: .init(name: "localharness_external", bytes: 118_611_392)
         )
         #else
         nil
