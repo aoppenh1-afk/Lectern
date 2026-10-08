@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 final class StatusBarController {
     private static let autosaveName = "LecternMenuBarItem"
-    private static let popoverSize = NSSize(width: MenuBarPopoverView.popoverWidth, height: 360)
+    private static let idlePopoverSize = NSSize(width: MenuBarPopoverView.popoverWidth, height: 360)
 
     private let capture: CaptureController
     private let surfacePreferences: SurfacePreferences
@@ -45,7 +45,7 @@ final class StatusBarController {
         MainActor.assumeIsolated {
             rebuild()
             if let popover {
-                lockPopoverSize(popover)
+                updatePopoverSize(popover)
             }
         }
     }
@@ -115,12 +115,21 @@ final class StatusBarController {
         )
     }
 
-    private func lockPopoverSize(_ pop: NSPopover) {
-        // NSPopover adopts the content view's size when a content controller is
-        // assigned, so set the fixed size after the controller is installed and
-        // re-assert it after state changes. This keeps the shell exactly the same
-        // size no matter which recording source/language is selected.
-        pop.contentSize = Self.popoverSize
+    private func updatePopoverSize(_ pop: NSPopover) {
+        guard let hosting = pop.contentViewController as? NSHostingController<AnyView> else { return }
+        // Keep idle selections from changing the shell's geometry. During a
+        // recording, retain the width but fit the shorter live controls,
+        // including the course and bookmark count when present.
+        var size = Self.idlePopoverSize
+        if capture.phase.isLive {
+            hosting.view.layoutSubtreeIfNeeded()
+            size.height = ceil(hosting.sizeThatFits(in: NSSize(
+                width: size.width,
+                height: .greatestFiniteMagnitude
+            )).height)
+        }
+        hosting.preferredContentSize = size
+        pop.contentSize = size
     }
 
     private func buildPopover() -> NSPopover {
@@ -128,15 +137,12 @@ final class StatusBarController {
         pop.behavior = .transient
 
         let hosting = NSHostingController(rootView: popoverRootView())
-        // The default .standardBounds option reflects SwiftUI's changing ideal,
-        // min, and max sizes back into AppKit. This popover is intentionally a
-        // fixed-size surface, so do not let child intrinsic-size changes resize
-        // its hosting view. Apple documents [] for fixed-frame hosting cases.
+        // Manage geometry here instead of reflecting SwiftUI's changing
+        // intrinsic sizes into AppKit after every source/language selection.
         hosting.sizingOptions = []
-        hosting.preferredContentSize = Self.popoverSize
 
         pop.contentViewController = hosting
-        lockPopoverSize(pop)
+        updatePopoverSize(pop)
         return pop
     }
 
@@ -147,14 +153,12 @@ final class StatusBarController {
         } else {
             let pop = popover ?? buildPopover()
             self.popover = pop
-            lockPopoverSize(pop)
+            updatePopoverSize(pop)
             pop.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            lockPopoverSize(pop)
-            // Clicking the status item while another app is active shows the
-            // popover but leaves it without key focus, forcing a second click
-            // before controls respond. Activate and make key so the first
-            // click is immediately interactive.
-            NSApp.activate(ignoringOtherApps: true)
+            updatePopoverSize(pop)
+            // AppKit's popover window is a nonactivating panel. Give only it
+            // key focus so controls respond immediately without activating
+            // Lectern and bringing the main window forward.
             pop.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
         }
     }
@@ -166,10 +170,9 @@ final class StatusBarController {
         rebuild()
         if let hosting = popover?.contentViewController as? NSHostingController<AnyView> {
             hosting.rootView = popoverRootView()
-            hosting.preferredContentSize = Self.popoverSize
         }
         if let popover {
-            lockPopoverSize(popover)
+            updatePopoverSize(popover)
         }
         if !capture.phase.isLive, popover?.isShown == true {
             // Give the user a beat to see the saved state before closing.
