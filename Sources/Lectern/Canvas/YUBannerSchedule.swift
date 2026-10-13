@@ -99,6 +99,7 @@ struct YUClassMeeting: Codable, Sendable, Equatable {
     func start(on day: Date, calendar: Calendar = .current) -> Date? {
         var nyCalendar = calendar
         nyCalendar.timeZone = Self.yuTimeZone
+        let day = nyCalendar.startOfDay(for: day)
         let weekday = nyCalendar.component(.weekday, from: day)
         guard weekdaySet.contains(weekday) else { return nil }
         if let rangeStart = startDate, day < nyCalendar.startOfDay(for: rangeStart) { return nil }
@@ -367,17 +368,27 @@ enum YUBannerSchedule {
         let end: Date?
     }
 
-    /// Next Banner class across courses. Used by Overview active session.
+    /// Current Banner class, or the next class if none is in progress.
+    /// A meeting stays current from its start through, but excluding, its end.
     static func nextClass(in courses: [(name: String, code: String?, meetings: [YUClassMeeting])],
                          now: Date = Date()) -> Occurrence? {
+        var ny = Calendar.current
+        ny.timeZone = YUClassMeeting.yuTimeZone
         var best: Occurrence?
         for course in courses {
             for meeting in course.meetings {
-                guard let start = meeting.nextStart(after: now) else { continue }
+                let currentStart: Date? = {
+                    guard let start = meeting.start(on: now, calendar: ny), start <= now else { return nil }
+                    if start == now { return start }
+                    // Without a known end, only future starts can be suggested.
+                    guard let endMinutes = meeting.endMinutes,
+                          let end = ny.date(bySettingHour: endMinutes / 60, minute: endMinutes % 60,
+                                            second: 0, of: start), now < end else { return nil }
+                    return start
+                }()
+                guard let start = currentStart ?? meeting.nextStart(after: now, calendar: ny) else { continue }
                 let end: Date? = {
                     guard let endMinutes = meeting.endMinutes else { return nil }
-                    var ny = Calendar.current
-                    ny.timeZone = YUClassMeeting.yuTimeZone
                     return ny.date(bySettingHour: endMinutes / 60, minute: endMinutes % 60, second: 0, of: start)
                 }()
                 if best == nil || start < best!.start {

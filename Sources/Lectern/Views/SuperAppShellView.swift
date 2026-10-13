@@ -500,33 +500,35 @@ struct OverviewDashboardView: View {
 
     private var activeSessionCard: some View {
         StudioCard("Active session") {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Circle().fill(capture.phase.isLive ? LecternTheme.successTint : Color.secondary.opacity(0.35)).frame(width: 7, height: 7)
-                    Text(capture.phase.isLive ? "LIVE SYNCED" : "READY TO RECORD")
-                        .font(.system(size: 10, weight: .semibold)).foregroundStyle(capture.phase.isLive ? LecternTheme.accent : .secondary)
-                    Spacer()
+            TimelineView(.periodic(from: .now, by: 60)) { _ in
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Circle().fill(capture.phase.isLive ? LecternTheme.successTint : Color.secondary.opacity(0.35)).frame(width: 7, height: 7)
+                        Text(capture.phase.isLive ? "LIVE SYNCED" : "READY TO RECORD")
+                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(capture.phase.isLive ? LecternTheme.accent : .secondary)
+                        Spacer()
+                    }
+                    Text(activeSessionTitle)
+                        .font(.system(size: 20, weight: .semibold, design: .serif))
+                        .foregroundStyle(LecternTheme.ink)
+                    Text(activeSessionSubtitle)
+                        .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
+                    Button {
+                        capture.toggle(in: suggestedCourse, source: surfacePreferences.captureSource)
+                    } label: {
+                        Text(capture.phase.isLive ? "Stop recording" : surfacePreferences.captureSource == .microphone ? "Start grounded recording" : surfacePreferences.captureSource.recordButtonTitle)
+                            .frame(maxWidth: .infinity).padding(.vertical, 10)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8))
                 }
-                Text(activeSessionTitle)
-                    .font(.system(size: 20, weight: .semibold, design: .serif))
-                    .foregroundStyle(LecternTheme.ink)
-                Text(activeSessionSubtitle)
-                    .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
-                Button {
-                    capture.toggle(in: suggestedCourse, source: surfacePreferences.captureSource)
-                } label: {
-                    Text(capture.phase.isLive ? "Stop recording" : surfacePreferences.captureSource == .microphone ? "Start grounded recording" : surfacePreferences.captureSource.recordButtonTitle)
-                        .frame(maxWidth: .infinity).padding(.vertical, 10)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8))
             }
         }
     }
 
     private var activeSessionTitle: String {
-        if capture.phase.isLive, let name = capture.activeCourseName { return name }
+        if capture.phase.isLive { return capture.activeCourseName ?? "Unfiled" }
         if let next = nextBanner { return next.courseName }
         return suggestedCourse?.name ?? todayEvents.first?.courseName ?? "Start your first class"
     }
@@ -650,7 +652,12 @@ struct OverviewDashboardView: View {
         if let next = nextBanner {
             var parts = [next.start.formatted(date: .omitted, time: .shortened)]
             if let location = next.meeting.locationDisplay { parts.append(location) }
-            parts.append(countdown(to: next.start))
+            if next.start <= Date(), let end = next.end {
+                parts.append("In progress")
+                parts.append("Ends at \(end.formatted(date: .omitted, time: .shortened))")
+            } else {
+                parts.append(countdown(to: next.start))
+            }
             return parts.joined(separator: " · ") + " · YU schedule"
         }
         if let event = todayEvents.first {

@@ -139,6 +139,77 @@ final class YUBannerScheduleTests: XCTestCase {
         XCTAssertEqual(next?.courseName, "Early")
     }
 
+    private func october13(_ hour: Int, _ minute: Int = 0) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = YUClassMeeting.yuTimeZone
+        return calendar.date(from: DateComponents(year: 2026, month: 10, day: 13,
+                                                  hour: hour, minute: minute))!
+    }
+
+    private var activeSessionCourses: [(name: String, code: String?, meetings: [YUClassMeeting])] {
+        [
+            (name: "Top: Contemporary World Poetry", code: nil,
+             meetings: section(subject: "ENG", number: "1", title: "Poetry", instructor: "",
+                               weekdays: [3, 5], startMinutes: 16 * 60 + 30).meetings),
+            (name: "Drashot-Eastern European Jewry", code: "JHI-2430-331",
+             meetings: section(subject: "JHI", number: "2430", title: "Drashot", instructor: "",
+                               weekdays: [3, 5], startMinutes: 15 * 60).meetings),
+        ]
+    }
+
+    func testNextClassKeepsDrashotWhileItIsInProgress() throws {
+        let selected = try XCTUnwrap(YUBannerSchedule.nextClass(in: activeSessionCourses,
+                                                               now: october13(15, 47)))
+        XCTAssertEqual(selected.courseName, "Drashot-Eastern European Jewry")
+        XCTAssertEqual(selected.courseCode, "JHI-2430-331")
+        XCTAssertEqual(selected.start, october13(15))
+        XCTAssertEqual(selected.end, october13(16, 15))
+    }
+
+    func testNextClassIncludesExactStartAndKeepsClassUntilEnd() {
+        for now in [october13(15), october13(16, 15).addingTimeInterval(-1)] {
+            XCTAssertEqual(YUBannerSchedule.nextClass(in: activeSessionCourses, now: now)?.courseName,
+                           "Drashot-Eastern European Jewry")
+        }
+    }
+
+    func testNextClassMovesToPoetryAtDrashotEnd() {
+        for now in [october13(16, 15), october13(16, 20), october13(16, 30)] {
+            XCTAssertEqual(YUBannerSchedule.nextClass(in: activeSessionCourses, now: now)?.courseName,
+                           "Top: Contemporary World Poetry")
+        }
+    }
+
+    func testNextClassDoesNotAssumeDurationWhenEndIsMissing() {
+        var courses = activeSessionCourses
+        courses[1].meetings[0].endMinutes = nil
+        XCTAssertEqual(YUBannerSchedule.nextClass(in: courses, now: october13(15))?.courseName,
+                       "Drashot-Eastern European Jewry")
+        XCTAssertEqual(YUBannerSchedule.nextClass(in: courses, now: october13(15, 47))?.courseName,
+                       "Top: Contemporary World Poetry")
+    }
+
+    func testNextClassDoesNotSelectInProgressMeetingOutsideTermDates() {
+        let ranges: [(start: Date?, end: Date?)] = [
+            (start: october13(0).addingTimeInterval(86400), end: nil),
+            (start: nil, end: october13(0).addingTimeInterval(-86400)),
+        ]
+        for range in ranges {
+            var courses = activeSessionCourses
+            courses[1].meetings[0].startDate = range.start
+            courses[1].meetings[0].endDate = range.end
+            XCTAssertEqual(YUBannerSchedule.nextClass(in: courses, now: october13(15, 47))?.courseName,
+                           "Top: Contemporary World Poetry")
+        }
+    }
+
+    func testNextClassIncludesLastDayOfTerm() {
+        var courses = activeSessionCourses
+        courses[1].meetings[0].endDate = october13(0)
+        XCTAssertEqual(YUBannerSchedule.nextClass(in: courses, now: october13(15, 47))?.courseName,
+                       "Drashot-Eastern European Jewry")
+    }
+
     func testBannerTimeFixesEarlyZoomInvite() throws {
         let message = """
         [Create Meeting]
