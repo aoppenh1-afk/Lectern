@@ -154,7 +154,7 @@ Keep two levels of direction separate. The outline, bullets, indentation, and se
 
 Store Hebrew in logical reading order, both characters and words. For example, store `גמ׳ סנהדרין דף נח:-ס.` in that order and `קודם מתן תורה, פרו ורבו` in that order. Keep the comma inside the Hebrew passage. Never reverse words, split a phrase into separately ordered words, or move punctuation to compensate for a screenshot's visual order. Lectern supplies display direction at the rendering/export boundary.
 
-- Return ordinary UTF-8 Markdown. Do not insert invisible direction marks, embeddings, overrides, or isolates, HTML `dir` attributes, literal `\u200e` escapes, or `&lrm;` entities. Direction controls belong to the renderer, not generated content.
+- Return ordinary UTF-8 Markdown. The only permitted added direction control is U+200E LEFT-TO-RIGHT MARK (LRM), at the English punctuation boundary defined below. Emit the actual character, never a literal `\u200e` escape or `&lrm;` entity. Do not add other direction marks, embeddings, overrides, isolates, or HTML `dir` attributes.
 - Write paired punctuation normally: opening `(`, its complete content, closing `)`. Keep both brackets around the intended phrase. Keep commas and ordinary label separators in their usual positions. Daf references use the specific amud-marker rule below.
 - Use `״` and `׳` inside Hebrew abbreviations; quotation marks around a quotation are separate punctuation. Keep quoted Hebrew wording only when supported by the source.
 - A standalone source label needs no extra separator colon. Store daf citations in their normal logical order, with the amud mark after its numeral: `דף לו:` for עמוד ב and `דף לו.` for עמוד א. Examples: `גמ׳ דף לו:`, `משנה (דף לו.)`, `תוס׳ (דף ל״ו:)`, `גמ׳ סנהדרין דף נח:-ס.`. Keep a range's endpoints in source order and preserve each endpoint's amud mark. Do not guess a missing עמוד.
@@ -170,9 +170,28 @@ The stored sequence is bold source, Hebrew explanation, then English continuatio
 - A parenthetical citation inside a Hebrew source label belongs to that source's RTL phrase. Keep it inside the same bold label: `**לפי תוס׳ (ורא״ש פרק ד׳):**` and `**פני יהושע (דף ל״ז. בשיטת רש״י)**`. Read the source name first at the right, then the parenthetical to its left. A fully Hebrew heading follows the same rule.
 - A parenthetical aside in an English sentence remains a separate component in the sentence's LTR order. For example, in `an איסור דרבנן of אטו שבת (שמא יחזיר בשבת)`, keep the aside to the right of `אטו שבת`, with RTL Hebrew inside the parentheses. A parenthesized Hebrew quotation is also its own component, with both delimiters enclosing the complete RTL quotation even when it wraps. Preserve this distinction when revising; do not move every parenthetical to the same side.
 - Use the translations and source wording rules above to decide which parentheticals to keep. Use child items for independently developed comparisons, preserving each view and qualifier. Keep fractions such as `1/3` in their ordinary numeric order. Preserve a continuous quotation as a quotation instead of splitting it into bullets to work around display direction.
-- In revisions, a screenshot shows visual order, which can differ from stored character order. Use the actual Markdown or source text to repair malformed punctuation. If the stored pair is already correct, preserve it; display-only problems require the renderer or export fix.
+- In revisions, a screenshot shows visual order, which can differ from stored character order. Use the actual Markdown or source text to repair malformed punctuation. Preserve correctly paired delimiters and logical word order. Apply only the English punctuation exception below in generated content; other display-only problems require the renderer or export fix.
 
-These examples show logical Markdown, without invisible characters:
+#### English punctuation between Hebrew insertions
+
+Classify the punctuation by the sentence it belongs to before adding an LRM. An English sentence can contain separate Hebrew terms or phrases, or a continuous Hebrew/Aramaic passage with its own grammar. An English introduction does not turn the passage's internal punctuation into English punctuation. Apply this distinction even when the passage has no quotation marks.
+
+- When an English comma or colon separates two independent Hebrew insertions in an English sentence, insert exactly one LRM immediately after that punctuation and before the following space. This keeps the insertions in the English sentence's LTR sequence while each Hebrew insertion reads RTL internally. Keep an existing LRM at that boundary instead of adding a duplicate.
+- Preserve every comma, colon, and other punctuation inside a continuous Hebrew/Aramaic phrase or quotation without inserting an LRM there. A pause within that passage still belongs to its Hebrew/Aramaic grammar. Source-internal parentheses, abbreviation marks, and daf/amud punctuation also stay within their original phrase.
+- Use the mark only at the qualifying boundary. When an English word already separates the Hebrew insertions, no LRM is needed. Never apply a global replacement to punctuation or add marks around every Hebrew word. If the punctuation's role is uncertain, preserve the text and ask for clarification when that distinction is needed for the requested repair.
+
+The first two examples contain one actual U+200E each, immediately after `משנה:` and `רש״י,` respectively. The last two contain none. These illustrate punctuation only; use wording supported by the lecture in actual notes.
+
+```markdown
+- from the משנה:‎ כופח fueled with ...
+- **Q:** acc to רש״י,‎ שאני הכא דקטומה means ...
+- The רי״ף rules: "לית הילכתא כוותיה, ואף על גב דסייעיה רבא... ההיא סיועא לאו דוקא הוא ולא גמירי מיניה, דעל מסקנא דגמרא סמכינן"
+- קודם מתן תורה, פרו ורבו applied to all mankind
+```
+
+In the first example, the colon introduces the case after the English phrase `from the משנה`. In the second, the comma ends the English attribution `acc to רש״י` before a separate source phrase. In the רי״ף example, the commas belong to the quoted Aramaic argument, so the quotation remains one continuous RTL passage. The unquoted Hebrew phrase in the last example also keeps its internal comma.
+
+The following layout examples need no LRM:
 
 ```markdown
 - **גמ׳ דף כ:**
@@ -250,5 +269,6 @@ Before responding, silently verify:
 2. Every list item on its own line, `- ` or `1. ` markers only, four-space nesting, and supporting points actually nested under the point they support.
 3. Every developed topic, source, question, answer, and example appears once, in source order, with nothing invented and no שיטות merged.
 4. The chosen layout is consistent throughout, and the shiur orthography follows the Hebrew-script and English-spelling rules above, with `״` and `׳` for Hebrew abbreviations. Bilingual pairs pass the translations and source wording check above.
-5. Parentheses and quotes are paired in logical order; source punctuation, question marks, and numeric fractions retain their meaning. Mixed-language comparisons remain readable as nested items. The output contains no added direction controls; Hebrew characters and words stay in logical reading order, with amud marks after their numerals. An inline bold source precedes its explanation in the LTR layout, while each Hebrew passage reads RTL across punctuation and line wraps. Source-internal parentheses follow their Hebrew source; English-sentence asides keep their LTR component position.
-6. The response is only the Markdown document.
+5. Parentheses and quotes are paired in logical order; source punctuation, question marks, and numeric fractions retain their meaning. Mixed-language comparisons remain readable as nested items. Hebrew characters and words stay in logical reading order, with amud marks after their numerals. An inline bold source precedes its explanation in the LTR layout, while each Hebrew passage reads RTL across punctuation and line wraps. Source-internal parentheses follow their Hebrew source; English-sentence asides keep their LTR component position.
+6. Every added LRM passes the English punctuation boundary rule above. Continuous Hebrew/Aramaic passages have no inserted marks at internal punctuation, and no other direction controls were added.
+7. The response is only the Markdown document.
