@@ -76,7 +76,33 @@ Antigravity uses native attachments, supplied once when a session starts. Changi
 
 Antigravity ACP is the default. **Settings › Agents** downloads its runtime and connects your Google account. For ChatGPT via `codex-acp` and OpenCode, the page provides official download instructions, installation in Terminal, and sign-in buttons. Click Refresh after installation. Custom agent commands are under Advanced.
 
-All three use the bundled [Lectern notes skill](.agents/skills/lectern-notes/SKILL.md), which contains separate layouts for English lectures and English-Hebrew shiurim. No separate skill installation or access to the author's notes is needed. Google Docs sync keeps headings and lists left to right and uses invisible left-to-right marks around Hebrew phrases so surrounding punctuation and numbers stay in the LTR sentence. The export format version is part of the sync hash, so the next sync can reformat existing notes without regenerating them.
+With Default Lectern style selected, all three use the bundled [Lectern notes skill](.agents/skills/lectern-notes/SKILL.md), which contains separate layouts for English lectures and English-Hebrew shiurim. No separate skill installation or access to the author's notes is needed. Google Docs sync keeps headings and lists left to right and uses invisible left-to-right marks around Hebrew phrases so surrounding punctuation and numbers stay in the LTR sentence. The export format version is part of the sync hash, so the next sync can reformat existing notes without regenerating them.
+
+## Personal note styles
+
+**Settings › Notes** lets you choose **Default Lectern style** or **My notes style**
+for future notes, including automatic shiur imports. In **Generate**, the Notes
+style picker can override that preference for one lecture.
+
+To create a personal style, paste or import one to five examples of your notes,
+choose an installed agent, and click **Create my style**. Markdown, text, Word,
+RTF, and PDFs with selectable text are supported. Review the extracted text:
+Word and PDF extraction can lose formatting, and scanned PDFs need text first.
+Use representative excerpts totaling at most 60,000 characters.
+
+The agent derives presentation instructions and short excerpts. Review or edit
+them, optionally generate a preview from Lectern's example lecture, then click
+**Use my style**. **Save without switching** retains the current preference and
+active style. **Saved versions** can restore an earlier revision. Selecting the
+default keeps the personal style available; **Remove** deletes its local samples
+and revisions.
+
+Personal styles persist under ~/Library/Application Support/Lectern/Note Styles
+across app restarts and provider changes. Creating a style sends the samples to
+the selected provider. Future notes requests send the saved rules and short
+excerpts, with lecture content supplied separately. The default style sends no
+personal samples. Changing a style affects new generations; each running job
+keeps the revision it started with. No global agent skill installation is needed.
 
 ## Read lectures from ChatGPT or Claude (MCP)
 

@@ -638,6 +638,8 @@ final class LectureChatService {
         \(LecternAgentSkill.notes.instructions())
         </notes-contract>
 
+        The current Notes document establishes the presentation for this edit, including paragraph layouts, section names, and language preferences. Match that presentation for additions and revisions when it differs from the default style above. Preserve the factual and rendering requirements.
+
         Support the requested operation as written: append or expand material, replace a named section, rewrite a quoted or selected passage, fix spelling or structure, rewrite for clarity, or add a visual. When a visual would make the material meaningfully easier to understand and an image-generation tool is available, use it to create a clean textbook-style labeled diagram or illustration. Save it in the current workspace and embed it with Markdown using its absolute local path. Use a fenced `mermaid` block when a flow, cycle, hierarchy, or comparison is better represented as a diagram or image generation is unavailable. Preserve unrelated Markdown exactly whenever possible. Do not edit the transcript.
 
         You may add accurate outside context when the request calls for it or it materially improves the requested section. Distinguish it from lecture material and add source names and links when available. Never invent sources or citations.

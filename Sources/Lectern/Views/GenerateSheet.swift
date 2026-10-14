@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import AppKit
 
 /// Sheet that kicks off study-material generation for a lecture.
 struct GenerateSheet: View {
@@ -9,6 +10,8 @@ struct GenerateSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var antigravityACP = AntigravityACPManager.shared
+    @State private var notesStyles = NotesStyleStore.shared
+    @State private var notesStyle = NotesStyleSelection.savedPreference
 
     @State private var cleanedTranscriptOn = true
     @State private var notesOn = true
@@ -58,7 +61,10 @@ struct GenerateSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             switch viewState {
-            case .selection: selectionView
+            case .selection:
+                ScrollView { selectionView }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .frame(height: min(660, max(400, (NSScreen.main?.visibleFrame.height ?? 800) - 160)))
             case .running: runningView
             case .finished: completionView
             }
@@ -116,6 +122,7 @@ struct GenerateSheet: View {
             }
 
             outputsCard
+            if notesOn { notesStyleCard }
             agentCard
 
             if quizOn {
@@ -154,7 +161,7 @@ struct GenerateSheet: View {
                       isOn: $cleanedTranscriptOn)
             cardDivider
             toggleRow(title: "Notes",
-                      detail: "Bullet study notes with a summary",
+                      detail: "Complete study notes in your selected style",
                       isOn: $notesOn)
             cardDivider
             toggleRow(title: "Flashcards",
@@ -620,6 +627,29 @@ struct GenerateSheet: View {
         )
     }
 
+    private var notesStyleCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Notes style").font(.system(size: 12, weight: .semibold))
+            Picker("Notes style", selection: $notesStyle) {
+                Text("Saved preference · \(notesStyles.preferredSelection.title)").tag(NotesStyleSelection.savedPreference)
+                Text(NotesStyleSelection.lecternDefault.title).tag(NotesStyleSelection.lecternDefault)
+                Text(NotesStyleSelection.personal.title).tag(NotesStyleSelection.personal)
+                    .disabled(notesStyles.current == nil)
+            }.labelsHidden()
+            if let warning = notesStyles.resolve(notesStyle).warning {
+                Text(warning).font(.system(size: 11)).foregroundStyle(LecternTheme.warningTint)
+            } else {
+                Text(notesStyles.current == nil
+                     ? "Create a personal style from sample notes in Settings › Notes."
+                     : "This choice applies to this generation. Change the saved preference in Settings › Notes.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+        }.padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: LecternTheme.cardRadius).fill(LecternTheme.cardFill))
+            .overlay(RoundedRectangle(cornerRadius: LecternTheme.cardRadius).strokeBorder(cardBorder))
+    }
+
     private func sectionLabel(_ title: String) -> some View {
         Text(title.uppercased())
             .font(.system(size: 10, weight: .semibold))
@@ -770,7 +800,8 @@ struct GenerateSheet: View {
                             quizOptions: QuizOptions(format: quizFormat, length: quizLength),
                             thinkingLevel: thinkingLevel,
                             modelOverride: resolvedModel,
-                            quizFocus: quizOn && !focus.isEmpty ? focus : nil)
+                            quizFocus: quizOn && !focus.isEmpty ? focus : nil,
+                            notesStyle: notesStyle)
     }
 
     // MARK: - Running (staged pipeline)

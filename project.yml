@@ -36,6 +36,9 @@ targets:
       - path: .agents/skills/lectern-notes
         type: folder
         buildPhase: resources
+      - path: .agents/skills/custom-note-styling
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: ParakeetTDT
         product: ParakeetTDT

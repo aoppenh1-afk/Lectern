@@ -24,6 +24,7 @@ final class GenerationService {
 
     private let modelContainer: ModelContainer
     private let completionNotifier: any CompletionNotifying
+    private let notesStyles: NotesStyleStore
 
     private struct GeneratedOutput: Sendable {
         let kind: GenerationJobKind
@@ -56,10 +57,12 @@ final class GenerationService {
 
     init(
         modelContainer: ModelContainer,
-        completionNotifier: any CompletionNotifying = SystemCompletionNotifier.shared
+        completionNotifier: any CompletionNotifying = SystemCompletionNotifier.shared,
+        notesStyles: NotesStyleStore? = nil
     ) {
         self.modelContainer = modelContainer
         self.completionNotifier = completionNotifier
+        self.notesStyles = notesStyles ?? .shared
 
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         workspaceDirectory = support.appendingPathComponent("Lectern/Workspace", isDirectory: true)
@@ -72,9 +75,11 @@ final class GenerationService {
                   quizOptions: QuizOptions = QuizOptions(),
                   thinkingLevel: ThinkingLevel = .medium,
                   modelOverride: String? = nil,
-                  quizFocus: String? = nil) {
+                  quizFocus: String? = nil,
+                  notesStyle: NotesStyleSelection = .savedPreference) {
         _ = start(lecture: lecture, kinds: kinds, profile: profile, quizOptions: quizOptions,
-                  thinkingLevel: thinkingLevel, modelOverride: modelOverride, quizFocus: quizFocus)
+                  thinkingLevel: thinkingLevel, modelOverride: modelOverride, quizFocus: quizFocus,
+                  notesStyle: notesStyle)
     }
 
     func cancel(lectureID: PersistentIdentifier) {
@@ -92,11 +97,13 @@ final class GenerationService {
         quizOptions: QuizOptions = QuizOptions(),
         thinkingLevel: ThinkingLevel = .medium,
         modelOverride: String? = nil,
-        quizFocus: String? = nil
+        quizFocus: String? = nil,
+        notesStyle: NotesStyleSelection = .savedPreference
     ) async throws {
         try Task.checkCancellation()
         guard let task = start(lecture: lecture, kinds: kinds, profile: profile, quizOptions: quizOptions,
-                               thinkingLevel: thinkingLevel, modelOverride: modelOverride, quizFocus: quizFocus) else { return }
+                               thinkingLevel: thinkingLevel, modelOverride: modelOverride, quizFocus: quizFocus,
+                               notesStyle: notesStyle) else { return }
         try await withTaskCancellationHandler {
             try await task.value
         } onCancel: {
@@ -106,15 +113,16 @@ final class GenerationService {
 
     private func start(lecture: Lecture, kinds: [GenerationJobKind], profile: AgentProfile,
                        quizOptions: QuizOptions, thinkingLevel: ThinkingLevel,
-                       modelOverride: String?, quizFocus: String?) -> Task<Void, Error>? {
+                       modelOverride: String?, quizFocus: String?, notesStyle: NotesStyleSelection) -> Task<Void, Error>? {
         let id = lecture.persistentModelID
         if let existing = generationTasks[id] { return existing }
         let ordered = GenerationJobKind.ordered.filter { kinds.contains($0) }
         guard !ordered.isEmpty else { return nil }
+        let resolvedStyle = ordered.contains(.notes) ? notesStyles.resolve(notesStyle) : (.lecternDefault, nil)
         let title = lecture.title
         activeJobs[id] = ActiveJob(lectureTitle: title, remaining: ordered)
         errors[id] = nil
-        warnings[id] = nil
+        warnings[id] = resolvedStyle.1
         lastError = nil
         completionNotifier.prepare(for: .generation)
         let task = Task<Void, Error> {
@@ -126,7 +134,7 @@ final class GenerationService {
                 try await executeGenerationCore(lectureID: id, lectureTitle: title, kinds: ordered,
                                                 profile: profile, quizOptions: quizOptions,
                                                 thinkingLevel: thinkingLevel, modelOverride: modelOverride,
-                                                quizFocus: quizFocus)
+                                                quizFocus: quizFocus, notesStyle: resolvedStyle.0)
             } catch {
                 if Task.isCancelled || error is CancellationError { throw CancellationError() }
                 let message = "\(profile.title): \(error.localizedDescription)"
@@ -148,7 +156,8 @@ final class GenerationService {
         quizOptions: QuizOptions,
         thinkingLevel: ThinkingLevel,
         modelOverride: String?,
-        quizFocus: String?
+        quizFocus: String?,
+        notesStyle: NotesStyleSnapshot
     ) async throws {
         try Task.checkCancellation()
         let context = modelContainer.mainContext
@@ -224,7 +233,8 @@ final class GenerationService {
                         language: language,
                         supplementaryInputs: supplementaryInputs,
                         bookmarkContext: kind == .notes ? bookmarkContext : "",
-                        requiredBookmarkLinks: kind == .notes ? requiredBookmarkLinks : []
+                        requiredBookmarkLinks: kind == .notes ? requiredBookmarkLinks : [],
+                        notesStyle: kind == .notes ? notesStyle : .lecternDefault
                     )
                 }
             }
@@ -244,8 +254,10 @@ final class GenerationService {
             case .cleanedTranscript:
                 break
             case .notes:
-                storeNotes(lecture: lecture, markdown: output.content, profile: profile, context: context)
-                warnings[lectureID] = output.warning
+                storeNotes(lecture: lecture, markdown: output.content, profile: profile, context: context,
+                           style: notesStyle)
+                let messages = [warnings[lectureID], output.warning].compactMap { $0 }
+                warnings[lectureID] = messages.isEmpty ? nil : messages.joined(separator: "\n")
             case .flashcards:
                 try storeFlashcards(lecture: lecture, output: output.content, context: context)
             case .quiz:
@@ -359,7 +371,8 @@ final class GenerationService {
         language: LectureLanguage,
         supplementaryInputs: [AntigravityACPClient.WorkspaceInput],
         bookmarkContext: String,
-        requiredBookmarkLinks: [NoteFlagRequirement]
+        requiredBookmarkLinks: [NoteFlagRequirement],
+        notesStyle: NotesStyleSnapshot = .lecternDefault
     ) async throws -> GeneratedOutput {
         if profile.id == AgentProfiles.antigravityID, kind == .notes {
             let cli = AntigravityACPClient.configured(for: profile)
@@ -379,12 +392,14 @@ final class GenerationService {
                 modelID: modelID,
                 thinkingLevel: thinkingLevel,
                 inputs: [source] + bookmarkInputs + supplementaryInputs,
-                skills: [.notes]
+                skills: [.notes],
+                skillInstructions: notesStyle.isPersonal ? [.notes: notesStyle.instructions] : [:]
             ))
             var violations = NotesOutputValidator.violations(
                 in: output,
                 source: transcript,
-                language: language
+                language: language,
+                personalStyle: notesStyle.isPersonal
             )
             violations += missingBookmarkLinkViolations(in: output, links: requiredBookmarkLinks)
             if !violations.isEmpty {
@@ -398,12 +413,14 @@ final class GenerationService {
                     thinkingLevel: thinkingLevel,
                     inputs: [source, .text(output, named: "draft-notes.md")]
                         + bookmarkInputs + supplementaryInputs,
-                    skills: [.notes]
+                    skills: [.notes],
+                    skillInstructions: notesStyle.isPersonal ? [.notes: notesStyle.instructions] : [:]
                 ))
                 violations = NotesOutputValidator.violations(
                     in: output,
                     source: transcript,
-                    language: language
+                    language: language,
+                    personalStyle: notesStyle.isPersonal
                 )
             }
             guard violations.isEmpty else {
@@ -419,7 +436,7 @@ final class GenerationService {
             prompt = Prompts.cleanedTranscript(rawTranscript: transcript, language: language)
         case .notes:
             prompt = Prompts.notes(cleanedTranscript: transcript, language: language,
-                                   bookmarkContext: bookmarkContext)
+                                   bookmarkContext: bookmarkContext, skillInstructions: notesStyle.instructions)
         case .flashcards:
             prompt = Prompts.flashcards(cleanedTranscript: transcript, language: language)
         case .quiz:
@@ -488,18 +505,20 @@ final class GenerationService {
                 var violations = NotesOutputValidator.violations(
                     in: output,
                     source: transcript,
-                    language: language
+                    language: language,
+                    personalStyle: notesStyle.isPersonal
                 )
                 violations += missingBookmarkLinkViolations(in: output, links: requiredBookmarkLinks)
                 if !violations.isEmpty {
                     output = NotesMarkdownNormalizer.normalize(try await connection.prompt(
                         sessionID: session.id,
-                        text: Prompts.notesRepair(violations: violations)
+                        text: Prompts.notesRepair(violations: violations, style: notesStyle)
                     ))
                     violations = NotesOutputValidator.violations(
                         in: output,
                         source: transcript,
-                        language: language
+                        language: language,
+                        personalStyle: notesStyle.isPersonal
                     )
                 }
                 guard violations.isEmpty else {
@@ -654,9 +673,11 @@ final class GenerationService {
 
     /// Copies any local image files the agent referenced into the lecture's
     /// attachment folder and rewrites references to absolute paths.
-    private func storeNotes(lecture: Lecture, markdown: String, profile: AgentProfile, context: ModelContext) {
+    private func storeNotes(lecture: Lecture, markdown: String, profile: AgentProfile, context: ModelContext,
+                            style: NotesStyleSnapshot = .lecternDefault) {
         let processed = Self.importReferencedImages(markdown: markdown, lectureID: lecture.persistentModelID)
-        upsertArtifact(kind: .notes, content: processed, modelInfo: profile.title, lecture: lecture, context: context)
+        let modelInfo = style.personal.map { "\(profile.title) · \($0.draft.name) · \($0.id.uuidString)" } ?? profile.title
+        upsertArtifact(kind: .notes, content: processed, modelInfo: modelInfo, lecture: lecture, context: context)
     }
 
     static func importReferencedImages(markdown: String, lectureID: PersistentIdentifier) -> String {

@@ -9,7 +9,7 @@ struct SettingsView: View {
     @State private var section: Section = .general
 
     enum Section: String, CaseIterable, Identifiable {
-        case general, notifications, appearance, recording, transcription, retention, canvas, anki, googleDocs, mcp, agents
+        case general, notifications, appearance, recording, transcription, notes, retention, canvas, anki, googleDocs, mcp, agents
 
         var id: String { rawValue }
 
@@ -20,6 +20,7 @@ struct SettingsView: View {
             case .appearance: return "Appearance"
             case .recording: return "Recording"
             case .transcription: return "Transcription"
+            case .notes: return "Notes"
             case .retention: return "Retention"
             case .canvas: return "Canvas"
             case .anki: return "Anki"
@@ -36,6 +37,7 @@ struct SettingsView: View {
             case .appearance: return "paintbrush"
             case .recording: return "mic"
             case .transcription: return "waveform.and.mic"
+            case .notes: return "text.book.closed"
             case .retention: return "clock.arrow.circlepath"
             case .canvas: return "building.columns"
             case .anki: return "rectangle.on.rectangle.angled"
@@ -52,6 +54,7 @@ struct SettingsView: View {
             case .appearance: return "Theme and accent across the whole app."
             case .recording: return "Capture source, hotkey, and menu surfaces."
             case .transcription: return "Where new recordings are transcribed."
+            case .notes: return "Choose Lectern's outline or learn your own note style."
             case .retention: return "How long lecture audio is kept."
             case .canvas: return "Pull courses, deadlines, and announcements."
             case .anki: return "Sync flashcards through AnkiConnect."
@@ -149,6 +152,7 @@ struct SettingsView: View {
                 case .appearance: AppearancePane()
                 case .recording: RecordingPane()
                 case .transcription: TranscriptionSettingsPane()
+                case .notes: NotesStyleSettingsPane()
                 case .retention: RetentionPane()
                 case .canvas: CanvasSettingsPane()
                 case .anki: AnkiPane()

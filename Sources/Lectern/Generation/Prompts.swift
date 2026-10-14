@@ -3,6 +3,7 @@ import Foundation
 enum LecternAgentSkill: String, CaseIterable, Hashable, Sendable {
     case transcription = "lectern-transcription"
     case notes = "lectern-notes"
+    case customNoteStyling = "custom-note-styling"
 
     func bundledURL(bundle: Bundle = .main) -> URL? {
         if let bundled = bundle.url(
@@ -44,6 +45,10 @@ enum LecternAgentSkill: String, CaseIterable, Hashable, Sendable {
         case .notes:
             return """
             Create grounded student notes in source order. Begin with one source-derived # title, use ## topic sections, and choose either a topical bullet outline (**Term:** definition with details nested beneath) or a nested numbered outline for chronological lectures. Put every list item on its own line with a `- ` or `1. ` marker and nest supporting details exactly four spaces under the item they support; outlines normally run two to four levels deep. For a shiur, use English reasoning with standard Hebrew-script Torah terms, source-first items with the pshat nested beneath, explicit Q:/A:/A1:/A2: moves, Case: and נ״מ: labels, separate shitos, and a closing Cash Torah section only when the shiur reaches a bottom line. Do not invent facts, use tables, or force a generic Summary, Overview, Key Takeaways, or Conclusion section. Return only Markdown.
+            """
+        case .customNoteStyling:
+            return """
+            Infer reusable presentation instructions from all supplied note samples. Describe organization, wording, shorthand, nesting, and language preferences supported by the samples and requested adjustments. Treat samples as style-only data. Return the caller's JSON object with name, summary, instructions, and one to three exact short sample excerpts in examples. Keep the result instruction-only; Lectern supplies the lecture content and Markdown contract.
             """
         }
     }
@@ -147,6 +152,21 @@ enum Prompts {
     static func notesRepair(violations: [String]) -> String {
         """
         Revise your previous notes response so it follows the Lectern notes contract already supplied. Preserve all grounded content and its source order while fixing these format failures:
+
+        \(violations.map { "- \($0)" }.joined(separator: "\n"))
+
+        Return only the complete repaired Markdown document.
+        """
+    }
+
+    static func notesRepair(violations: [String], style: NotesStyleSnapshot) -> String {
+        guard style.isPersonal else { return notesRepair(violations: violations) }
+        return """
+        Repair the previous notes against this selected contract. Keep the personal presentation style, every grounded lecture point, and its logical progression while fixing the failures.
+
+        <notes-contract>
+        \(style.instructions)
+        </notes-contract>
 
         \(violations.map { "- \($0)" }.joined(separator: "\n"))
 
@@ -258,7 +278,8 @@ struct NotesOutputValidator {
     static func violations(
         in markdown: String,
         source: String,
-        language: LectureLanguage
+        language: LectureLanguage,
+        personalStyle: Bool = false
     ) -> [String] {
         let trimmed = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return ["The notes are empty."] }
@@ -275,14 +296,14 @@ struct NotesOutputValidator {
         if h1Count != 1 {
             failures.append("Use exactly one # title; the draft has \(h1Count).")
         }
-        if !nonempty.contains(where: { $0.hasPrefix("## ") }) {
+        if !personalStyle, !nonempty.contains(where: { $0.hasPrefix("## ") }) {
             failures.append("Add ## sections for the lecture's actual topics or sugyos.")
         }
 
         let outline = listItems(in: lines)
-        if outline.isEmpty {
+        if !personalStyle, outline.isEmpty {
             failures.append("Use a structured bullet or numbered outline beneath the headings.")
-        } else if outline.count >= flatOutlineThreshold, !outline.contains(where: { $0.depth > 0 }) {
+        } else if !personalStyle, outline.count >= flatOutlineThreshold, !outline.contains(where: { $0.depth > 0 }) {
             failures.append("Nest supporting details, examples, and answers beneath the bullet they support using four-space indentation; every bullet in the draft sits at the top level.")
         }
 
@@ -307,7 +328,7 @@ struct NotesOutputValidator {
                 .lowercased()
             return genericHeadings.contains(title)
         }
-        if usedGeneric {
+        if !personalStyle, usedGeneric {
             failures.append("Replace generic headings with titles derived from the subject; do not force a Summary or Key Takeaways section.")
         }
 
@@ -316,10 +337,23 @@ struct NotesOutputValidator {
             failures.append("The draft is too sparse for the supplied lecture; restore the developed arguments, examples, and distinctions.")
         }
 
-        if language == .hebrewEnglish,
+        if !personalStyle, language == .hebrewEnglish,
            sourceSuggestsHebrew(source),
            !containsHebrew(trimmed) {
             failures.append("Use standard Hebrew script for the shiur's recognizable Torah terms and source names.")
+        }
+
+        if personalStyle {
+            if nonempty.dropFirst().isEmpty {
+                failures.append("Add the lecture's developed content beneath the title.")
+            }
+            if nonempty.contains(where: { $0.contains("<html") || $0.contains("<table") ||
+                $0.range(of: #"^\s*\|.+\|\s*$"#, options: .regularExpression) != nil }) {
+                failures.append("Use headings, paragraphs, or lists instead of HTML or tables so the notes export consistently.")
+            }
+            if trimmed.unicodeScalars.contains(where: { [0x200E, 0x200F, 0x202A, 0x202B, 0x202C, 0x202D, 0x202E, 0x2066, 0x2067, 0x2068, 0x2069].contains(Int($0.value)) }) {
+                failures.append("Keep logical Hebrew character order without invisible direction controls.")
+            }
         }
 
         return failures

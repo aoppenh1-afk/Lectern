@@ -120,12 +120,13 @@ struct AntigravityACPClient: Sendable {
         thinkingLevel: ThinkingLevel = .high,
         inputs: [WorkspaceInput] = [],
         skills: Set<LecternAgentSkill> = [],
+        skillInstructions: [LecternAgentSkill: String] = [:],
         jsonSchema: String? = nil,
         transcriptionDuration: Double? = nil
     ) async throws -> String {
         try await sessionPool.withPermit {
             try await runSession(prompt: prompt, modelID: modelID, thinkingLevel: thinkingLevel,
-                                 inputs: inputs, skills: skills, jsonSchema: jsonSchema,
+                                 inputs: inputs, skills: skills, skillInstructions: skillInstructions, jsonSchema: jsonSchema,
                                  transcriptionDuration: transcriptionDuration)
         }
     }
@@ -143,6 +144,7 @@ struct AntigravityACPClient: Sendable {
         thinkingLevel: ThinkingLevel = .high,
         inputs: [WorkspaceInput] = [],
         skills: Set<LecternAgentSkill> = [],
+        skillInstructions: [LecternAgentSkill: String] = [:],
         jsonSchema: String? = nil,
         transcriptionDuration: Double? = nil
     ) async throws -> String {
@@ -186,8 +188,13 @@ struct AntigravityACPClient: Sendable {
 
         var instructionParts: [String] = []
         for skill in skills.sorted(by: { $0.rawValue < $1.rawValue }) {
-            let url = try resolvedSkillURL(for: skill)
-            let instructions = try String(contentsOf: url, encoding: .utf8)
+            let instructions: String
+            if let selected = skillInstructions[skill] {
+                instructions = selected
+            } else {
+                let url = try resolvedSkillURL(for: skill)
+                instructions = try String(contentsOf: url, encoding: .utf8)
+            }
             instructionParts.append("Instructions from /\(skill.rawValue):\n\(instructions)")
         }
         instructionParts.append(prompt.trimmingCharacters(in: .whitespacesAndNewlines))

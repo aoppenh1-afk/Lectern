@@ -73,6 +73,24 @@ enum ReferenceMaterialService {
         }
     }
 
+    /// Read style samples without attaching their subject matter to a course or lecture.
+    static func readStyleSamples(_ urls: [URL]) throws -> [NotesStyleSample] {
+        guard (1...5).contains(urls.count) else {
+            throw NotesStyleError.invalid("Choose up to five sample note files.")
+        }
+        return try urls.map { url in
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            let values = try url.resourceValues(forKeys: [.fileSizeKey])
+            guard (values.fileSize ?? 0) <= 20_000_000 else {
+                throw NotesStyleError.invalid("\(url.lastPathComponent) is too large. Use an excerpt or a file under 20 MB.")
+            }
+            let kind = try kind(for: url)
+            let text = try extractText(from: url, kind: kind)
+            return NotesStyleSample(name: url.lastPathComponent, text: text)
+        }
+    }
+
     private static func extractText(from url: URL, kind: ReferenceAttachmentKind) throws -> String {
         let text: String
         switch kind {
