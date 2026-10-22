@@ -8,6 +8,6 @@
     "test:hosted": "node --test Tests/HostedMCP/*.test.mjs",
     "db:migrate": "node scripts/migrate-hosted.mjs"
   },
-  "dependencies": { "@modelcontextprotocol/sdk": "^1.32.1", "jose": "^6.2.1", "pg": "^8.23.1", "zod": "^4.6.6" },
-  "devDependencies": { "@electric-sql/pglite": "^0.5.8" }
+  "dependencies": { "@modelcontextprotocol/sdk": "^1.32.1", "jose": "^6.2.1", "pg": "^8.23.1", "zod": "^4.6.7" },
+  "devDependencies": { "@electric-sql/pglite": "^0.5.10" }
 }
