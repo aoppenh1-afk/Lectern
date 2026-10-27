@@ -89,6 +89,8 @@ final class CaptureController {
     private var systemPipeline: CapturePipeline?
     private var systemCapture: SystemAudioCapture?
     private var microphoneTapInstalled = false
+    private var pendingWriteError: Error?
+    private var captureID = UUID()
     private var zoomWatchers: [NSObjectProtocol] = []
     private var destinationURL: URL?
     private var activeCourse: Course?
@@ -122,6 +124,8 @@ final class CaptureController {
         activeLanguage = language ?? course?.language ?? .english
         activeSource = resolvedSource
         errorMessage = nil
+        pendingWriteError = nil
+        captureID = UUID()
         phase = .requestingPermission
         notifyPhaseChange()
 
@@ -276,7 +280,8 @@ final class CaptureController {
                 : destinationURL!
             let pipeline = try CapturePipeline(
                 sourceFormat: SystemAudioCapture.expectedFormat,
-                destinationURL: url
+                destinationURL: url,
+                onFailure: captureWriteFailureHandler()
             )
             let capture = SystemAudioCapture()
             capture.onBuffer = { [pipeline] buffer in
@@ -306,6 +311,10 @@ final class CaptureController {
         activeCourse = course
         phase = .recording(startedAt: Date())
         notifyPhaseChange()
+        if let pendingWriteError {
+            self.pendingWriteError = nil
+            handleCaptureWriteFailure(pendingWriteError)
+        }
     }
 
     private func startMicrophone(destinationURL: URL) throws {
@@ -314,7 +323,10 @@ final class CaptureController {
             throw CaptureError.noInputHardware
         }
 
-        let newPipeline = try CapturePipeline(sourceFormat: sourceFormat, destinationURL: destinationURL)
+        let newPipeline = try CapturePipeline(
+            sourceFormat: sourceFormat, destinationURL: destinationURL,
+            onFailure: captureWriteFailureHandler()
+        )
         let tapHandler: @Sendable (AVAudioPCMBuffer, AVAudioTime) -> Void = { [newPipeline] buffer, _ in
             newPipeline.ingest(buffer)
         }
@@ -347,6 +359,26 @@ final class CaptureController {
         systemCapture = nil
         destinationURL = nil
         await capture?.stop()
+    }
+
+    private func captureWriteFailureHandler() -> @Sendable (Error) -> Void {
+        let id = captureID
+        return { [weak self] error in
+            Task { @MainActor in
+                guard let self, self.captureID == id else { return }
+                self.handleCaptureWriteFailure(error)
+            }
+        }
+    }
+
+    private func handleCaptureWriteFailure(_ error: Error) {
+        if case .requestingPermission = phase {
+            pendingWriteError = error
+            return
+        }
+        guard case .recording = phase else { return }
+        errorMessage = "Recording stopped because audio could not be saved: \(error.localizedDescription)"
+        stop()
     }
 
     private func handleSystemCaptureFailure(_ error: Error) {

@@ -80,6 +80,27 @@ final class WAVMixdownTests: XCTestCase {
         XCTAssertEqual(try reader.readFrames(8), [1_500, 2_400, 3_000])
     }
 
+    func testCaptureReportsWriteFailureWithoutCrashing() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let handle = try FileHandle(forWritingTo: url)
+        let writer = try WAVFileWriter(url: url, sampleRate: 16_000, handle: handle)
+        let format = try XCTUnwrap(AVAudioFormat(commonFormat: .pcmFormatFloat32,
+                                                  sampleRate: 16_000, channels: 1, interleaved: false))
+        let reported = expectation(description: "write failure reported")
+        let pipeline = try CapturePipeline(sourceFormat: format, destinationURL: url,
+                                           onFailure: { _ in reported.fulfill() }, writer: writer)
+        try handle.close()
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1024))
+        buffer.frameLength = 1024
+        pipeline.ingest(buffer)
+        wait(for: [reported], timeout: 5)
+        if case .success = pipeline.finish() {
+            XCTFail("A failed write must not be reported as a successful recording")
+        }
+    }
+
     func testPCMBufferCloneIsIndependent() throws {
         let format = try XCTUnwrap(AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -100,7 +121,7 @@ final class WAVMixdownTests: XCTestCase {
     private func writeWAV(samples: [Int16], in directory: URL, name: String) throws -> URL {
         let url = directory.appendingPathComponent(name)
         let writer = try WAVFileWriter(url: url, sampleRate: 16_000)
-        writer.append(int16Samples: samples[...])
+        try writer.append(int16Samples: samples[...])
         _ = try writer.finish()
         return url
     }

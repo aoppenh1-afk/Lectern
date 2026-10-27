@@ -11,20 +11,22 @@ final class WAVFileWriter {
     private var dataBytes: Int64 = 0
     private var finished = false
 
-    init(url: URL, sampleRate: Double) throws {
+    init(url: URL, sampleRate: Double, handle suppliedHandle: FileHandle? = nil) throws {
         self.url = url
         self.sampleRate = sampleRate
 
-        FileManager.default.createFile(atPath: url.path, contents: nil)
-        guard let handle = FileHandle(forWritingAtPath: url.path) else {
-            throw CocoaError(.fileNoSuchFile,
-                             userInfo: [NSFilePathErrorKey: url.path])
+        let handle: FileHandle
+        if let suppliedHandle {
+            handle = suppliedHandle
+        } else {
+            FileManager.default.createFile(atPath: url.path, contents: nil)
+            handle = try FileHandle(forWritingTo: url)
         }
         self.handle = handle
-        handle.write(Self.header(dataBytes: 0, sampleRate: UInt32(sampleRate)))
+        try handle.write(contentsOf: Self.header(dataBytes: 0, sampleRate: UInt32(sampleRate)))
     }
 
-    func append(_ buffer: AVAudioPCMBuffer) {
+    func append(_ buffer: AVAudioPCMBuffer) throws {
         guard !finished, buffer.format.commonFormat == .pcmFormatFloat32,
               let channel = buffer.floatChannelData?[0] else { return }
 
@@ -37,13 +39,13 @@ final class WAVFileWriter {
             samples[index] = Int16(clamped * Float(32767))
         }
 
-        append(int16Samples: samples[0..<frameCount])
+        try append(int16Samples: samples[0..<frameCount])
     }
 
-    func append(int16Samples samples: ArraySlice<Int16>) {
+    func append(int16Samples samples: ArraySlice<Int16>) throws {
         guard !finished, !samples.isEmpty else { return }
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
-        handle.write(data)
+        try handle.write(contentsOf: data)
         dataBytes += Int64(samples.count * MemoryLayout<Int16>.size)
     }
 
@@ -52,9 +54,14 @@ final class WAVFileWriter {
     func finish() throws -> Int64 {
         guard !finished else { return 44 + dataBytes }
         finished = true
-        try handle.seek(toOffset: 0)
-        handle.write(Self.header(dataBytes: UInt32(dataBytes), sampleRate: UInt32(sampleRate)))
-        try handle.close()
+        do {
+            try handle.seek(toOffset: 0)
+            try handle.write(contentsOf: Self.header(dataBytes: UInt32(dataBytes), sampleRate: UInt32(sampleRate)))
+            try handle.close()
+        } catch {
+            try? handle.close()
+            throw error
+        }
         return 44 + dataBytes
     }
 
@@ -91,8 +98,12 @@ final class CapturePipeline: @unchecked Sendable {
     private var sourceFormat: AVAudioFormat
     private let outputFormat: AVAudioFormat
     private let queue = DispatchQueue(label: "com.lectern.capture.pipeline")
+    private let onFailure: @Sendable (Error) -> Void
+    private var writeError: Error?
 
-    init(sourceFormat: AVAudioFormat, destinationURL: URL) throws {
+    init(sourceFormat: AVAudioFormat, destinationURL: URL,
+         onFailure: @escaping @Sendable (Error) -> Void = { _ in },
+         writer suppliedWriter: WAVFileWriter? = nil) throws {
         guard let output = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 16_000,
@@ -105,10 +116,11 @@ final class CapturePipeline: @unchecked Sendable {
             throw CaptureError.conversionUnavailable
         }
 
-        self.writer = try WAVFileWriter(url: destinationURL, sampleRate: output.sampleRate)
+        self.writer = try suppliedWriter ?? WAVFileWriter(url: destinationURL, sampleRate: output.sampleRate)
         self.converter = converter
         self.sourceFormat = sourceFormat
         self.outputFormat = output
+        self.onFailure = onFailure
     }
 
     func ingest(_ buffer: AVAudioPCMBuffer) {
@@ -121,9 +133,10 @@ final class CapturePipeline: @unchecked Sendable {
         queue.sync {
             do {
                 let totalBytes = try writer.finish()
+                if let writeError { return .failure(writeError) }
                 return .success((writer.url, totalBytes))
             } catch {
-                return .failure(error)
+                return .failure(writeError ?? error)
             }
         }
     }
@@ -133,6 +146,7 @@ final class CapturePipeline: @unchecked Sendable {
     }
 
     private func convertAndAppend(_ input: AVAudioPCMBuffer) {
+        guard writeError == nil else { return }
         if !Self.sameFormat(input.format, sourceFormat),
            let rebuilt = AVAudioConverter(from: input.format, to: outputFormat) {
             converter = rebuilt
@@ -169,7 +183,13 @@ final class CapturePipeline: @unchecked Sendable {
             }
 
             if scratch.frameLength > 0 {
-                writer.append(scratch)
+                do {
+                    try writer.append(scratch)
+                } catch {
+                    writeError = error
+                    onFailure(error)
+                    return
+                }
             }
 
             switch status {

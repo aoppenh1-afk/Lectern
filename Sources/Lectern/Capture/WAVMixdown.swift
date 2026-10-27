@@ -94,7 +94,7 @@ enum WAVMixdown {
             }
 
             if framesThisChunk == 0 { break }
-            writer.append(int16Samples: mixed[0..<framesThisChunk])
+            try writer.append(int16Samples: mixed[0..<framesThisChunk])
         }
 
         return try writer.finish()
