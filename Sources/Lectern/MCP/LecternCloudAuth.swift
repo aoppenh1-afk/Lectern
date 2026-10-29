@@ -17,7 +17,8 @@ final class LecternCloudAuth {
     private(set) var isSigningIn = false
     private(set) var credentialWarning: String?
 
-    init() {
+    init(restoreFromKeychain: Bool = true) {
+        guard restoreFromKeychain else { return }
         var query = keychainQuery
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne

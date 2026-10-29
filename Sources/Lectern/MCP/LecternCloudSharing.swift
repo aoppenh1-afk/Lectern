@@ -6,7 +6,7 @@ import SwiftData
 @MainActor
 @Observable
 final class LecternCloudSharing {
-    let auth = LecternCloudAuth()
+    let auth: LecternCloudAuth
     private let container: ModelContainer
     private let defaults: UserDefaults
     private var timer: Task<Void, Never>?
@@ -27,7 +27,8 @@ final class LecternCloudSharing {
     }
     static var connectionURL: URL { LecternCloudAuth.origin.appendingPathComponent("mcp") }
 
-    init(container: ModelContainer, defaults: UserDefaults = .standard) {
+    init(container: ModelContainer, defaults: UserDefaults = .standard, auth: LecternCloudAuth? = nil) {
+        self.auth = auth ?? LecternCloudAuth()
         self.container = container
         self.defaults = defaults
         sharedCourseIDs = Set(defaults.stringArray(forKey: "hostedSharing.courses") ?? [])
@@ -36,7 +37,13 @@ final class LecternCloudSharing {
         userID = defaults.string(forKey: "hostedSharing.user")
         revision = defaults.object(forKey: "hostedSharing.revision") as? Int
         lastSync = defaults.object(forKey: "hostedSharing.lastSync") as? Date
-        if sharingEnabled { status = "Checking your hosted connection…" }
+        if sharingEnabled {
+            if self.auth.isSignedIn {
+                status = "Checking your hosted connection…"
+            } else {
+                requireReconnect()
+            }
+        }
         timer = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 await self?.syncIfNeeded()
@@ -87,7 +94,11 @@ final class LecternCloudSharing {
     }
 
     func syncIfNeeded() async {
-        guard sharingEnabled, auth.isSignedIn, !isBusy, !needsReview else { return }
+        guard sharingEnabled, !isBusy, !needsReview else { return }
+        guard auth.isSignedIn else {
+            requireReconnect()
+            return
+        }
         isBusy = true
         defer { isBusy = false }
         do {
@@ -101,6 +112,11 @@ final class LecternCloudSharing {
             }
             try await upload()
         } catch { status = error.localizedDescription }
+    }
+
+    private func requireReconnect() {
+        needsReview = true
+        status = "Sign in again to reconnect Lectern, then review your courses and start sharing. Your local notes are kept."
     }
 
     func deleteHostedLibrary() async {

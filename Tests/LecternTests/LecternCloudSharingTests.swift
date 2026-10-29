@@ -4,6 +4,25 @@ import XCTest
 
 @MainActor
 final class LecternCloudSharingTests: XCTestCase {
+    func testRestoredSharingWithoutCredentialsRequestsSignIn() async throws {
+        let container = try ModelContainer(for: Course.self, Lecture.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let suite = "LecternCloudSharingTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: "hostedSharing.enabled")
+        let auth = LecternCloudAuth(restoreFromKeychain: false)
+        let sharing = LecternCloudSharing(container: container, defaults: defaults, auth: auth)
+        defer { sharing.shutdown() }
+
+        XCTAssertTrue(sharing.status.contains("Sign in again"))
+        await sharing.syncIfNeeded()
+        XCTAssertTrue(sharing.status.contains("Sign in again"))
+        XCTAssertFalse(sharing.isBusy)
+        XCTAssertTrue(sharing.needsReview)
+        XCTAssertFalse(auth.isSignedIn)
+    }
+
     func testSnapshotIncludesOnlySelectedCoursesAndSupportedDocuments() throws {
         let container = try ModelContainer(for: Course.self, Lecture.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true))
