@@ -131,6 +131,13 @@ struct SettingsView: View {
 
     // MARK: - Content
 
+    private var contentMaxWidth: CGFloat {
+        switch section {
+        case .mcp, .agents, .transcription: 1040
+        default: 820
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         ScrollView {
@@ -163,6 +170,9 @@ struct SettingsView: View {
             }
             .padding(.horizontal, section == .mcp ? 24 : 40)
             .padding(.vertical, section == .mcp ? 24 : 32)
+            // Form rows read label-to-control; on a wide window an unbounded
+            // card put switches a full screen away from what they control.
+            .frame(maxWidth: contentMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -377,7 +387,8 @@ private struct GeneralPane: View {
                                 caption: "Download any version by hand from GitHub.",
                                 showsDivider: false) {
                         Link("Open", destination: releases)
-                            .font(.system(size: 12))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(LecternTheme.accent)
                     }
                 }
             }
@@ -485,13 +496,10 @@ private struct AppearancePane: View {
         }
     }
 
+    /// The real accent for each choice, so the swatch matches what the app
+    /// paints. Moss previously showed a lighter green than the accent itself.
     private func swatchColor(for id: String) -> Color {
-        switch id {
-        case "blue": return Color(.sRGB, red: 0.184, green: 0.420, blue: 0.929)
-        case "plum": return Color(.sRGB, red: 0.486, green: 0.290, blue: 0.451)
-        case "graphite": return Color(.sRGB, red: 0.290, green: 0.300, blue: 0.320)
-        default: return Color(.sRGB, red: 0.290, green: 0.459, blue: 0.329)
-        }
+        LecternTheme.accent(for: id)
     }
 }
 
@@ -707,18 +715,26 @@ private struct RetentionPane: View {
 // MARK: - Anki
 
 private struct AnkiPane: View {
-    @AppStorage("ankiPort") private var ankiPort = 8_761
+    @AppStorage("ankiPort") private var ankiPort = 8_765
 
     var body: some View {
         SettingsCard {
             SettingsRow(
                 title: "AnkiConnect port",
-                caption: "Requires the AnkiConnect add-on (default port 8761). Flashcards sync through Anki's local API.",
+                caption: "Requires the AnkiConnect add-on (default port 8765). Flashcards sync through Anki's local API.",
                 showsDivider: false
             ) {
-                Stepper("\(ankiPort)", value: $ankiPort, in: 1024...65_535)
-                    .controlSize(.small)
-                    .frame(width: 160)
+                // Ports are identifiers, not quantities: never "8,765".
+                HStack(spacing: 6) {
+                    TextField("Port", value: $ankiPort, format: .number.grouping(.never))
+                        .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.trailing)
+                        .font(.system(size: 12).monospacedDigit())
+                        .frame(width: 64)
+                    Stepper("AnkiConnect port", value: $ankiPort, in: 1024...65_535)
+                        .labelsHidden()
+                        .controlSize(.small)
+                }
             }
         }
     }

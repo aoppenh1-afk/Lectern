@@ -12,7 +12,8 @@ struct MCPSettingsPane: View {
     @State private var showsAllCourses = false
     @State private var copiedURL = false
 
-    private let green = Color(hex: "30583E")
+    // Follows the Appearance accent like the rest of the app.
+    private var green: Color { LecternTheme.accent }
     private let muted = Color.secondary
 
     private enum SemesterFilter: Hashable {
@@ -197,7 +198,7 @@ struct MCPSettingsPane: View {
                 Spacer(minLength: 0)
             }
             if let warning = sharing.auth.credentialWarning {
-                Text(warning).font(.system(size: 12)).foregroundStyle(.orange)
+                Text(warning).font(.system(size: 12)).foregroundStyle(LecternTheme.warningTint)
             }
         }
     }
@@ -467,12 +468,13 @@ struct MCPSettingsPane: View {
     private func setupLink(_ title: String, url: URL) -> some View {
         Link(destination: url) { HStack(spacing: 4) { Text(title); Image(systemName: "arrow.right").font(.system(size: 9)) } }
             .font(.system(size: 12, weight: .medium)).foregroundStyle(green)
+            .lineLimit(1).fixedSize()
     }
     private func iconBadge(_ icon: String, destructive: Bool = false) -> some View {
         Image(systemName: icon).font(.system(size: 15, weight: .medium))
-            .foregroundStyle(destructive ? Color(hex: "AF342C") : green)
+            .foregroundStyle(destructive ? LecternTheme.recordTint : green)
             .frame(width: 30, height: 30)
-            .background((destructive ? Color.red : green).opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background((destructive ? LecternTheme.recordTint : green).opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
     private func cardHeading(_ icon: String, _ title: String, _ caption: String, smallCaption: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 10) {
@@ -497,12 +499,13 @@ private struct MCPButtonStyle: ButtonStyle {
     var prominent = false
     var destructive = false
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.system(size: 12.5, weight: .semibold))
             .padding(.horizontal, 13).padding(.vertical, 7)
-            .foregroundStyle(prominent ? .white : destructive ? Color(hex: "AF342C") : LecternTheme.ink)
-            .background(prominent ? Color(hex: "30583E") : destructive ? Color.red.opacity(0.12) : LecternTheme.ink.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .foregroundStyle(prominent ? (colorScheme == .dark ? Color.black : .white) : destructive ? LecternTheme.recordTint : LecternTheme.ink)
+            .background(prominent ? LecternTheme.accent : destructive ? LecternTheme.recordTint.opacity(0.12) : LecternTheme.ink.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.45)
     }
 }

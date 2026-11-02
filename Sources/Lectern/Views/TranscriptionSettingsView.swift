@@ -77,7 +77,8 @@ struct TranscriptionSettingsPane: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(width: 280)
+                    .fixedSize()
+                    .frame(width: 280, alignment: .trailing)
                 }
 
                 if builtInFamilyID(preferences.builtInModelID) == BuiltInTranscriptionModel.antigravity.id {
@@ -100,7 +101,8 @@ struct TranscriptionSettingsPane: View {
                                 }
                             }
                             .labelsHidden()
-                            .frame(width: 280)
+                            .fixedSize()
+                            .frame(width: 280, alignment: .trailing)
                         }
                     }
 
@@ -129,7 +131,8 @@ struct TranscriptionSettingsPane: View {
                             }
                         }
                         .labelsHidden()
-                        .frame(width: 140)
+                        .fixedSize()
+                        .frame(width: 280, alignment: .trailing)
                     }
                 }
 
@@ -176,8 +179,9 @@ struct TranscriptionSettingsPane: View {
             LocalModelRow(model: .whisper, availability: localAvailability)
 
             Button("Check again") { localAvailability.refresh() }
-                .font(.system(size: 11))
-                .buttonStyle(.link)
+                .font(.system(size: 11, weight: .medium))
+                .buttonStyle(.plain)
+                .foregroundStyle(LecternTheme.accent)
         }
         .padding(16)
         .transcriptionSettingsCard()

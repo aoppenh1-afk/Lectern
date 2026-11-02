@@ -13,8 +13,10 @@ struct GoogleDocsNotesBar: View {
                     Text("Google Docs")
                         .font(.system(size: 15, weight: .semibold))
                     Text(destinationLabel)
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer()

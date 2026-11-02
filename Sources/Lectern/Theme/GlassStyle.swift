@@ -13,7 +13,11 @@ enum LecternTheme {
     // MARK: Accent (switchable brand accent, tuned per appearance)
 
     static var accent: Color {
-        let (light, dark) = accentNSColors(for: UserDefaults.standard.string(forKey: "appearance.accent") ?? "moss")
+        accent(for: UserDefaults.standard.string(forKey: "appearance.accent") ?? "moss")
+    }
+
+    static func accent(for id: String) -> Color {
+        let (light, dark) = accentNSColors(for: id)
         return adaptive(light: light, dark: dark)
     }
 
@@ -273,6 +277,61 @@ struct StatusChip: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
         .background(tint.opacity(0.11), in: RoundedRectangle(cornerRadius: LecternTheme.chipRadius, style: .continuous))
+    }
+}
+
+/// Thin rounded progress bar for grades. Drawn by hand so it keeps its tint
+/// when the window is inactive, where a stock ProgressView turns grey.
+struct ScoreBar: View {
+    let fraction: Double
+    var tint: Color = LecternTheme.accent
+    var height: CGFloat = 6
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.primary.opacity(0.07))
+                Capsule()
+                    .fill(tint)
+                    .frame(width: proxy.size.width * min(max(fraction, 0), 1))
+            }
+        }
+        .frame(height: height)
+        .accessibilityElement()
+        .accessibilityValue("\(Int((min(max(fraction, 0), 1) * 100).rounded())) percent")
+    }
+}
+
+/// Calendar-page tile for a due date: abbreviated month over the day number.
+/// Undated work shows a dash so rows keep the same rhythm.
+struct DueDateTile: View {
+    let date: Date?
+    var tint: Color = LecternTheme.accent
+
+    var body: some View {
+        Group {
+            if let date {
+                VStack(spacing: 0) {
+                    Text(date.formatted(.dateTime.month(.abbreviated)))
+                        .font(.system(size: 8.5, weight: .semibold))
+                        .textCase(.uppercase)
+                        .foregroundStyle(tint)
+                    Text(date.formatted(.dateTime.day()))
+                        .font(.system(size: 15, weight: .semibold, design: .serif).monospacedDigit())
+                        .foregroundStyle(LecternTheme.ink)
+                }
+            } else {
+                Image(systemName: "calendar")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityLabel("No due date")
+            }
+        }
+        .frame(width: 36, height: 36)
+        .background(
+            (date == nil ? Color.primary.opacity(0.04) : tint.opacity(0.09)),
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
     }
 }
 

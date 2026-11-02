@@ -736,7 +736,20 @@ struct MainWindowView: View {
         return result.map { (key: $0.0, items: $0.1) }
     }
 
-    private func listRow(_ lecture: Lecture) -> some View {
+    /// Date and length first. The course name only appears where rows from
+    /// different courses mix (search results, the library home); inside a
+    /// course it repeated on every row and pushed the date out of view.
+    private func rowMeta(_ lecture: Lecture, showsCourse: Bool? = nil) -> String {
+        let includeCourse = showsCourse ?? (selectedCourse == nil || !searchText.isEmpty)
+        var parts: [String] = []
+        if includeCourse { parts.append(lecture.course?.name ?? "Unfiled") }
+        parts.append(shortDate(lecture))
+        parts.append(durationLabel(lecture))
+        if lecture.language == .hebrewEnglish { parts.append("En+עב") }
+        return parts.joined(separator: " · ")
+    }
+
+    private func listRow(_ lecture: Lecture, showsCourse: Bool? = nil) -> some View {
         let isSelected = selectedLecture == lecture
         let isRenaming = renamingLecture == lecture
         return Button {
@@ -759,9 +772,9 @@ struct MainWindowView: View {
                             .truncationMode(.tail)
                             .frame(minWidth: 0, alignment: .leading)
                     }
-                    Text("\(lecture.course?.name ?? "Unfiled") · \(shortDate(lecture)) · \(durationLabel(lecture))\(lecture.language == .hebrewEnglish ? " · En+עב" : "")")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                    Text(rowMeta(lecture, showsCourse: showsCourse))
+                        .font(.system(size: 11).monospacedDigit())
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                     if !searchText.isEmpty, transcriptMatches.contains(lecture.persistentModelID) {
                         Text("Transcript match")
@@ -968,27 +981,34 @@ struct MainWindowView: View {
     private var dashboardHome: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Home")
-                    .font(.system(size: 22, weight: .bold, design: .serif))
-                    .foregroundStyle(LecternTheme.ink)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Your library")
+                        .font(.system(size: 22, weight: .bold, design: .serif))
+                        .foregroundStyle(LecternTheme.ink)
+                    Text("Select a lecture to read its transcript, notes, and study materials.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
 
+                // One accent for every stat: the numbers carry the meaning,
+                // so four unrelated hues only added noise.
                 HStack(spacing: 12) {
                     statCard(value: "\(lectures.count)",
                              label: "Lectures",
                              icon: "waveform",
-                             tint: LecternTheme.processingTint)
+                             tint: LecternTheme.accent)
+                    statCard(value: "\(lectures.filter { $0.status == .ready }.count)",
+                             label: "Transcribed",
+                             icon: "text.quote",
+                             tint: LecternTheme.accent)
                     statCard(value: "\((try? modelContext.fetchCount(FetchDescriptor<Artifact>())) ?? 0)",
-                             label: "Materials",
+                             label: "Study materials",
                              icon: "doc.text",
-                             tint: .purple)
+                             tint: LecternTheme.accent)
                     statCard(value: "\((try? modelContext.fetchCount(FetchDescriptor<Flashcard>())) ?? 0)",
                              label: "Flashcards",
                              icon: "rectangle.on.rectangle.angled",
-                             tint: .teal)
-                    statCard(value: "\(lectures.filter { $0.status == .ready }.count)",
-                             label: "Ready",
-                             icon: "checkmark.circle",
-                             tint: LecternTheme.successTint)
+                             tint: LecternTheme.accent)
                 }
 
                 if !lectures.isEmpty {
@@ -998,7 +1018,7 @@ struct MainWindowView: View {
                             .foregroundStyle(LecternTheme.ink)
                             .padding(.bottom, 4)
                         ForEach(lectures.prefix(5)) { lecture in
-                            listRow(lecture)
+                            listRow(lecture, showsCourse: true)
                         }
                     }
                 }
@@ -1017,16 +1037,17 @@ struct MainWindowView: View {
                 Image(systemName: icon)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(tint)
-                    .frame(width: 24, height: 24)
-                    .background(Circle().fill(tint.opacity(0.12)))
+                    .frame(width: 26, height: 26)
+                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(tint.opacity(0.09)))
                 Spacer()
             }
             Text(value)
-                .font(.system(size: 20, weight: .bold, design: .serif).monospacedDigit())
+                .font(.system(size: 22, weight: .bold, design: .serif).monospacedDigit())
                 .foregroundStyle(LecternTheme.ink)
             Text(label)
                 .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)

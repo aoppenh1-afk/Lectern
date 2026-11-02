@@ -113,6 +113,7 @@ struct CanvasCalendarView: View {
     @AppStorage("calendar.filter.coursework") private var showCoursework = true
     @AppStorage("calendar.filter.academic") private var showAcademic = true
     @AppStorage("calendar.filter.manual") private var showManual = true
+    @AppStorage("commandStudio.selectedTerm") private var selectedTerm = AcademicScopeMatcher.preferredTerm
 
     private var scopedEvents: [CanvasEvent] {
         events.filter { event in
@@ -148,57 +149,47 @@ struct CanvasCalendarView: View {
     }
 
     var body: some View {
-        StudioPage(title: "Calendar", subtitle: "Your Fall 2026 schedule, Canvas deadlines, and personal events") {
-            HStack(alignment: .top, spacing: 10) {
-                HStack(spacing: 10) {
-                    Button { move(-1) } label: { Image(systemName: "chevron.left") }
-                    Button { move(1) } label: { Image(systemName: "chevron.right") }
-                    Button("Today") { anchorDate = Date() }
-                    Text(calendarTitle).font(.system(size: 20, weight: .semibold, design: .serif)).padding(.leading, 8)
-                }
-                .buttonStyle(.bordered)
-                .padding(.top, 26)
-                Spacer()
-                VStack(alignment: .trailing, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Button { showingFilter.toggle() } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "line.3.horizontal.decrease.circle")
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text("Filter")
-                                    .font(.system(size: 12.5, weight: .semibold))
-                                if !showCoursework || !showAcademic || !showManual {
-                                    Circle().fill(LecternTheme.accent).frame(width: 7, height: 7)
-                                }
-                            }
-                            .foregroundStyle(LecternTheme.ink)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(LecternTheme.hairline))
-                        }
-                        .buttonStyle(.plain)
-                        .help("Filter which calendars show")
-                        .popover(isPresented: $showingFilter, arrowEdge: .bottom) {
-                            filterPopover
-                        }
-                        Button {
-                            sheetInitialDate = anchorDate
-                            showingEventSheet = true
-                        } label: {
-                            Label("Add Event", systemImage: "plus")
-                                .font(.system(size: 12.5, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .help("Add a personal event to your calendar")
+        StudioPage(title: "Calendar", subtitle: "Your \(selectedTerm) schedule, Canvas deadlines, and personal events") {
+            StudioSecondaryButton(action: { showingFilter.toggle() }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "line.3.horizontal.decrease")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("Filter")
+                    if !showCoursework || !showAcademic || !showManual {
+                        Circle().fill(LecternTheme.accent).frame(width: 6, height: 6)
                     }
-                    Picker("View", selection: $mode) { ForEach(Mode.allCases) { Text($0.rawValue).tag($0) } }
-                        .pickerStyle(.segmented).frame(width: 250)
                 }
+            }
+            .help("Filter which calendars show")
+            .popover(isPresented: $showingFilter, arrowEdge: .bottom) {
+                filterPopover
+            }
+            StudioPrimaryButton(title: "Add Event") {
+                sheetInitialDate = anchorDate
+                showingEventSheet = true
+            }
+            .help("Add a personal event to your calendar")
+        } content: {
+            HStack(alignment: .center, spacing: 8) {
+                StudioSecondaryButton(action: { move(-1) }) {
+                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
+                }
+                .help("Previous \(mode.rawValue.lowercased())")
+                StudioSecondaryButton(action: { move(1) }) {
+                    Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                }
+                .help("Next \(mode.rawValue.lowercased())")
+                StudioSecondaryButton(action: { anchorDate = Date() }) { Text("Today") }
+                Text(calendarTitle)
+                    .font(.system(size: 20, weight: .semibold, design: .serif))
+                    .foregroundStyle(LecternTheme.ink)
+                    .lineLimit(1)
+                    .padding(.leading, 8)
+                Spacer(minLength: 12)
+                Picker("View", selection: $mode) { ForEach(Mode.allCases) { Text($0.rawValue).tag($0) } }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 220)
             }
             Group {
                 switch mode {
@@ -332,11 +323,14 @@ struct CanvasCalendarView: View {
         let dayAssignments = scopedAssignments.filter { $0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
         let dayFinals = scopedFinals.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
         let dayAcademic = scopedAcademic.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
+        let isToday = Calendar.current.isDateInToday(day)
+        let inMonth = Calendar.current.isDate(day, equalTo: anchorDate, toGranularity: .month)
         return VStack(alignment: .leading, spacing: 4) {
-            Text(day.formatted(.dateTime.day())).font(.system(size: 11, weight: Calendar.current.isDateInToday(day) ? .bold : .regular))
-                .foregroundStyle(Calendar.current.isDate(day, equalTo: anchorDate, toGranularity: .month) ? LecternTheme.ink : Color.secondary.opacity(0.45))
-                .padding(5)
-                .background(Calendar.current.isDateInToday(day) ? LecternTheme.accent.opacity(0.14) : .clear, in: Circle())
+            Text(day.formatted(.dateTime.day()))
+                .font(.system(size: 11, weight: isToday ? .bold : .medium).monospacedDigit())
+                .foregroundStyle(isToday ? Color.white : inMonth ? LecternTheme.ink : Color.secondary.opacity(0.45))
+                .frame(width: 22, height: 22)
+                .background(isToday ? LecternTheme.accent : .clear, in: Circle())
             ForEach(dayFinals.prefix(2)) { final in
                 calendarChip(final.title, color: LecternTheme.recordTint, icon: "graduationcap")
             }
@@ -361,6 +355,7 @@ struct CanvasCalendarView: View {
             Spacer(minLength: 0)
         }
         .padding(7).frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
+        .background(inMonth ? Color.clear : Color.primary.opacity(0.018))
         .overlay(Rectangle().stroke(LecternTheme.hairline, lineWidth: 0.5))
         .contentShape(Rectangle()).onTapGesture { anchorDate = day; mode = .day }
     }
@@ -411,11 +406,11 @@ struct CanvasCalendarView: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(isToday ? LecternTheme.accent : .secondary)
                 Text(day.formatted(.dateTime.day()))
-                    .font(.system(size: 20, design: .serif))
+                    .font(.system(size: 18, design: .serif).monospacedDigit())
                     .fontWeight(isToday ? .bold : .regular)
-                    .foregroundStyle(LecternTheme.ink)
-                    .padding(5)
-                    .background(isToday ? LecternTheme.accent.opacity(0.14) : .clear, in: Circle())
+                    .foregroundStyle(isToday ? Color.white : LecternTheme.ink)
+                    .frame(width: 34, height: 34)
+                    .background(isToday ? LecternTheme.accent : .clear, in: Circle())
             }
             Spacer(minLength: 4)
             Button {
@@ -513,7 +508,15 @@ struct CanvasCalendarView: View {
         let dayAssignments = scopedAssignments.filter { $0.dueAt.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
         let dayFinals = scopedFinals.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
         let dayAcademic = scopedAcademic.filter { Calendar.current.isDate($0.startAt, inSameDayAs: day) }
-        return ScrollView {
+        let isToday = Calendar.current.isDateInToday(day)
+        // Open on the first thing scheduled, else the current hour today,
+        // else the start of a normal school day, not midnight.
+        let busyHours = dayEvents.map(\.startAt) + dayFinals.map(\.startAt) + dayAssignments.compactMap(\.dueAt)
+        let focusHour = busyHours.map { Calendar.current.component(.hour, from: $0) }.min()
+            ?? (isToday ? Calendar.current.component(.hour, from: .now) : 8)
+        let scrollHour = max(0, focusHour - 1)
+        return ScrollViewReader { proxy in
+        ScrollView {
             VStack(spacing: 0) {
                 HStack {
                     Text(day.formatted(.dateTime.weekday(.wide).month(.wide).day()))
@@ -535,19 +538,45 @@ struct CanvasCalendarView: View {
                 ForEach(dayAcademic) { AcademicAgendaRow(entry: $0) }
                     .padding(.horizontal, 14)
                 ForEach(0..<24, id: \.self) { hour in
-                    HStack(alignment: .top, spacing: 16) {
+                    let isCurrentHour = isToday && Calendar.current.component(.hour, from: .now) == hour
+                    HStack(alignment: .top, spacing: 12) {
+                        // The label's midline sits on the hour's gridline.
                         Text(Calendar.current.date(from: DateComponents(hour: hour))?.formatted(date: .omitted, time: .shortened) ?? "")
-                            .font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary).frame(width: 64, alignment: .trailing)
+                            .font(.system(size: 10, weight: isCurrentHour ? .semibold : .regular).monospacedDigit())
+                            .foregroundStyle(isCurrentHour ? AnyShapeStyle(LecternTheme.recordTint) : AnyShapeStyle(.tertiary))
+                            .frame(width: 64, alignment: .trailing)
+                            .alignmentGuide(.top) { $0[VerticalAlignment.center] }
                         VStack(spacing: 6) {
+                            Rectangle().fill(LecternTheme.hairline.opacity(0.7)).frame(height: 1)
                             ForEach(dayFinals.filter { Calendar.current.component(.hour, from: $0.startAt) == hour }) { FinalExamAgendaRow(final: $0) }
                             ForEach(dayEvents.filter { Calendar.current.component(.hour, from: $0.startAt) == hour }) { eventRow($0) }
                             ForEach(dayAssignments.filter { ($0.dueAt.map { Calendar.current.component(.hour, from: $0) } ?? -1) == hour }) { AssignmentAgendaRow(assignment: $0) }
-                            Divider()
-                        }.frame(maxWidth: .infinity, minHeight: 54, alignment: .top)
-                    }.padding(.horizontal, 14)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .top)
+                        .overlay(alignment: .topLeading) {
+                            if isCurrentHour { nowIndicator }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .id(hour)
                 }
             }.padding(.vertical, 12)
         }
+        .onAppear { proxy.scrollTo(scrollHour, anchor: .top) }
+        .onChange(of: day) { proxy.scrollTo(scrollHour, anchor: .top) }
+        }
+    }
+
+    /// Red "now" rule placed inside the current hour at the minute offset.
+    private var nowIndicator: some View {
+        let minute = Double(Calendar.current.component(.minute, from: .now))
+        return HStack(spacing: 0) {
+            Circle().fill(LecternTheme.recordTint).frame(width: 7, height: 7)
+            Rectangle().fill(LecternTheme.recordTint).frame(height: 1.5)
+        }
+        .offset(x: -3.5, y: 52 * minute / 60 - 3.5)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     @ViewBuilder
@@ -1806,6 +1835,7 @@ struct CanvasAssignmentsView: View {
     @State private var filter: Filter = .upcoming
     @State private var selectedCourseID: Int64?
     @State private var search = ""
+    @AppStorage("commandStudio.selectedTerm") private var selectedTerm = AcademicScopeMatcher.preferredTerm
 
     @State private var showingAddSheet = false
     @State private var editingAssignment: CanvasAssignment?
@@ -1834,11 +1864,17 @@ struct CanvasAssignmentsView: View {
     }
 
     var body: some View {
-        StudioPage(title: "Assignments", subtitle: "Fall 2026 work, filterable by course and status") {
+        StudioPage(title: "Assignments", subtitle: "\(selectedTerm) work, filterable by course and status") {
+            StudioPrimaryButton(title: "Add Assignment") { showingAddSheet = true }
+                .help("Add a personal assignment")
+        } content: {
             assignmentFilters
             ScrollView {
-                LazyVStack(spacing: 10) {
-                    if visible.isEmpty { ContentUnavailableView("No assignments", systemImage: "checklist", description: Text("Nothing matches this view.")) }
+                LazyVStack(spacing: 8) {
+                    if visible.isEmpty {
+                        ContentUnavailableView(emptyTitle, systemImage: "checklist", description: Text(emptyMessage))
+                            .padding(.top, 40)
+                    }
                     ForEach(visible) { assignment in
                         assignmentRow(assignment)
                     }
@@ -1853,40 +1889,40 @@ struct CanvasAssignmentsView: View {
         }
     }
 
+    private var emptyTitle: String {
+        if !search.isEmpty { return "No matches" }
+        switch filter {
+        case .upcoming: return "Nothing due"
+        case .missing: return "Nothing missing"
+        case .submitted: return "Nothing submitted yet"
+        case .all: return "No assignments"
+        }
+    }
+
+    private var emptyMessage: String {
+        if !search.isEmpty { return "No assignment matches “\(search)”." }
+        return filter == .upcoming ? "Upcoming Canvas work and your own assignments show up here." : "Try another filter or course."
+    }
+
     /// One row when the card is wide, two when a windowed frame would
-    /// otherwise push the add button past the window edge.
+    /// otherwise crowd the search field.
     private var assignmentFilters: some View {
         ViewThatFits(in: .horizontal) {
-            assignmentFilterRow(pickerWidth: 380, courseWidth: 230, searchWidth: 260, spacing: 16)
-            assignmentFilterRow(pickerWidth: 300, courseWidth: 168, searchWidth: 150, spacing: 8)
+            HStack(spacing: 10) {
+                filterPicker.frame(width: 340)
+                StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: 230, icon: "book.closed")
+                Spacer(minLength: 12)
+                StudioSearchField(placeholder: "Search assignments", text: $search, width: 280)
+            }
             VStack(alignment: .leading, spacing: 10) {
-                filterPicker
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
+                    filterPicker.frame(width: 300)
                     StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: 200, icon: "book.closed")
-                    addAssignmentButton
-                    TextField("Search assignments", text: $search)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(minWidth: 0, maxWidth: .infinity)
                 }
+                StudioSearchField(placeholder: "Search assignments", text: $search, width: nil)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func assignmentFilterRow(pickerWidth: CGFloat, courseWidth: CGFloat, searchWidth: CGFloat, spacing: CGFloat) -> some View {
-        HStack(spacing: 8) {
-            filterPicker.frame(width: pickerWidth)
-            // This gap is horizontal only; an unconstrained Color also fills
-            // the available height and pushes the assignment list down.
-            Color.clear.frame(width: spacing, height: 0)
-            StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: courseWidth, icon: "book.closed")
-            addAssignmentButton
-            TextField("Search assignments", text: $search)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: searchWidth)
-        }
-        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var filterPicker: some View {
@@ -1898,36 +1934,13 @@ struct CanvasAssignmentsView: View {
         .accessibilityLabel("Filter")
     }
 
-    private var addAssignmentButton: some View {
-        Button { showingAddSheet = true } label: {
-            Label("Add Assignment", systemImage: "plus")
-                .font(.system(size: 12.5, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .fixedSize(horizontal: true, vertical: true)
-        .help("Add a personal assignment")
-    }
-
     @ViewBuilder
     private func assignmentRow(_ assignment: CanvasAssignment) -> some View {
         if assignment.isManual {
             Button { editingAssignment = assignment } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: assignment.isComplete ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 18)).foregroundStyle(assignment.isComplete ? LecternTheme.successTint : assignment.assignmentCategory.color)
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack { Text(assignment.title).font(.system(size: 13.5, weight: .semibold)); StatusChip("Personal", LecternTheme.accent) }
-                        Text("\(assignment.courseCode ?? assignment.courseName) · \(assignmentDetail(assignment))").font(.system(size: 11)).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Text(relativeDue(assignment.dueAt)).font(.system(size: 11, weight: .semibold)).foregroundStyle(LecternTheme.accent)
-                    Image(systemName: "pencil").font(.system(size: 10)).foregroundStyle(.tertiary)
+                assignmentRowContent(assignment, trailingIcon: "pencil") {
+                    StatusChip("Personal", LecternTheme.accent)
                 }
-                .padding(15).studioPanel()
             }
             .buttonStyle(.plain)
             .help("Edit personal assignment")
@@ -1935,21 +1948,54 @@ struct CanvasAssignmentsView: View {
             Button {
                 if let value = assignment.htmlURL, let url = URL(string: value) { openURL(url) }
             } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: assignment.isComplete ? "checkmark.circle.fill" : assignment.isMissing ? "exclamationmark.circle.fill" : "circle")
-                        .font(.system(size: 18)).foregroundStyle(assignment.isComplete ? LecternTheme.successTint : assignment.isMissing ? LecternTheme.warningTint : .secondary)
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack { Text(assignment.title).font(.system(size: 13.5, weight: .semibold)); if assignment.isMissing { StatusChip("Missing", LecternTheme.warningTint) } }
-                        Text("\(assignment.courseCode ?? assignment.courseName) · \(assignmentDetail(assignment))").font(.system(size: 11)).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Text(relativeDue(assignment.dueAt)).font(.system(size: 11, weight: .semibold)).foregroundStyle(LecternTheme.accent)
-                    Image(systemName: "arrow.up.right").font(.system(size: 10)).foregroundStyle(.tertiary)
+                assignmentRowContent(assignment, trailingIcon: "arrow.up.right") {
+                    if assignment.isMissing { StatusChip("Missing", LecternTheme.recordTint) }
                 }
-                .padding(15).studioPanel()
             }
             .buttonStyle(.plain)
+            .help("Open in Canvas")
         }
+    }
+
+    private func assignmentRowContent<Badge: View>(_ assignment: CanvasAssignment, trailingIcon: String,
+                                                    @ViewBuilder badge: () -> Badge) -> some View {
+        let tint = dueTint(assignment.dueAt, isComplete: assignment.isComplete)
+        // Personal work keeps its category color on the tile.
+        let tileTint = assignment.isComplete ? LecternTheme.successTint
+            : assignment.isManual ? assignment.assignmentCategory.color : tint
+        return HStack(spacing: 14) {
+            DueDateTile(date: assignment.dueAt, tint: tileTint)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(assignment.title)
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(LecternTheme.ink)
+                        .lineLimit(1)
+                    badge()
+                }
+                Text([assignment.courseCode ?? assignment.courseName,
+                      assignment.dueAt.map { $0.formatted(date: .omitted, time: .shortened) },
+                      assignment.pointsPossible.map { "\($0.formatted()) pts" }]
+                    .compactMap { $0 }.joined(separator: " · "))
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 12)
+            if assignment.isComplete {
+                Label("Submitted", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(LecternTheme.successTint)
+            } else {
+                Text(assignment.dueAt == nil ? "No due date" : dueSummary(assignment.dueAt))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(tint)
+            }
+            Image(systemName: trailingIcon).font(.system(size: 10)).foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .contentShape(Rectangle())
+        .studioPanel()
     }
 }
 
@@ -1965,6 +2011,11 @@ struct CanvasGradesView: View {
         StudioPage(title: "Grades", subtitle: "Current Canvas standing with assignment-level results") {
             HStack(alignment: .top, spacing: 16) {
                 ScrollView {
+                    if gradedCourses.isEmpty {
+                        ContentUnavailableView("No grades yet", systemImage: "chart.bar",
+                                               description: Text("Connect Canvas in Settings, or pick another term."))
+                            .padding(.top, 60)
+                    }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 14)], spacing: 14) {
                         ForEach(gradedCourses) { course in
                             Button { selectedCourseID = course.persistentModelID } label: { gradeCard(course) }.buttonStyle(.plain)
@@ -1983,27 +2034,83 @@ struct CanvasGradesView: View {
 
     private func gradeCard(_ course: Course) -> some View {
         let recent = assignments.filter { $0.courseCanvasID == course.canvasID && $0.score != nil }.sorted { ($0.dueAt ?? .distantPast) > ($1.dueAt ?? .distantPast) }.prefix(3)
+        let tint = Color(hex: course.colorHex)
+        let isSelected = selectedCourseID == course.persistentModelID
         return VStack(alignment: .leading, spacing: 14) {
-            HStack {
+            HStack(alignment: .top, spacing: 10) {
                 CourseBadge(colorHex: course.colorHex, initial: String(course.name.prefix(1)), size: 34)
-                VStack(alignment: .leading, spacing: 2) { Text(course.courseCode ?? course.name).font(.system(size: 13, weight: .semibold)); Text(course.instructorName ?? course.termName ?? "Canvas course").font(.system(size: 10.5)).foregroundStyle(.secondary) }
-                Spacer()
-                Text(course.currentGrade ?? "—").font(.system(size: 20, weight: .medium, design: .serif))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(course.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(LecternTheme.ink)
+                        .lineLimit(1)
+                    Text([course.courseCode, course.instructorName].compactMap { $0 }.joined(separator: " · "))
+                        .font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 6)
+                if let letter = course.currentGrade, !letter.isEmpty {
+                    Text(letter)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(tint.darkened(by: 0.12))
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                }
             }
-            HStack(alignment: .firstTextBaseline) { Text(course.currentScore.map { String(format: "%.1f", $0) } ?? "—").font(.system(size: 34, design: .serif)); Text("%").font(.system(size: 15)).foregroundStyle(.secondary) }
-            ProgressView(value: min(max(course.currentScore ?? 0, 0), 100), total: 100).tint(LecternTheme.accent)
-            if recent.isEmpty { Text("Canvas has not returned graded assignments yet.").font(.system(size: 11)).foregroundStyle(.secondary) }
-            ForEach(Array(recent)) { assignment in
-                HStack { Text(assignment.title).font(.system(size: 11)).lineLimit(1); Spacer(); Text(assignment.grade ?? assignment.score.map { $0.formatted() } ?? "—").font(.system(size: 11, weight: .semibold)) }
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(course.currentScore.map { String(format: "%.1f", $0) } ?? "—")
+                    .font(.system(size: 34, design: .serif).monospacedDigit())
+                    .foregroundStyle(LecternTheme.ink)
+                Text("%").font(.system(size: 15)).foregroundStyle(.secondary)
+            }
+            ScoreBar(fraction: (course.currentScore ?? 0) / 100, tint: tint)
+            VStack(spacing: 0) {
+                if recent.isEmpty {
+                    Text("Canvas has not returned graded assignments yet.")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                ForEach(Array(recent)) { assignment in
+                    HStack {
+                        Text(assignment.title).font(.system(size: 11.5)).foregroundStyle(LecternTheme.ink).lineLimit(1)
+                        Spacer()
+                        Text(assignment.grade ?? assignment.score.map { $0.formatted() } ?? "—")
+                            .font(.system(size: 11.5, weight: .semibold).monospacedDigit())
+                    }
+                    .padding(.vertical, 6)
+                    if assignment.id != recent.last?.id { Divider() }
+                }
             }
         }
-        .padding(18).frame(maxWidth: .infinity, minHeight: 250, maxHeight: 250, alignment: .topLeading).studioPanel()
+        .padding(18)
+        .frame(maxWidth: .infinity, minHeight: 236, maxHeight: 236, alignment: .topLeading)
+        .contentShape(Rectangle())
+        .studioPanel()
+        .overlay(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(isSelected ? LecternTheme.accent.opacity(0.6) : .clear, lineWidth: 1.5)
+        )
+        .help("Show every Canvas grade for \(course.name)")
     }
 
     private func gradeDetail(_ course: Course) -> some View {
         let items = assignments.filter { $0.courseCanvasID == course.canvasID }.sorted { ($0.dueAt ?? .distantFuture) > ($1.dueAt ?? .distantFuture) }
         return VStack(alignment: .leading, spacing: 12) {
-            HStack { VStack(alignment: .leading) { Text(course.name).font(.system(size: 17, weight: .semibold, design: .serif)); Text("All Canvas grades").font(.system(size: 11)).foregroundStyle(.secondary) }; Spacer(); Button { selectedCourseID = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain) }
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(course.name).font(.system(size: 17, weight: .semibold, design: .serif)).foregroundStyle(LecternTheme.ink)
+                    Text("All Canvas grades").font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button { selectedCourseID = nil } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(Color.primary.opacity(0.05), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Close")
+            }
             Divider()
             ScrollView {
                 LazyVStack(spacing: 0) {
@@ -2080,18 +2187,7 @@ struct CanvasResourcesView: View {
             HStack(spacing: 12) {
                 StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: 250, icon: "book.closed")
                 Spacer()
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                    TextField("Search resources", text: $search).textFieldStyle(.plain)
-                    if !search.isEmpty {
-                        Button { search = "" } label: { Image(systemName: "xmark.circle.fill") }
-                            .buttonStyle(.plain).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal, 11)
-                .frame(width: 320, height: 34)
-                .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(LecternTheme.hairline))
+                StudioSearchField(placeholder: "Search resources", text: $search, width: 320)
             }
 
             HStack(spacing: 14) {
@@ -2119,9 +2215,9 @@ struct CanvasResourcesView: View {
     private var moduleSidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("MODULES").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                Text("Modules").font(.system(size: 12, weight: .semibold)).foregroundStyle(LecternTheme.ink)
                 Spacer()
-                Text("\(moduleGroups.count)").font(.system(size: 10).monospacedDigit()).foregroundStyle(.tertiary)
+                Text("\(moduleGroups.count)").font(.system(size: 11).monospacedDigit()).foregroundStyle(.tertiary)
             }
             .padding(14)
 
@@ -2134,8 +2230,9 @@ struct CanvasResourcesView: View {
                         moduleButton(
                             id: group.id,
                             title: group.moduleName,
-                            subtitle: "\(group.courseName) · \(group.items.count)",
-                            icon: "square.stack.3d.up"
+                            subtitle: group.courseName,
+                            icon: "square.stack.3d.up",
+                            count: group.items.count
                         )
                     }
                 }
@@ -2147,16 +2244,21 @@ struct CanvasResourcesView: View {
         .studioPanel()
     }
 
-    private func moduleButton(id: String?, title: String, subtitle: String, icon: String) -> some View {
+    private func moduleButton(id: String?, title: String, subtitle: String, icon: String, count: Int? = nil) -> some View {
         let isSelected = selectedModuleID == id
         return Button { selectedModuleID = id } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon).font(.system(size: 12)).frame(width: 18)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 11.5, weight: .medium)).lineLimit(1)
-                    Text(subtitle).font(.system(size: 9.5)).foregroundStyle(.secondary).lineLimit(1)
+                    Text(title).font(.system(size: 12, weight: isSelected ? .semibold : .medium)).lineLimit(1)
+                    Text(subtitle).font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
                 }
-                Spacer()
+                Spacer(minLength: 6)
+                // Count sits apart from the course name so truncating a long
+                // name never hides it.
+                if let count {
+                    Text("\(count)").font(.system(size: 10.5).monospacedDigit()).foregroundStyle(.tertiary)
+                }
             }
             .foregroundStyle(isSelected ? LecternTheme.accent : LecternTheme.ink)
             .padding(.horizontal, 10)
@@ -2178,7 +2280,7 @@ struct CanvasResourcesView: View {
                 }
                 Spacer()
                 kindChip(nil, title: "All")
-                ForEach(kinds.prefix(5), id: \.self) { kind in kindChip(kind, title: kind) }
+                ForEach(kinds.prefix(5), id: \.self) { kind in kindChip(kind, title: resourceKindTitle(kind)) }
             }
             .padding(14)
 
@@ -2204,12 +2306,14 @@ struct CanvasResourcesView: View {
     }
 
     private func kindChip(_ kind: String?, title: String) -> some View {
-        Button { selectedKind = kind } label: {
+        let isSelected = selectedKind == kind
+        return Button { selectedKind = kind } label: {
             Text(title)
-                .font(.system(size: 9.5, weight: .medium))
-                .padding(.horizontal, 8).padding(.vertical, 5)
-                .foregroundStyle(selectedKind == kind ? LecternTheme.accent : .secondary)
-                .background(selectedKind == kind ? LecternTheme.accent.opacity(0.10) : Color.primary.opacity(0.035), in: Capsule())
+                .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .foregroundStyle(isSelected ? LecternTheme.accent : LecternTheme.ink.opacity(0.7))
+                .background(isSelected ? LecternTheme.accent.opacity(0.11) : Color.primary.opacity(0.045), in: Capsule())
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -2218,11 +2322,11 @@ struct CanvasResourcesView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(group.moduleName).font(.system(size: 13.5, weight: .semibold))
-                    Text(group.courseName).font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text(group.moduleName).font(.system(size: 13.5, weight: .semibold)).foregroundStyle(LecternTheme.ink)
+                    Text(group.courseName).font(.system(size: 10.5)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text("\(items.count) items").font(.system(size: 9.5)).foregroundStyle(.secondary)
+                Text(items.count == 1 ? "1 item" : "\(items.count) items").font(.system(size: 10.5).monospacedDigit()).foregroundStyle(.secondary)
             }
             .padding(12)
             Divider()
@@ -2254,8 +2358,8 @@ struct CanvasResourcesView: View {
                             .foregroundStyle(LecternTheme.accent)
                             .background(LecternTheme.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 6))
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(resource.title).font(.system(size: 12, weight: .medium)).lineLimit(2)
-                            Text(resource.kind).font(.system(size: 9.5)).foregroundStyle(.secondary)
+                            Text(resource.title).font(.system(size: 12.5, weight: .medium)).foregroundStyle(LecternTheme.ink).lineLimit(2)
+                            Text(resourceKindTitle(resource.kind)).font(.system(size: 10.5)).foregroundStyle(.secondary)
                         }
                         Spacer()
                         if resourceOpener.openingKey == resource.syncKey {
@@ -2276,7 +2380,19 @@ struct CanvasResourcesView: View {
         .studioPanel()
     }
 
-    private func resourceIcon(_ kind: String) -> String { switch kind { case "File": "doc.fill"; case "Page": "doc.text"; case "Quiz": "questionmark.circle"; case "Assignment": "checklist"; case "Discussion": "bubble.left.and.bubble.right"; default: "link" } }
+    private func resourceIcon(_ kind: String) -> String { switch kind { case "File": "doc.fill"; case "Page", "WikiPage": "doc.text"; case "Quiz": "questionmark.circle"; case "Assignment": "checklist"; case "Discussion": "bubble.left.and.bubble.right"; case "ExternalTool": "wrench.and.screwdriver"; default: "link" } }
+
+    /// Canvas module item types are API identifiers ("ExternalUrl"); show the
+    /// words a student would use.
+    private func resourceKindTitle(_ kind: String) -> String {
+        switch kind {
+        case "ExternalUrl": "Link"
+        case "ExternalTool": "Tool"
+        case "WikiPage": "Page"
+        case "SubHeader": "Heading"
+        default: kind
+        }
+    }
 }
 
 struct CanvasAnnouncementsView: View {
@@ -2341,14 +2457,19 @@ struct CanvasAnnouncementsView: View {
 
     var body: some View {
         StudioPage(title: "Announcements", subtitle: "Faculty updates and Canvas Inbox messages") {
+            if !unreadVisible.isEmpty {
+                StudioSecondaryButton(action: markAllVisibleRead) {
+                    Label("Mark all read", systemImage: "checkmark.circle")
+                }
+            }
+        } content: {
             HStack {
                 StudioDropdown(title: "Course", selection: $selectedCourseID, options: courseOptions, width: 250, icon: "book.closed")
                 Spacer()
                 if !unreadVisible.isEmpty {
-                    Button("Mark all read", action: markAllVisibleRead)
-                        .buttonStyle(.plain)
+                    Text("\(unreadVisible.count) unread")
                         .font(.system(size: 11.5, weight: .medium))
-                        .foregroundStyle(LecternTheme.accent)
+                        .foregroundStyle(.secondary)
                 }
             }
             HStack(spacing: 0) {
@@ -2356,25 +2477,40 @@ struct CanvasAnnouncementsView: View {
                     LazyVStack(spacing: 8) {
                         if visible.isEmpty { ContentUnavailableView("No announcements", systemImage: "megaphone") }
                         ForEach(visible) { announcement in
+                            let isSelected = selectedAnnouncementID == announcement.canvasID
                             Button { select(announcement) } label: {
-                                VStack(alignment: .leading, spacing: 7) {
-                                    HStack {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(spacing: 6) {
                                         if !announcement.isRead {
-                                            Circle().fill(LecternTheme.accent).frame(width: 7, height: 7)
+                                            Circle().fill(LecternTheme.accent).frame(width: 6, height: 6)
                                         }
-                                        Text(announcement.courseName).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(LecternTheme.accent)
+                                        Text(announcement.courseName)
+                                            .font(.system(size: 10.5, weight: .semibold))
+                                            .foregroundStyle(LecternTheme.accent)
+                                            .lineLimit(1)
                                         if announcement.isInboxMessage {
                                             Text("Inbox").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
                                                 .padding(.horizontal, 5).padding(.vertical, 2)
                                                 .background(Color.primary.opacity(0.06), in: Capsule())
                                         }
-                                        Spacer(); Text(announcement.postedAt.formatted(date: .abbreviated, time: .omitted)).font(.system(size: 10)).foregroundStyle(.secondary)
+                                        Spacer(minLength: 6)
+                                        Text(announcement.postedAt.formatted(date: .abbreviated, time: .omitted))
+                                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                                            .fixedSize()
                                     }
                                     Text(announcement.title)
                                         .font(.system(size: 13, weight: announcement.isRead ? .regular : .semibold, design: .serif))
+                                        .foregroundStyle(LecternTheme.ink)
                                         .lineLimit(2)
-                                    Text(announcement.messageHTML?.canvasPlainText ?? "No preview available").font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(3)
-                                }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(selectedAnnouncementID == announcement.canvasID ? LecternTheme.accent.opacity(0.10) : LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(LecternTheme.hairline))
+                                    Text(announcement.messageHTML?.canvasPreviewText ?? "No preview available")
+                                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+                                .padding(14)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(isSelected ? LecternTheme.accent.opacity(0.10) : LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(isSelected ? LecternTheme.accent.opacity(0.45) : LecternTheme.hairline))
+                                .contentShape(Rectangle())
                             }.buttonStyle(.plain)
                         }
                     }
@@ -2390,11 +2526,18 @@ struct CanvasAnnouncementsView: View {
         if let selected {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(selected.courseName.uppercased()).font(.system(size: 10, weight: .semibold)).foregroundStyle(LecternTheme.accent)
-                    Text(selected.title).font(.system(size: 25, weight: .bold, design: .serif))
-                    HStack { Text(selected.authorName ?? "Course faculty"); Text("·"); Text(selected.postedAt.formatted(date: .long, time: .shortened)); Spacer() }.font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text(selected.courseName).font(.system(size: 11.5, weight: .semibold)).foregroundStyle(LecternTheme.accent)
+                    Text(selected.title).font(.system(size: 25, weight: .bold, design: .serif)).foregroundStyle(LecternTheme.ink)
+                    HStack(spacing: 6) {
+                        Text(canvasAuthorSummary(selected.authorName) ?? "Course faculty")
+                            .lineLimit(1)
+                            .help(selected.authorName ?? "")
+                        Text("·")
+                        Text(selected.postedAt.formatted(date: .long, time: .shortened)).fixedSize()
+                        Spacer()
+                    }.font(.system(size: 11)).foregroundStyle(.secondary)
                     Divider()
-                    Text(selected.messageHTML?.canvasPlainText ?? "This announcement has no body.").font(.system(size: 13)).lineSpacing(5).textSelection(.enabled)
+                    Text(selected.messageHTML?.canvasReadableText ?? "This announcement has no body.").font(.system(size: 13.5)).foregroundStyle(LecternTheme.ink).lineSpacing(5).textSelection(.enabled)
                     if let value = selected.htmlURL, let url = URL(string: value) { Button("Open original in Canvas") { openURL(url) }.buttonStyle(.bordered) }
                 }.padding(28).frame(maxWidth: 760, alignment: .leading)
             }.frame(maxWidth: .infinity)
@@ -2430,20 +2573,117 @@ struct CommandStudioAIView: View {
     }
 }
 
-struct StudioPage<Content: View>: View {
+struct StudioPage<Actions: View, Content: View>: View {
     let title: String
     let subtitle: String
+    @ViewBuilder let actions: Actions
     @ViewBuilder let content: Content
 
-    init(title: String, subtitle: String, @ViewBuilder content: () -> Content) {
-        self.title = title; self.subtitle = subtitle; self.content = content()
+    /// `actions` sit on the title row, trailing, so every page puts its
+    /// primary command in the same place.
+    init(title: String, subtitle: String,
+         @ViewBuilder actions: () -> Actions,
+         @ViewBuilder content: () -> Content) {
+        self.title = title; self.subtitle = subtitle
+        self.actions = actions(); self.content = content()
     }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 4) { Text(title).font(.system(size: 28, weight: .bold, design: .serif)).foregroundStyle(LecternTheme.ink); Text(subtitle).font(.system(size: 12)).foregroundStyle(.secondary) }
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.system(size: 28, weight: .bold, design: .serif)).foregroundStyle(LecternTheme.ink)
+                    Text(subtitle).font(.system(size: 12)).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 12)
+                HStack(spacing: 8) { actions }
+            }
             content
         }
         .padding(28).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).background(LecternTheme.panelFill)
+    }
+}
+
+extension StudioPage where Actions == EmptyView {
+    init(title: String, subtitle: String, @ViewBuilder content: () -> Content) {
+        self.init(title: title, subtitle: subtitle, actions: { EmptyView() }, content: content)
+    }
+}
+
+/// Filled accent command for a page header ("Add Event", "Add Assignment").
+struct StudioPrimaryButton: View {
+    let title: String
+    var systemImage: String = "plus"
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .frame(height: 32)
+                .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+    }
+}
+
+/// Quiet outlined command that pairs with `StudioPrimaryButton`.
+struct StudioSecondaryButton<Label: View>: View {
+    let action: () -> Void
+    @ViewBuilder let label: Label
+
+    var body: some View {
+        Button(action: action) {
+            label
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(LecternTheme.ink)
+                .padding(.horizontal, 12)
+                .frame(minWidth: 32, minHeight: 32)
+                .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(LecternTheme.hairline))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+    }
+}
+
+/// Search box shared by the Canvas pages: glyph, plain field, clear button.
+struct StudioSearchField: View {
+    let placeholder: String
+    @Binding var text: String
+    var width: CGFloat? = 280
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            TextField(placeholder, text: $text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12.5))
+                .focused($focused)
+            if !text.isEmpty {
+                Button { text = "" } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tertiary)
+                    .help("Clear search")
+            }
+        }
+        .padding(.horizontal, 11)
+        .frame(width: width, height: 34)
+        .frame(maxWidth: width == nil ? .infinity : nil)
+        .background(LecternTheme.canvasCard, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(focused ? LecternTheme.accent.opacity(0.55) : LecternTheme.hairline, lineWidth: focused ? 1.5 : 1)
+        )
+        .animation(LecternTheme.standardAnimation, value: focused)
     }
 }
 

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Minimal AnkiConnect (http://localhost:8761) client.
+/// Minimal AnkiConnect (http://localhost:8765) client.
 /// All calls are `POST` with `{action, version, params}` envelopes.
 struct AnkiConnectClient {
     struct BridgeError: LocalizedError {

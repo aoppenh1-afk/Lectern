@@ -106,10 +106,19 @@ struct SubscriptionsView: View {
     @ViewBuilder
     private var failedImportsSection: some View {
         if !failedItems.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Imports needing attention")
-                        .font(.headline)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center, spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(LecternTheme.warningTint)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Imports needing attention")
+                            .font(.system(size: 15, weight: .semibold, design: .serif))
+                            .foregroundStyle(LecternTheme.ink)
+                        Text(failedItems.count == 1 ? "1 shiur stopped before it finished." : "\(failedItems.count) shiurim stopped before they finished.")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
                     Button("Dismiss All") {
                         automationService.dismissFailedItems(failedItems)
@@ -119,33 +128,62 @@ struct SubscriptionsView: View {
                     .buttonStyle(.plain)
                     .help("Remove all failed imports from this list")
                 }
+                .padding(.bottom, 12)
                 ForEach(failedItems) { item in
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.title).font(.subheadline.weight(.semibold))
-                            Text(item.stateMessage ?? "Import stopped before completion.")
-                                .font(.caption)
+                    Divider()
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(item.title)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(LecternTheme.ink)
+                                .lineLimit(1)
+                            Text(Self.failureSummary(item.stateMessage))
+                                .font(.system(size: 11.5))
                                 .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .help(item.stateMessage ?? "")
                         }
-                        Spacer()
+                        Spacer(minLength: 12)
                         HStack(spacing: 8) {
                             Button("Retry") {
                                 Task { await automationService.retryItem(item) }
                             }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
                             .disabled(automationService.activeItemIDs.contains(item.id))
                             Button("Dismiss") {
                                 automationService.dismissItem(item)
                             }
-                            .foregroundStyle(.secondary)
+                            .controlSize(.small)
                             .disabled(automationService.activeItemIDs.contains(item.id))
                             .help("Remove this failed import from the list")
                         }
                     }
+                    .padding(.vertical, 10)
                 }
             }
-            .padding(14)
-            .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10))
+            .padding(16)
+            .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: LecternTheme.cardRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: LecternTheme.cardRadius, style: .continuous)
+                    .strokeBorder(LecternTheme.warningTint.opacity(0.25), lineWidth: 1)
+            )
         }
+    }
+
+    /// Pipeline errors are stored verbatim ("…(Swift.CancellationError error
+    /// 1.)"). Show what happened in plain words; the raw text stays in the
+    /// tooltip for debugging.
+    static func failureSummary(_ message: String?) -> String {
+        guard let message, !message.isEmpty else { return "Import stopped before completion." }
+        let stage = message.components(separatedBy: " failed").first.flatMap { prefix -> String? in
+            prefix.count < 40 && message.contains(" failed") ? prefix : nil
+        }
+        if message.contains("CancellationError") {
+            return stage.map { "\($0) was interrupted before it finished. Retry to continue." }
+                ?? "Interrupted before it finished. Retry to continue."
+        }
+        return message
     }
 
     private var header: some View {

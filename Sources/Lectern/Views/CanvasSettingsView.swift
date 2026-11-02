@@ -138,7 +138,8 @@ struct CanvasSettingsPane: View {
                                 showsWalkthrough.toggle()
                             }
                         }
-                        .buttonStyle(.link)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(LecternTheme.accent)
                         .font(.system(size: 11, weight: .medium))
                     }
 
@@ -173,6 +174,7 @@ struct CanvasSettingsPane: View {
                                 if let guideURL = URL(string: "https://community.instructure.com/en/kb/articles/662901-how-do-i-manage-api-access-tokens-in-my-user-account") {
                                     Link("Open full Canvas guide", destination: guideURL)
                                         .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(LecternTheme.accent)
                                 }
                             }
                         }

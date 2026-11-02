@@ -56,9 +56,11 @@ struct FlashcardsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(lecture.flashcards.count) flashcards")
                     .font(.system(size: 15, weight: .semibold))
-                Text("Deck · \(CardSyncService.deck(for: lecture))")
-                    .font(.system(size: 11, design: .monospaced))
+                Text("Anki deck: \(CardSyncService.deck(for: lecture).replacingOccurrences(of: "::", with: " › "))")
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer()
@@ -137,7 +139,8 @@ private struct CardRow: View {
             } else {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(card.front)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(LecternTheme.ink)
                         .textSelection(.enabled)
                     Text(card.back)
                         .font(.system(size: 13))
@@ -153,14 +156,16 @@ private struct CardRow: View {
                 }
                 .opacity(hovering ? 1 : 0)
 
-                syncChip
+                // The header already counts pending cards; rows only flag the
+                // exceptions (in Anki, failed) so the list reads cleanly.
+                if card.syncState != .pending { syncChip }
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background {
             RoundedRectangle(cornerRadius: LecternTheme.cardRadius, style: .continuous)
-                .fill(hovering ? Color.primary.opacity(0.055) : LecternTheme.surfaceFill)
+                .fill(hovering ? LecternTheme.canvasCard : LecternTheme.cardFill)
         }
         .overlay(
             RoundedRectangle(cornerRadius: LecternTheme.cardRadius, style: .continuous)

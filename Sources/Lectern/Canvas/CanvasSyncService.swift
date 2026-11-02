@@ -355,4 +355,37 @@ extension String {
     var canvasPlainText: String {
         CanvasHTMLTextCache.shared.text(for: self)
     }
+
+    /// Single-line preview for list rows. Canvas bodies keep the line breaks
+    /// and indentation of the original email, which wastes a two-line preview
+    /// on "Hello Class," and a run of spaces.
+    var canvasPreviewText: String {
+        canvasPlainText
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+    }
+
+    /// Body text for the reading pane: keeps paragraphs but drops the email
+    /// indentation and runs of blank lines.
+    var canvasReadableText: String {
+        var lines: [String] = []
+        for line in canvasPlainText.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty, lines.last?.isEmpty ?? true { continue }
+            lines.append(trimmed)
+        }
+        return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// Inbox threads store every participant as the author. Lists show the first
+/// name and a count so a class-wide message does not fill the row.
+func canvasAuthorSummary(_ authorName: String?) -> String? {
+    guard let authorName else { return nil }
+    let names = authorName
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+        .filter { !$0.isEmpty }
+    guard names.count > 2, let first = names.first else { return authorName }
+    return "\(first) and \(names.count - 1) others"
 }

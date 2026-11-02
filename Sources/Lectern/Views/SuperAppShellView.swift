@@ -90,6 +90,8 @@ struct SuperAppShellView: View {
     @Query private var announcements: [CanvasAnnouncement]
     @Environment(\.modelContext) private var modelContext
     @AppStorage("commandStudio.selectedTerm") private var selectedTerm = AcademicScopeMatcher.preferredTerm
+    // Observed so the app-wide tint follows an accent change immediately.
+    @AppStorage("appearance.accent") private var accentID = "moss"
     @State private var selection: CommandStudioSection = .overview
 
     private var availableTerms: [String] {
@@ -145,6 +147,9 @@ struct SuperAppShellView: View {
         }
         .appCanvas()
         .ignoresSafeArea()
+        // Stock controls (links, prominent buttons, switches, progress bars)
+        // otherwise fall back to system blue instead of the brand accent.
+        .tint(LecternTheme.accent(for: accentID))
         .background(WindowConfigurationView())
         .task(priority: .utility) {
             // Let SwiftUI commit the cached dashboard before maintenance touches SwiftData.
@@ -248,16 +253,11 @@ struct SuperAppShellView: View {
             .padding(.horizontal, 12)
 
             Spacer()
-            Button {
-                selection = .settings
-            } label: {
-                Label("Settings", systemImage: "gearshape")
-                    .font(.system(size: 13))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(LecternTheme.ink)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 26)
+            // Same row treatment as the sections above so Settings lines up
+            // with them and shows where you are when it is open.
+            sidebarButton(.settings)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 18)
         }
         .frame(width: 260)
         .glassSidebar()
@@ -478,24 +478,30 @@ struct OverviewDashboardView: View {
             }
             Spacer()
             HStack(spacing: 10) {
-                metric(icon: "book.closed", value: "\(scopedCourses.count)", label: "Classes")
-                metric(icon: "circle.fill", value: nextDeadlineTitle, label: nextDeadlineLabel)
+                metric(icon: "book.closed", value: "\(scopedCourses.count)", label: scopedCourses.count == 1 ? "Class" : "Classes")
+                metric(icon: "calendar.badge.clock", value: nextDeadlineValue, label: nextDeadlineLabel, width: 190)
                 metric(icon: "chart.line.uptrend.xyaxis", value: gpaEstimate, label: "Est. GPA")
             }
         }
     }
 
-    private func metric(icon: String, value: String, label: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon).font(.system(size: 17)).foregroundStyle(LecternTheme.ink)
+    private func metric(icon: String, value: String, label: String, width: CGFloat = 132) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(LecternTheme.accent)
+                .frame(width: 30, height: 30)
+                .background(LecternTheme.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
-                Text(value).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                Text(label).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                Text(value).font(.system(size: 14, weight: .semibold)).foregroundStyle(LecternTheme.ink).lineLimit(1)
+                Text(label).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
             }
+            Spacer(minLength: 0)
         }
-        .frame(width: 130, height: 62)
-        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 11))
-        .overlay(RoundedRectangle(cornerRadius: 11).stroke(LecternTheme.hairline))
+        .padding(.horizontal, 12)
+        .frame(width: width, height: 62)
+        .background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).stroke(LecternTheme.hairline))
     }
 
     private var activeSessionCard: some View {
@@ -516,12 +522,19 @@ struct OverviewDashboardView: View {
                     Button {
                         capture.toggle(in: suggestedCourse, source: surfacePreferences.captureSource)
                     } label: {
-                        Text(capture.phase.isLive ? "Stop recording" : surfacePreferences.captureSource == .microphone ? "Start grounded recording" : surfacePreferences.captureSource.recordButtonTitle)
-                            .frame(maxWidth: .infinity).padding(.vertical, 10)
+                        HStack(spacing: 8) {
+                            Image(systemName: capture.phase.isLive ? "stop.fill" : "record.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(capture.phase.isLive ? "Stop recording" : surfacePreferences.captureSource == .microphone ? "Start recording" : surfacePreferences.captureSource.recordButtonTitle)
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .frame(maxWidth: .infinity).padding(.vertical, 10)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.white)
-                    .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8))
+                    .background(capture.phase.isLive ? LecternTheme.recordTint : LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .help(suggestedCourse.map { "Record into \($0.name) with its class materials as context" } ?? "Start recording")
                 }
             }
         }
@@ -536,7 +549,7 @@ struct OverviewDashboardView: View {
     private var scheduleCard: some View {
         StudioCard("Today's schedule", actionTitle: "View calendar") { navigate(.calendar) } content: {
             VStack(spacing: 0) {
-                if bannerToday.isEmpty, todayEvents.isEmpty { emptyLine("No Canvas events scheduled today") }
+                if bannerToday.isEmpty, todayEvents.isEmpty { emptyLine("Nothing scheduled today", icon: "calendar") }
                 ForEach(Array(bannerToday.enumerated()), id: \.offset) { _, occurrence in
                     HStack(alignment: .top, spacing: 12) {
                         Text(occurrence.start.formatted(date: .omitted, time: .shortened))
@@ -574,22 +587,28 @@ struct OverviewDashboardView: View {
     private var deadlineCard: some View {
         StudioCard("Upcoming work & deadlines", actionTitle: "View all") { navigate(.assignments) } content: {
             VStack(spacing: 0) {
-                if upcomingAssignments.isEmpty { emptyLine("No upcoming Canvas assignments") }
+                if upcomingAssignments.isEmpty { emptyLine("You're all caught up", icon: "checkmark.circle") }
                 ForEach(upcomingAssignments) { assignment in
-                    HStack(spacing: 11) {
-                        RoundedRectangle(cornerRadius: 3).stroke(Color.secondary.opacity(0.55)).frame(width: 16, height: 16)
+                    HStack(spacing: 12) {
+                        DueDateTile(date: assignment.dueAt, tint: dueTint(assignment.dueAt))
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("\(assignment.courseCode ?? assignment.courseName): \(assignment.title)")
-                                .font(.system(size: 12, weight: .semibold)).lineLimit(1)
-                            Text(assignmentDetail(assignment)).font(.system(size: 10.5)).foregroundStyle(.secondary)
+                            Text(assignment.title)
+                                .font(.system(size: 12.5, weight: .semibold))
+                                .foregroundStyle(LecternTheme.ink)
+                                .lineLimit(1)
+                            Text([assignment.courseCode ?? assignment.courseName,
+                                  assignment.pointsPossible.map { "\($0.formatted()) pts" },
+                                  assignment.isMissing ? "Missing" : nil]
+                                .compactMap { $0 }.joined(separator: " · "))
+                                .font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
                         }
-                        Spacer()
-                        Text(relativeDue(assignment.dueAt))
-                            .font(.system(size: 9.5, weight: .semibold)).foregroundStyle(LecternTheme.accent)
-                            .padding(.horizontal, 6).padding(.vertical, 3).background(LecternTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 4))
+                        Spacer(minLength: 8)
+                        Text(assignment.dueAt == nil ? "No date" : relativeDue(assignment.dueAt))
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(dueTint(assignment.dueAt))
                     }
-                    .padding(.vertical, 8)
-                    if assignment.id != upcomingAssignments.last?.id { Divider() }
+                    .padding(.vertical, 7)
+                    if assignment.id != upcomingAssignments.last?.id { Divider().padding(.leading, 48) }
                 }
             }
         }
@@ -598,25 +617,35 @@ struct OverviewDashboardView: View {
     private var announcementCard: some View {
         StudioCard("Faculty bulletins", actionTitle: "View all") { navigate(.announcements) } content: {
             VStack(spacing: 10) {
-                if scopedAnnouncements.isEmpty { emptyLine("No recent Canvas announcements") }
+                if scopedAnnouncements.isEmpty { emptyLine("No recent announcements", icon: "megaphone") }
                 ForEach(scopedAnnouncements.prefix(2)) { announcement in
-                    VStack(alignment: .leading, spacing: 7) {
-                        HStack {
-                            Circle().fill(announcement.isRead ? Color.secondary.opacity(0.35) : LecternTheme.accent).frame(width: 7, height: 7)
-                            Text(announcement.courseName).font(.system(size: 11.5, weight: .medium)).foregroundStyle(LecternTheme.accent)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            if !announcement.isRead {
+                                Circle().fill(LecternTheme.accent).frame(width: 6, height: 6)
+                            }
+                            Text(announcement.courseName)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(LecternTheme.accent)
+                                .lineLimit(1)
                             if announcement.isInboxMessage {
                                 Text("Inbox").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
                                     .padding(.horizontal, 5).padding(.vertical, 2)
                                     .background(Color.primary.opacity(0.06), in: Capsule())
                             }
-                            if let author = announcement.authorName { Text("·  \(author)").font(.system(size: 11)).foregroundStyle(.secondary) }
-                            Spacer()
-                            Text(announcement.postedAt.formatted(.relative(presentation: .named))).font(.system(size: 10)).foregroundStyle(.secondary)
+                            Spacer(minLength: 8)
+                            Text(announcement.postedAt.formatted(.relative(presentation: .named)))
+                                .font(.system(size: 10)).foregroundStyle(.secondary)
+                                .fixedSize()
                         }
-                        Text(announcement.title).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
-                        if let message = announcement.messageHTML?.canvasPlainText {
-                            Text(message).font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(2)
-                        }
+                        Text(announcement.title)
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(LecternTheme.ink)
+                            .lineLimit(1)
+                        Text([canvasAuthorSummary(announcement.authorName),
+                              announcement.messageHTML?.canvasPreviewText]
+                            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ": "))
+                            .font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
                     }
                     .padding(12)
                     .background(Color.primary.opacity(0.018), in: RoundedRectangle(cornerRadius: 9))
@@ -628,22 +657,64 @@ struct OverviewDashboardView: View {
 
     private var gradeStrip: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack { Text("COURSE STANDING").font(.system(size: 11, weight: .semibold)); Spacer(); Button("Open grades") { navigate(.grades) }.buttonStyle(.plain).font(.system(size: 11.5)).foregroundStyle(LecternTheme.accent) }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), spacing: 12)], spacing: 12) {
+            HStack {
+                Text("COURSE STANDING")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(LecternTheme.ink.opacity(0.78))
+                Spacer()
+                Button("Open grades") { navigate(.grades) }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(LecternTheme.accent)
+            }
+            if gradedCourses.isEmpty {
+                Text("Grades appear here after Canvas returns a score.")
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                    .padding(.vertical, 6)
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 12)], spacing: 12) {
                 ForEach(gradedCourses) { course in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack { Text(course.courseCode ?? course.name).font(.system(size: 11.5, weight: .medium)).lineLimit(1); Spacer(); Text(course.currentGrade ?? "").font(.system(size: 12, weight: .medium, design: .serif)) }
-                        Text(course.currentScore.map { String(format: "%.1f%%", $0) } ?? "—").font(.system(size: 23, design: .serif))
-                        ProgressView(value: min(max(course.currentScore ?? 0, 0), 100), total: 100).tint(LecternTheme.accent)
-                        Text(course.instructorName ?? course.termName ?? "Synced from Canvas").font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .top, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(course.name)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(LecternTheme.ink)
+                                    .lineLimit(1)
+                                Text([course.courseCode, course.instructorName].compactMap { $0 }.joined(separator: " · "))
+                                    .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer(minLength: 4)
+                            if let letter = course.currentGrade, !letter.isEmpty {
+                                Text(letter)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(Color(hex: course.colorHex).darkened(by: 0.12))
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Color(hex: course.colorHex).opacity(0.14), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            }
+                        }
+                        Text(course.currentScore.map { String(format: "%.1f%%", $0) } ?? "—")
+                            .font(.system(size: 24, design: .serif).monospacedDigit())
+                            .foregroundStyle(LecternTheme.ink)
+                        ScoreBar(fraction: (course.currentScore ?? 0) / 100, tint: Color(hex: course.colorHex))
                     }
-                    .padding(14).background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(LecternTheme.hairline))
+                    .padding(14).background(LecternTheme.cardFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(LecternTheme.hairline))
                 }
             }
         }
     }
 
-    private func emptyLine(_ title: String) -> some View { Text(title).font(.system(size: 12)).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 76, alignment: .center) }
+    private func emptyLine(_ title: String, icon: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .light))
+                .foregroundStyle(.tertiary)
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+    }
     private var greeting: String { Calendar.current.component(.hour, from: Date()) < 12 ? "Good morning" : Calendar.current.component(.hour, from: Date()) < 18 ? "Good afternoon" : "Good evening" }
     private var activeSessionSubtitle: String {
         if capture.phase.isLive {
@@ -663,7 +734,7 @@ struct OverviewDashboardView: View {
         if let event = todayEvents.first {
             return "\(event.startAt.formatted(date: .omitted, time: .shortened)) · \(event.locationName ?? "Canvas schedule")"
         }
-        return "Choose a course and Lectern will ground the recording in its class context."
+        return "Lectern files the recording under this course and uses its materials as context."
     }
 
     private func countdown(to date: Date) -> String {
@@ -675,8 +746,11 @@ struct OverviewDashboardView: View {
         let days = hours / 24
         return days == 1 ? "Tomorrow" : "In \(days) days"
     }
-    private var nextDeadlineTitle: String { upcomingAssignments.first.map { String($0.title.prefix(16)) } ?? "All clear" }
-    private var nextDeadlineLabel: String { upcomingAssignments.first.map { relativeDue($0.dueAt) } ?? "No deadline" }
+    private var nextDeadlineValue: String {
+        guard let next = upcomingAssignments.first else { return "All clear" }
+        return next.dueAt == nil ? "Next up" : dueSummary(next.dueAt)
+    }
+    private var nextDeadlineLabel: String { upcomingAssignments.first?.title ?? "No upcoming deadlines" }
     private var gpaEstimate: String { let scores = gradedCourses.compactMap(\.currentScore); guard !scores.isEmpty else { return "—" }; let points = scores.map { score in score >= 93 ? 4.0 : score >= 90 ? 3.7 : score >= 87 ? 3.3 : score >= 83 ? 3.0 : score >= 80 ? 2.7 : score >= 77 ? 2.3 : score >= 73 ? 2.0 : score >= 70 ? 1.7 : score >= 67 ? 1.3 : score >= 65 ? 1.0 : 0 }; return String(format: "%.2f", points.reduce(0, +) / Double(points.count)) }
 }
 
@@ -694,4 +768,25 @@ func relativeDue(_ date: Date?) -> String {
     if Calendar.current.isDateInTomorrow(date) { return "Tomorrow" }
     let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: date).day ?? 0
     return days > 0 && days < 7 ? "\(days) days" : date.formatted(.dateTime.month(.abbreviated).day())
+}
+
+/// Sentence-style due phrase for headlines: "Due today", "Due in 3 days".
+func dueSummary(_ date: Date?) -> String {
+    guard let date else { return "No due date" }
+    let calendar = Calendar.current
+    if date < Date(), !calendar.isDateInToday(date) { return "Overdue" }
+    if calendar.isDateInToday(date) { return "Due today" }
+    if calendar.isDateInTomorrow(date) { return "Due tomorrow" }
+    let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: date).day ?? 0
+    return days > 0 && days < 7 ? "Due in \(days) days" : "Due \(date.formatted(.dateTime.month(.abbreviated).day()))"
+}
+
+/// Due label tint: overdue and same-day work draws the eye, later work recedes.
+func dueTint(_ date: Date?, isComplete: Bool = false) -> Color {
+    guard !isComplete, let date else { return .secondary }
+    let calendar = Calendar.current
+    if date < Date(), !calendar.isDateInToday(date) { return LecternTheme.recordTint }
+    let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: date).day ?? 0
+    if days <= 1 { return LecternTheme.warningTint }
+    return LecternTheme.accent
 }

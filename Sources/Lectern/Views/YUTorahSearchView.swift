@@ -148,10 +148,10 @@ struct YUTorahSearchView: View {
 
                         Text("\(searchResults.activeTeacher?.shiurCount ?? teacher.shiurCount) shiurim")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(LecternTheme.accent)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.10), in: Capsule())
+                            .background(LecternTheme.accent.opacity(0.10), in: Capsule())
                     }
 
                     if let sub = activeSubcategory {
@@ -217,7 +217,7 @@ struct YUTorahSearchView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.blue.opacity(0.18), lineWidth: 1)
+                .strokeBorder(LecternTheme.accent.opacity(0.22), lineWidth: 1)
         )
     }
 

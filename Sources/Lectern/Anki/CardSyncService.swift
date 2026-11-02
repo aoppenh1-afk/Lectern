@@ -19,7 +19,7 @@ final class CardSyncService {
 
     private var port: Int {
         let stored = UserDefaults.standard.integer(forKey: "ankiPort")
-        guard stored != 0 else { return 8_761 }
+        guard stored != 0 else { return 8_765 }
         return max(1024, min(stored, 65_535))
     }
 

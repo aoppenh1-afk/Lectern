@@ -392,9 +392,10 @@ struct LectureDetailView: View {
                 }
 
                 HStack(spacing: 8) {
+                    // Take whatever width the buttons leave instead of a
+                    // fixed 215pt, which cut off the provider name.
                     transcriptProvenanceInfo(provider: provider, model: model)
-                        .frame(width: 215, alignment: .leading)
-                    Spacer(minLength: 0)
+                        .frame(minWidth: 0, idealWidth: 215, maxWidth: .infinity, alignment: .leading)
                     transcriptProvenanceActions(compactLabel: true)
                         .fixedSize(horizontal: true, vertical: false)
                 }
@@ -489,16 +490,18 @@ struct LectureDetailView: View {
     private func generateCleanTranscriptAndNotesButton(title: String) -> some View {
         Button(action: onGenerate) {
             HStack(spacing: 6) {
-                Image(systemName: "doc.text")
-                    .font(.system(size: 12, weight: .medium))
+                Image(systemName: "sparkles")
+                    .font(.system(size: 11, weight: .semibold))
                 Text(title)
             }
-            .font(.system(size: 11.5, weight: .medium))
+            .font(.system(size: 11.5, weight: .semibold))
             .foregroundStyle(.white)
             .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 10)
             .frame(height: 28)
-            .background(Color(hex: "2168ED"), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            // Brand accent, not a hard-coded system blue, so the primary
+            // action matches every other one in the app.
+            .background(LecternTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(generation.job(for: lecture.persistentModelID) != nil)
@@ -793,7 +796,7 @@ struct LectureDetailView: View {
     private var tabBar: some View {
         if hasAnyArtifact {
             VStack(spacing: 0) {
-                HStack(spacing: 18) {
+                HStack(spacing: 22) {
                     tabButton(.rawTranscript, "Raw Transcript")
                     if lecture.artifact(of: .cleanedTranscript) != nil {
                         tabButton(.cleanedTranscript, "Cleaned")
@@ -830,30 +833,34 @@ struct LectureDetailView: View {
         return Button {
             withAnimation(LecternTheme.standardAnimation) { selectedTab = tab }
         } label: {
-            VStack(spacing: 7) {
-                HStack(spacing: 4) {
+            VStack(spacing: 8) {
+                HStack(spacing: 5) {
                     Text(title)
                         .font(.system(size: 13, weight: isActive ? .semibold : .regular))
                     if let count {
                         Text("\(count)")
-                            .font(.system(size: 11).monospacedDigit())
-                            .foregroundStyle(isActive ? .secondary : .tertiary)
+                            .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(isActive ? LecternTheme.accent : Color.secondary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(
+                                (isActive ? LecternTheme.accent.opacity(0.12) : Color.primary.opacity(0.06)),
+                                in: Capsule()
+                            )
                     }
                 }
-                .foregroundStyle(isActive ? Color.primary : Color.secondary)
+                .foregroundStyle(isActive ? LecternTheme.ink : Color.secondary)
 
+                // Underline spans the label only; a flexible bar stretched
+                // every tab to an equal share of the row.
                 RoundedRectangle(cornerRadius: 1)
                     .fill(isActive ? LecternTheme.accent : .clear)
                     .frame(height: 2)
             }
+            .fixedSize()
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering in
-            if hovering && !isActive {
-                // subtle affordance handled by color; no-op keeps motion budget
-            }
-        }
     }
 
     @ViewBuilder
@@ -1025,14 +1032,12 @@ struct TranscriptView: View {
         let paragraphs = self.paragraphs
         let bookmarksByParagraph = self.bookmarksByParagraph(paragraphs)
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                SectionLabel(title: "Raw Transcript")
-                Spacer()
-                if playable {
-                    Text("Tap a timestamp to listen")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                }
+            // The tab above already names this view; only the playback hint
+            // earns a line here.
+            if playable {
+                Label("Click a timestamp to listen from that point", systemImage: "play.circle")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
             }
 
             ForEach(Array(paragraphs.enumerated()), id: \.offset) { index, paragraph in
@@ -1044,7 +1049,7 @@ struct TranscriptView: View {
                             }
                         } label: {
                             Text(label)
-                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                .font(.system(size: 11, weight: .medium).monospacedDigit())
                                 .foregroundStyle(playable ? LecternTheme.accent : Color.secondary.opacity(0.6))
                                 .frame(width: 42, alignment: .trailing)
                         }
@@ -1053,9 +1058,10 @@ struct TranscriptView: View {
                         .help(playable ? "Play from here" : "Audio has been pruned")
                     }
 
-                    Text(paragraph.text)
-                        .font(.system(size: 13))
-                        .lineSpacing(4)
+                    Text(Self.styledParagraph(paragraph.text))
+                        .font(.system(size: 13.5))
+                        .foregroundStyle(LecternTheme.ink)
+                        .lineSpacing(4.5)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -1068,7 +1074,7 @@ struct TranscriptView: View {
 
             if !playable {
                 HStack {
-                    Label("Recording audio was pruned; timestamps are no longer clickable.",
+                    Label("The recording was removed to save space, so timestamps no longer play audio.",
                           systemImage: "waveform.slash")
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
@@ -1088,6 +1094,30 @@ struct TranscriptView: View {
                 }
             }
         }
+    }
+
+    /// Transcribers mark speakers as `**Professor:**`. Render that prefix as
+    /// a bold label instead of showing the asterisks; the rest of the
+    /// paragraph stays literal text.
+    static func styledParagraph(_ text: String) -> AttributedString {
+        guard text.hasPrefix("**"),
+              let close = text.range(of: "**", range: text.index(text.startIndex, offsetBy: 2)..<text.endIndex) else {
+            return AttributedString(text)
+        }
+        var speaker = String(text[text.index(text.startIndex, offsetBy: 2)..<close.lowerBound])
+            .trimmingCharacters(in: .whitespaces)
+        guard !speaker.isEmpty, speaker.count <= 40, !speaker.contains("\n") else {
+            return AttributedString(text)
+        }
+        var rest = text[close.upperBound...]
+        if rest.hasPrefix(":") { rest = rest.dropFirst() }
+        if speaker.hasSuffix(":") { speaker.removeLast() }
+
+        var label = AttributedString(speaker + ": ")
+        label.font = .system(size: 13.5, weight: .semibold)
+        var body = AttributedString(rest.trimmingCharacters(in: .whitespaces))
+        body.font = .system(size: 13.5)
+        return label + body
     }
 }
 

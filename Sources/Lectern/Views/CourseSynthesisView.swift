@@ -471,10 +471,10 @@ struct CourseSynthesisView: View {
                                 }
                             )) {
                                 HStack(spacing: 9) {
-                                    SourceRowIcon(icon: "doc.text", tint: .blue)
+                                    SourceRowIcon(icon: "doc.text", tint: LecternTheme.ink.opacity(0.55))
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(lecture.title).font(.system(size: 11.5, weight: .medium)).lineLimit(1)
-                                        Text("Recovered · \(lecture.capturedAt.formatted(date: .abbreviated, time: .shortened))")
+                                        Text(sourceMeta(for: lecture))
                                             .font(.system(size: 9.5)).foregroundStyle(.secondary).lineLimit(1)
                                     }
                                 }
@@ -500,7 +500,7 @@ struct CourseSynthesisView: View {
                                 }
                             )) {
                                 HStack(spacing: 9) {
-                                    SourceRowIcon(icon: "building.columns", tint: .blue)
+                                    SourceRowIcon(icon: "building.columns", tint: LecternTheme.ink.opacity(0.55))
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(source.label).font(.system(size: 11.5, weight: .medium)).lineLimit(1)
                                         Text(selectedCanvasSourceLabels.contains(source.label) ? "Included" : "Not included")
@@ -570,6 +570,17 @@ struct CourseSynthesisView: View {
             && canvasSources.isEmpty
             && course.attachments.isEmpty
             && courseCanvasResources.isEmpty
+    }
+
+    /// Date and length, matching the library list. Every row used to say
+    /// "Recovered", which is only true for crash-recovered recordings.
+    private func sourceMeta(for lecture: Lecture) -> String {
+        var parts = [lecture.capturedAt.formatted(.dateTime.month(.abbreviated).day())]
+        if lecture.duration > 0 {
+            parts.append(Duration.seconds(lecture.duration).formatted(.time(pattern: .hourMinuteSecond)))
+        }
+        parts.append(lecture.status == .ready ? "Transcribed" : lecture.status.rawValue.capitalized)
+        return parts.joined(separator: " · ")
     }
 
     private func sourceSection<Content: View>(title: String,
@@ -766,15 +777,33 @@ struct CourseSynthesisView: View {
         }
     }
 
+    /// A few named sources plus a count. The old horizontal scroller clipped
+    /// the last chip mid-word with no hint that more were attached.
     private var sourceChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(selectedLectures, id: \.persistentModelID) { lecture in Label(lecture.title, systemImage: "waveform").lineLimit(1).sourceChip() }
-                ForEach(selectedAttachments) { attachment in Label(attachment.name, systemImage: "paperclip").lineLimit(1).sourceChip() }
-                ForEach(selectedCanvasSummarySources, id: \.label) { source in Label(source.label, systemImage: "building.columns").lineLimit(1).sourceChip() }
-                ForEach(courseCanvasResources.filter { selectedResourceKeys.contains($0.syncKey) }) { resource in
-                    Label(resource.title, systemImage: "doc").lineLimit(1).sourceChip()
-                }
+        let all: [(title: String, icon: String)] =
+            selectedLectures.map { ($0.title, "waveform") }
+            + selectedAttachments.map { ($0.name, "paperclip") }
+            + selectedCanvasSummarySources.map { ($0.label, "building.columns") }
+            + courseCanvasResources.filter { selectedResourceKeys.contains($0.syncKey) }.map { ($0.title, "doc") }
+        let shown = Array(all.prefix(3))
+        let remaining = all.count - shown.count
+        return HStack(spacing: 6) {
+            Text("Using")
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(.tertiary)
+            ForEach(Array(shown.enumerated()), id: \.offset) { _, source in
+                Label(source.title, systemImage: source.icon)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .sourceChip()
+            }
+            if remaining > 0 {
+                Text("+\(remaining) more")
+                    .lineLimit(1)
+                    .fixedSize()
+                    .sourceChip()
+                    .layoutPriority(1)
+                    .help(all.dropFirst(3).map(\.title).joined(separator: "\n"))
             }
         }
     }
