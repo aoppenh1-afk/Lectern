@@ -1,5 +1,22 @@
 # Website redesign
 
+## Lower page, November 2026
+
+The user asked to keep everything through the demo and replace everything after it, using the frontend-design skill. The previous lower page repeated one template (eyebrow, numbered label, two-line headline with an italic accent, hairlines) and broke from the classroom. The new page stays in that room:
+
+- **The board.** An oak rail cut from the photo's chalk tray ends the demo, so the plant and bottle rest on it. Below it, one real idea from the real `Pre Lab 9/2` lecture is followed through crops of the actual Raw Transcript, Notes, and Cards tabs. A highlighter marks the same fact in each crop and the hero's chalk hand explains each step.
+- **The film** stays on the board as the view of the whole window.
+- **The rest of Lectern, in outline.** Set like a Lectern note, with bold serif headings, nested bullets, and `Q:`/`A:` for the FAQ.
+- **The close.** The classroom photo returns, with text centered on the board in the photo rather than on the page. The photo is a CSS background on purpose: a second `<img>` of the same file changed how Chrome rasterized the hero's photo at some widths.
+
+The last section was checked against the user's earlier direction: real screenshots only, no invented interface cards, and forest green throughout. Crops in `assets/app/crops/` are cut directly from `assets/app/*.png`, and each opens its full window in the viewer. `thread-cards.png` joins the Cards header to card 4 and skips cards 1 to 3, which the chalk note states as "Card 4 of 20". Highlight positions are in each crop's own pixels (`--x`, `--y`, `--w`, `--h` against `--W`, `--H`), so recutting a crop means remeasuring them.
+
+`assets/board.jpg` and `assets/board-rail.jpg` are cut from `assets/classroom-warm.jpg`. Outfit is no longer used by the site; headings use the hero's Georgia and body text uses the system font, as the hero and the app do.
+
+The demo grows the page after load, so `product.js` repeats a deep link's jump once `.story-enabled` is set.
+
+The notes below describe the previous lower page.
+
 Continued from thread `a0c2e6a0-efb9-4122-b0b7-9ba26cc6ff37` on September 17, 2026. The user's latest direction was to preserve the classroom hero and demo, replace the unrelated colors and invented interface cards with a consistent forest-green design, use actual app screenshots, and make a product video.
 
 The lower page now follows the course library, lecture notes and transcript, then flashcards and exports. Forest green, warm paper, serif headings, and Outfit body text repeat throughout. Screenshot tabs support arrow keys, Home, and End. Screenshots open in a native modal with zoom, Close, Escape, and focus restoration. Modified clicks retain normal link behavior. The existing classroom and interactive demo remain above this sequence.

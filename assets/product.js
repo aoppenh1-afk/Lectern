@@ -1,32 +1,39 @@
-// Native app screenshot tabs. Keep the first screenshot available without JavaScript.
-const tabs = [...document.querySelectorAll('.af-tabs [role="tab"]')];
-function selectTab(tab) {
-  for (const item of tabs) {
-    const selected = item === tab;
-    item.setAttribute('aria-selected', String(selected));
-    item.tabIndex = selected ? 0 : -1;
-    document.getElementById(item.getAttribute('aria-controls')).hidden = !selected;
-  }
+// As each step of the real lecture arrives, mark the same idea and draw its chalk arrow, once.
+// Everything is fully visible by default, so nothing depends on this running.
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const steps = [...document.querySelectorAll('.af-step')];
+if (steps.length && !reduceMotion && 'IntersectionObserver' in window) {
+  document.querySelector('.afterword').classList.add('af-motion');
+  const stepObserver = new IntersectionObserver(
+    entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add('is-seen');
+        stepObserver.unobserve(entry.target);
+      }
+    },
+    { threshold: 0.4 },
+  );
+  for (const step of steps) stepObserver.observe(step);
 }
-for (const [index, tab] of tabs.entries()) {
-  tab.addEventListener('click', () => selectTab(tab));
-  tab.addEventListener('keydown', event => {
-    let next;
-    if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
-    if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
-    if (event.key === 'Home') next = 0;
-    if (event.key === 'End') next = tabs.length - 1;
-    if (next === undefined) return;
-    event.preventDefault();
-    selectTab(tabs[next]);
-    tabs[next].focus();
-  });
+
+// The demo grows the page when it starts, which can be after load, and that throws off a deep link
+// such as #download. Jump again after load and again once the demo has taken its full height.
+const linked = location.hash ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+if (linked?.closest('.afterword')) {
+  const jump = () => requestAnimationFrame(() => linked.scrollIntoView({ behavior: 'instant' }));
+  addEventListener('load', jump, { once: true });
+  new MutationObserver((_, watcher) => {
+    if (!document.documentElement.classList.contains('story-enabled')) return;
+    watcher.disconnect();
+    jump();
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 }
+
 // Silent demo film autoplays when scrolled into view, pauses when out of view.
-const film = document.querySelector('.af-movie video');
+const film = document.querySelector('.af-film video');
 if (film) {
   film.muted = true; // Required for autoplay policies; the clip has no audio.
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let userPaused = false;
   let inView = false;
   const tryPlay = () => {
@@ -81,7 +88,7 @@ if (imageLinks.length) {
       event.preventDefault();
       opener = link;
       picture.src = link.href;
-      picture.alt = link.querySelector('img').alt;
+      picture.alt = link.dataset.fullAlt || link.querySelector('img').alt;
       resetZoom();
       previousOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
